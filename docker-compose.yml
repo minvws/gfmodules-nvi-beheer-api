@@ -1,0 +1,37 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        NEW_UID: ${NEW_UID:-1000}
+        NEW_GID: ${NEW_GID:-1000}
+      dockerfile: docker/Dockerfile
+    environment:
+      FASTAPI_CONFIG_PATH: /src/app.conf
+    volumes:
+      - ./:/src
+      - ./secrets:/src/secrets
+    ports:
+      - 8502:8502
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8502/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --user postgres"]
+      start_period: 30s
+      start_interval: 1s
+    ports:
+      - 5432:5432
