@@ -32,6 +32,9 @@ class HealthcareProvidersRepository(RepositoryBase):
     def update(self, id: UUID, **kwargs: object) -> HealthcareProviderEntity | None:
         try:
             target = {k: kwargs[k] for k in HealthcareProviderEntity.__table__.columns.keys() if k in kwargs}
+            if not target:
+                return None
+
             stmt = (
                 update(HealthcareProviderEntity)
                 .where(

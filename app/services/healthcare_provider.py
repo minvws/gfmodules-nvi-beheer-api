@@ -1,35 +1,31 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import HTTPException
-
 from app.db.db import Database
 from app.db.models.healthcare_provider import HealthcareProviderEntity
-from app.db.repository.healthcare_service import HealthcareProvidersRepository
+from app.db.repository.healthcare_provider import HealthcareProvidersRepository
 
 
 class HeatlhcareProviderService:
     def __init__(self, db: Database) -> None:
         self.db = db
 
-    def get_one(self, id: UUID) -> HealthcareProviderEntity:
+    def get_one(self, id: UUID) -> HealthcareProviderEntity | None:
         with self.db.get_db_session() as session:
             repository = session.get_repository(HealthcareProvidersRepository)
             provider = repository.get_one(id)
-            if provider is None or provider.deleted_at:
-                raise HTTPException(status_code=404)
 
             return provider
 
     def create_one(
         self,
         ura_number: str,
-        source_id: str,
         is_source: bool,
         is_viewer: bool,
         oin: str,
         common_name: str,
         status: str,
+        source_id: str | None = None,
     ) -> HealthcareProviderEntity:
         with self.db.get_db_session() as session:
             repo = session.get_repository(HealthcareProvidersRepository)

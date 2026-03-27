@@ -30,7 +30,11 @@ def get_by_id(
     id: UUID,
     service: Annotated[HeatlhcareProviderService, Depends(get_healthcare_provider_service)],
 ) -> Any:
-    return service.get_one(id)
+    results = service.get_one(id)
+    if results is None:
+        raise HTTPException(status_code=404)
+
+    return results
 
 
 @router.delete("/{id}")
