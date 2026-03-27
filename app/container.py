@@ -24,5 +24,9 @@ def get_database() -> Database:
     return inject.instance(Database)
 
 
+def get_healthcare_provider_service() -> HeatlhcareProviderService:
+    return inject.instance(HeatlhcareProviderService)
+
+
 def configure() -> None:
     inject.configure(container_config, once=True)
