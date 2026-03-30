@@ -14,7 +14,7 @@ class OinNumber:
             self.value = str(value)
 
         else:
-            raise ValueError("OIN is must be 20 digits")
+            raise ValueError("OIN must be 20 digits")
 
     def __str__(self) -> str:
         return self.value
