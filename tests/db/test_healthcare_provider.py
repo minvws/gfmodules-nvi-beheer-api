@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from app.db.models.healthcare_provider import HealthcareProviderEntity
 from app.db.repository.healthcare_provider import HealthcareProvidersRepository
+from app.models.oin_number import OinNumber
 from app.models.ura_number import UraNumber
 
 
@@ -117,13 +118,14 @@ def test_get_many_should_return_exact_as_per_query(
     healthcare_provider_repository: HealthcareProvidersRepository,
     healthcare_provider_entity: HealthcareProviderEntity,
     ura_number: UraNumber,
+    oin: OinNumber,
 ) -> None:
     entity_2 = HealthcareProviderEntity(
         ura_number=ura_number.value,
         source_id="some_other_source_id",
         is_source=True,
         is_viewer=True,
-        oin="some_oin",
+        oin=oin.value,
         common_name="some_common_name",
         status="active",
     )
@@ -141,7 +143,7 @@ def test_get_many_should_return_exact_as_per_query(
         healthcare_provider_repository.add_one(entity_2)
         healthcare_provider_repository.add_one(entity_3)
 
-        results = healthcare_provider_repository.get_many(ura_number=ura_number.value, oin="some_oin")
+        results = healthcare_provider_repository.get_many(ura_number=ura_number.value, oin=oin.value)
 
         assert len(results) == 2
 
