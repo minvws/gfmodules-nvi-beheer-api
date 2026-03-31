@@ -19,13 +19,13 @@ pydantic-settings = "^2.13.0"
 inject = "^5.3.0"
 sqlalchemy = "^2.0.46"
 psycopg = { extras = ["binary", "pool"], version = "^3.3.2" }
-types-requests = "^2.32.4.20260107"
+types-requests = "^2.33.0.20260327"
 opentelemetry-sdk = "^1.39.1"
 opentelemetry-exporter-otlp-proto-grpc = "^1.39.1"
 opentelemetry-instrumentation = "^0.60b1"
 opentelemetry-instrumentation-fastapi = "^0.60b1"
 opentelemetry-instrumentation-requests = "^0.60b1"
-requests = "^2.32.5"
+requests = "^2.33.1"
 statsd = "^4.0.1"
 puzi = { git = "https://github.com/minvws/puzi-python" }
 
@@ -33,7 +33,7 @@ puzi = { git = "https://github.com/minvws/puzi-python" }
 pytest = "^9.0.2"
 pytest-cov = "^7.0.0"
 pytest-mock = "^3.15.0"
-ruff = "0.15.7"
+ruff = "0.15.8"
 codespell = "^2.4.1"
 pip-audit = "^2.10.0"
 
