@@ -12,7 +12,8 @@ ARG NEW_GID=1000
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
   PYTHONUNBUFFERED=1 \
-  POETRY_VERSION=1.8.2
+  POETRY_VERSION=1.8.2 \
+  PIP_VERSION=26.0.1
 
 # Create a non-privileged user that the app will run under.
 RUN groupadd --system ${APP_GROUP} --gid=${NEW_GID} && \
@@ -42,15 +43,16 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 # Install poetry
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --upgrade pip && \
+  pip install pip==${PIP_VERSION} && \
   pip install poetry==${POETRY_VERSION}
 
-# Install Python dependencies
+# Install Python dependencies into an isolated virtualenv
 WORKDIR ${PROJECT_DIR}
 COPY ./pyproject.toml ./poetry.lock ./
 
 ENV POETRY_CACHE_DIR=/root/.cache/poetry \
-  POETRY_VIRTUALENVS_CREATE=false
+  POETRY_VIRTUALENVS_CREATE=true \
+  POETRY_VIRTUALENVS_IN_PROJECT=true
 
 RUN --mount=type=cache,target=/root/.cache/poetry \
   poetry install --no-root --no-interaction --only main
@@ -74,8 +76,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 WORKDIR ${PROJECT_DIR}
 
-# Copy Python packages
-COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local/lib/python${PYTHON_VERSION}/site-packages /usr/local/lib/python${PYTHON_VERSION}/site-packages
+# Copy only the app's dependencies from the builder's virtualenv (excludes poetry and its deps)
+COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /src/.venv/lib/python${PYTHON_VERSION}/site-packages /usr/local/lib/python${PYTHON_VERSION}/site-packages
 
 # Copy application
 COPY --chown=${APP_USER}:${APP_GROUP} . ${PROJECT_DIR}
