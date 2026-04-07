@@ -1,3 +1,4 @@
+from typing import List
 from uuid import UUID
 
 from sqlalchemy import and_, select, update
@@ -18,6 +19,11 @@ class HealthcareProvidersRepository(RepositoryBase):
         except SQLAlchemyError as e:
             self.db_session.rollback()
             raise e
+
+    def get_all(self) -> List[HealthcareProviderEntity]:
+        stmt = select(HealthcareProviderEntity).where(HealthcareProviderEntity.deleted_at.is_(None))
+        results = self.db_session.session.execute(stmt).scalars().all()
+        return list(results)
 
     def get_one(self, id: UUID) -> HealthcareProviderEntity | None:
         stmt = select(HealthcareProviderEntity).where(
