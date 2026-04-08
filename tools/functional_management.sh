@@ -28,7 +28,7 @@ function usage() {
     echo -e ""
     echo -e "Output format (for commands that return data):"
     echo -e "  --pretty-json               Pretty-print JSON output (default)"
-    echo -e "  --table                     Render output as a table"
+    echo -e "  --table                     Render output as a table (if supported tools (jq and column, or miller, or python3) are available)"
     echo -e ""
     echo -e "Options for add / update:"
     echo -e "  --ura-number  <value>       URA number (max 8 digits)"
@@ -78,8 +78,16 @@ function pretty_json() {
 
 function render_output() {
     local json="$1"
+    echo
     if [[ "$OUTPUT_FORMAT" == "table" ]]; then
-        echo "$json" | python3 -c "
+        if command -v mlr &>/dev/null; then
+            echo "$json" | mlr --ijson --opprint --barred cat
+            return
+        fi
+        if command -v jq &>/dev/null && command -v column &>/dev/null; then
+            echo "$json" | jq -r 'if type == "object" then [.] else . end | (.[0] | keys), (.[] | [.[] | tostring]) | @tsv' | column -t -s $'\t'
+        elif command -v python3 &>/dev/null; then
+            echo "$json" | python3 -c "
 import json, sys
 
 data = json.load(sys.stdin)
@@ -103,6 +111,10 @@ print(sep)
 for row in data:
     print('  '.join(str(row.get(k, '')).ljust(widths[k]) for k in keys))
 "
+        else
+            echo -e "${YELLOW}Warning: No suitable tool found for table output. \n I tried miller, jq with column and python3. Falling back to pretty JSON.${NC}\n" >&2
+            echo "$json" | pretty_json
+        fi
     else
         echo "$json" | pretty_json
     fi
