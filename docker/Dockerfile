@@ -12,7 +12,7 @@ ARG NEW_GID=1000
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
   PYTHONUNBUFFERED=1 \
-  POETRY_VERSION=1.8.2 \
+  POETRY_VERSION=2.3.3 \
   PIP_VERSION=26.0.1
 
 # Create a non-privileged user that the app will run under.
