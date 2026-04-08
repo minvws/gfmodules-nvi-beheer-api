@@ -37,6 +37,14 @@ def get_by_id(
     return results
 
 
+@router.get("", response_model=list[HealthcareProvider], response_model_exclude_none=True)
+def get_all(
+    service: Annotated[HeatlhcareProviderService, Depends(get_healthcare_provider_service)],
+) -> Any:
+    results = service.get_all()
+    return results
+
+
 @router.delete("/{id}")
 def delete_by_id(
     id: UUID,

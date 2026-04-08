@@ -77,3 +77,25 @@ def test_update_not_found(
         result = healthcare_provider_repository.update(uuid4(), name="Does not exist")
 
         assert result is None
+
+
+def test_get_all(
+    healthcare_provider_repository: HealthcareProvidersRepository,
+    healthcare_provider_entity: HealthcareProviderEntity,
+) -> None:
+    with healthcare_provider_repository.db_session:
+        healthcare_provider_repository.add_one(healthcare_provider_entity)
+
+        result = healthcare_provider_repository.get_all()
+
+        assert len(result) == 1
+        assert result[0].id == healthcare_provider_entity.id
+
+
+def test_get_all_returns_empty_list_when_no_data(
+    healthcare_provider_repository: HealthcareProvidersRepository,
+) -> None:
+    with healthcare_provider_repository.db_session:
+        result = healthcare_provider_repository.get_all()
+
+        assert result == []

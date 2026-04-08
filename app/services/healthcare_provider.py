@@ -17,6 +17,13 @@ class HeatlhcareProviderService:
 
             return provider
 
+    def get_all(self) -> list[HealthcareProviderEntity]:
+        with self.db.get_db_session() as session:
+            repository = session.get_repository(HealthcareProvidersRepository)
+            providers = repository.get_all()
+
+            return providers
+
     def create_one(
         self,
         ura_number: str,

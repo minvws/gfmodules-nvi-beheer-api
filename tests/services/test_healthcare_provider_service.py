@@ -145,3 +145,58 @@ def test_update_one_should_return_none_when_nothing_to_update(
 
     expected = healthcare_provider_service.update_one(data.id)
     assert expected is None
+
+
+def test_get_all_should_succeed(
+    healthcare_provider_service: HeatlhcareProviderService,
+    healthcare_provider_entity: HealthcareProviderEntity,
+) -> None:
+    data = healthcare_provider_service.create_one(
+        ura_number=healthcare_provider_entity.ura_number,
+        source_id=healthcare_provider_entity.source_id,
+        is_source=healthcare_provider_entity.is_source,
+        is_viewer=healthcare_provider_entity.is_viewer,
+        oin=healthcare_provider_entity.oin,
+        common_name=healthcare_provider_entity.common_name,
+        status=healthcare_provider_entity.status,
+    )
+    data2 = healthcare_provider_service.create_one(
+        ura_number="00000456",
+        source_id=healthcare_provider_entity.source_id,
+        is_source=healthcare_provider_entity.is_source,
+        is_viewer=healthcare_provider_entity.is_viewer,
+        oin=healthcare_provider_entity.oin,
+        common_name=healthcare_provider_entity.common_name,
+        status=healthcare_provider_entity.status,
+    )
+
+    expected = healthcare_provider_service.get_all()
+    assert len(expected) == 2
+    assert expected[0].id == data.id
+    assert expected[1].id == data2.id
+
+
+def test_get_all_should_return_empty_list_when_no_data(
+    healthcare_provider_service: HeatlhcareProviderService,
+) -> None:
+    expected = healthcare_provider_service.get_all()
+    assert expected == []
+
+
+def test_get_all_should_return_only_non_deleted_data(
+    healthcare_provider_service: HeatlhcareProviderService,
+    healthcare_provider_entity: HealthcareProviderEntity,
+) -> None:
+    data = healthcare_provider_service.create_one(
+        ura_number=healthcare_provider_entity.ura_number,
+        source_id=healthcare_provider_entity.source_id,
+        is_source=healthcare_provider_entity.is_source,
+        is_viewer=healthcare_provider_entity.is_viewer,
+        oin=healthcare_provider_entity.oin,
+        common_name=healthcare_provider_entity.common_name,
+        status=healthcare_provider_entity.status,
+    )
+    healthcare_provider_service.delete_one(data.id)
+
+    expected = healthcare_provider_service.get_all()
+    assert expected == []
