@@ -18,6 +18,7 @@ function usage() {
     echo -e "Usage: ./functional_management.sh <command> [options]\n"
     echo -e "Commands:"
     echo -e "  help                        Show this help message"
+    echo -e "  list                        List all Zorgaanbieders"
     echo -e "  add    [options]            Add a new Zorgaanbieder"
     echo -e "  get    <id>                 Get a Zorgaanbieder by UUID"
     echo -e "  update <id> [options]       Update a Zorgaanbieder"
@@ -141,6 +142,18 @@ function build_payload() {
 EOF
 }
 
+function cmd_list() {
+    echo -e "${GREEN}Getting all Zorgaanbieders...${NC}"
+    local raw
+    raw=$(http_request GET "$PROVIDERS_ENDPOINT")
+    split_response "$raw"
+
+    case "$HTTP_CODE" in
+        200) echo "$BODY" | pretty_json ;;
+        *)   echo -e "${RED}Failed (HTTP $HTTP_CODE):${NC}"; echo "$BODY"; exit 1 ;;
+    esac
+}
+
 function cmd_add() {
     parse_provider_args "$@"
 
@@ -235,6 +248,7 @@ function main() {
 
     case "$cmd" in
         help | --help | -h) usage ;;
+        list)   cmd_list   "$@" ;;
         add)    cmd_add    "$@" ;;
         get)    cmd_get    "$@" ;;
         update) cmd_update "$@" ;;
