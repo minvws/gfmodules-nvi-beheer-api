@@ -147,7 +147,7 @@ def test_update_one_should_return_none_when_nothing_to_update(
     assert expected is None
 
 
-def test_get_all_should_succeed(
+def test_get_should_succeed_and_return_all_records(
     healthcare_provider_service: HeatlhcareProviderService,
     healthcare_provider_entity: HealthcareProviderEntity,
 ) -> None:
@@ -170,20 +170,20 @@ def test_get_all_should_succeed(
         status=healthcare_provider_entity.status,
     )
 
-    expected = healthcare_provider_service.get_all()
+    expected = healthcare_provider_service.get()
     assert len(expected) == 2
     assert expected[0].id == data.id
     assert expected[1].id == data2.id
 
 
-def test_get_all_should_return_empty_list_when_no_data(
+def test_get_should_return_empty_list_when_no_data(
     healthcare_provider_service: HeatlhcareProviderService,
 ) -> None:
-    expected = healthcare_provider_service.get_all()
+    expected = healthcare_provider_service.get()
     assert expected == []
 
 
-def test_get_all_should_return_only_non_deleted_data(
+def test_get_should_return_only_non_deleted_data(
     healthcare_provider_service: HeatlhcareProviderService,
     healthcare_provider_entity: HealthcareProviderEntity,
 ) -> None:
@@ -198,5 +198,39 @@ def test_get_all_should_return_only_non_deleted_data(
     )
     healthcare_provider_service.delete_one(data.id)
 
-    expected = healthcare_provider_service.get_all()
+    expected = healthcare_provider_service.get()
     assert expected == []
+
+
+def test_get_should_return_exact_as_per_args(
+    healthcare_provider_service: HeatlhcareProviderService,
+    healthcare_provider_entity: HealthcareProviderEntity,
+) -> None:
+    data = healthcare_provider_service.create_one(
+        ura_number=healthcare_provider_entity.ura_number,
+        source_id=healthcare_provider_entity.source_id,
+        is_source=healthcare_provider_entity.is_source,
+        is_viewer=healthcare_provider_entity.is_viewer,
+        oin=healthcare_provider_entity.oin,
+        common_name=healthcare_provider_entity.common_name,
+        status=healthcare_provider_entity.status,
+    )
+    healthcare_provider_service.create_one(
+        ura_number="00000456",
+        source_id="some-other-source-id",
+        is_source=True,
+        is_viewer=True,
+        oin="some-other-oin",
+        common_name="some-other-common-name",
+        status="active",
+    )
+
+    results = healthcare_provider_service.get(oin=data.oin, source_id=data.source_id)
+
+    assert len(results) == 1
+    assert results[0].id == data.id
+    for key in data.__table__.columns.keys():
+        expected_attr = getattr(results[0], key)
+        actual_attr = getattr(data, key)
+
+        assert expected_attr == actual_attr

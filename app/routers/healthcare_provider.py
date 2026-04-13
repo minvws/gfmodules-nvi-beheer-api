@@ -8,9 +8,9 @@ from app.container import get_healthcare_provider_service
 from app.models.healthcare_provider import (
     HealthcareProvider,
     HealthcareProviderCreate,
-    HealthcareProvidersQueryParams,
     HealthcareProviderUpdate,
 )
+from app.models.params import HealthcareProvidersQueryParams
 from app.services.healthcare_provider import HeatlhcareProviderService
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ def get(
     params: Annotated[HealthcareProvidersQueryParams, Query()],
     service: Annotated[HeatlhcareProviderService, Depends(get_healthcare_provider_service)],
 ) -> Any:
+    # TODO: update this is functional_management
     return service.get(**params.model_dump())
 
 
