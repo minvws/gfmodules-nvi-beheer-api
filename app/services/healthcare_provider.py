@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List
 from uuid import UUID
 
 from app.db.db import Database
@@ -17,12 +18,16 @@ class HeatlhcareProviderService:
 
             return provider
 
-    def get_all(self) -> list[HealthcareProviderEntity]:
+    def get(
+        self,
+        oin: str | None = None,
+        source_id: str | None = None,
+        ura_number: str | None = None,
+    ) -> List[HealthcareProviderEntity]:
         with self.db.get_db_session() as session:
             repository = session.get_repository(HealthcareProvidersRepository)
-            providers = repository.get_all()
-
-            return providers
+            healthcare_provider = repository.get_many(oin, source_id, ura_number)
+            return list(healthcare_provider)
 
     def create_one(
         self,

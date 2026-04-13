@@ -1,13 +1,14 @@
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, List
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 
 from app.container import get_healthcare_provider_service
 from app.models.healthcare_provider import (
     HealthcareProvider,
     HealthcareProviderCreate,
+    HealthcareProvidersQueryParams,
     HealthcareProviderUpdate,
 )
 from app.services.healthcare_provider import HeatlhcareProviderService
@@ -25,6 +26,14 @@ def add_one_provider(
     return new_provider
 
 
+@router.get("", response_model=List[HealthcareProvider], response_model_exclude_none=True)
+def get(
+    params: Annotated[HealthcareProvidersQueryParams, Query()],
+    service: Annotated[HeatlhcareProviderService, Depends(get_healthcare_provider_service)],
+) -> Any:
+    return service.get(**params.model_dump())
+
+
 @router.get("/{id}", response_model=HealthcareProvider, response_model_exclude_none=True)
 def get_by_id(
     id: UUID,
@@ -34,14 +43,6 @@ def get_by_id(
     if results is None:
         raise HTTPException(status_code=404)
 
-    return results
-
-
-@router.get("", response_model=list[HealthcareProvider], response_model_exclude_none=True)
-def get_all(
-    service: Annotated[HeatlhcareProviderService, Depends(get_healthcare_provider_service)],
-) -> Any:
-    results = service.get_all()
     return results
 
 
