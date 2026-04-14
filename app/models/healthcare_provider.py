@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.models.oin_number import OinNumber
 from app.models.ura_number import UraNumber
 
 
@@ -33,6 +34,16 @@ class HealthcareProviderCreate(BaseModel):
             result = UraNumber(value)
         except ValueError as e:
             raise ValueError(f"Invalid UraNumber: {e}")
+
+        return result.value
+
+    @field_validator("oin")
+    @classmethod
+    def validate_oin(cls, value: Any) -> str:
+        try:
+            result = OinNumber(value)
+        except ValueError as e:
+            raise ValueError(f"Invalid OIN: {e}")
 
         return result.value
 
