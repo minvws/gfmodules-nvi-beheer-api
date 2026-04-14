@@ -39,6 +39,11 @@ function usage() {
     echo -e "  --common-name <value>       Common name"
     echo -e "  --status      <value>       One of: active | soft-freeze | suspended | hard-blocked"
     echo -e ""
+    echo -e "Filter options for list:"
+    echo -e "  --oin <value>                Filter providers by OIN (Max 20 characters)" 
+    echo -e "  --source-id <value>          Filter providers by Source ID" 
+    echo -e "  --ura-number <value>         Filter providers by URA number (Max 8 digits)" 
+    echo -e ""
     echo -e "App URL (current: ${CYAN}${APP_URL}${NC}):"
     echo -e "  Set via env var : ${DIM}export FUNCTIONAL_MANAGEMENT_APP_URL=<url>${NC}"
     echo -e "  Or run          : ${DIM}eval \$(./functional_management.sh set-url <url>)${NC}"
@@ -150,6 +155,18 @@ function health_check() {
     fi
 }
 
+function parse_list_args() {
+    OIN_FILTER="" SOURCE_ID_FILTER="" URA_NUMBER_FILTER=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --oin)         OIN_FILTER="$2";         shift 2 ;;
+            --source-id)   SOURCE_ID_FILTER="$2";   shift 2 ;;
+            --ura-number)  URA_NUMBER_FILTER="$2";  shift 2 ;;
+            *) die "Unknown option: $1" ;;
+        esac
+    done
+}
+
 function parse_provider_args() {
     URA_NUMBER="" SOURCE_ID="" IS_SOURCE="" IS_VIEWER="" OIN="" COMMON_NAME="" STATUS=""
     MISSING_ARGS=()
@@ -191,10 +208,42 @@ function build_payload() {
 EOF
 }
 
+function urlencode() {
+    local string="$1"
+    local encoded=""
+    local pos c o
+
+    for (( pos=0 ; pos<${#string} ; pos++ )); do
+        c=${string:$pos:1}
+        case "$c" in
+            [a-zA-Z0-9.~_-]) o="$c" ;;
+            *) printf -v o '%%%02X' "'$c" ;;
+        esac
+        encoded+="$o"
+    done
+    echo "$encoded"
+}
+
+function build_query_params() {
+    local params=""
+    [[ -n "$OIN_FILTER" ]] && params+="oin=$(urlencode "$OIN_FILTER")&"
+    [[ -n "$SOURCE_ID_FILTER" ]] && params+="source_id=$(urlencode "$SOURCE_ID_FILTER")&"
+    [[ -n "$URA_NUMBER_FILTER" ]] && params+="ura_number=$(urlencode "$URA_NUMBER_FILTER")&"
+    echo "${params%&}"
+}
+
 function cmd_list() {
+    parse_list_args "$@"
+
     echo -e "${GREEN}Getting all Zorgaanbieders...${NC}"
     local raw
-    raw=$(http_request GET "$PROVIDERS_ENDPOINT")
+    local query_params
+    query_params=$(build_query_params)
+    if [[ -n "$query_params" ]]; then
+        raw=$(http_request GET "$PROVIDERS_ENDPOINT?$query_params")
+    else
+        raw=$(http_request GET "$PROVIDERS_ENDPOINT")
+    fi
     split_response "$raw"
 
     case "$HTTP_CODE" in
