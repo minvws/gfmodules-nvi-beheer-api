@@ -1,4 +1,4 @@
-from typing import List
+from typing import Sequence
 from uuid import UUID
 
 from sqlalchemy import and_, select, update
@@ -20,11 +20,6 @@ class HealthcareProvidersRepository(RepositoryBase):
             self.db_session.rollback()
             raise e
 
-    def get_all(self) -> List[HealthcareProviderEntity]:
-        stmt = select(HealthcareProviderEntity).where(HealthcareProviderEntity.deleted_at.is_(None))
-        results = self.db_session.session.execute(stmt).scalars().all()
-        return list(results)
-
     def get_one(self, id: UUID) -> HealthcareProviderEntity | None:
         stmt = select(HealthcareProviderEntity).where(
             and_(
@@ -33,6 +28,31 @@ class HealthcareProvidersRepository(RepositoryBase):
             )
         )
         results = self.db_session.session.execute(stmt).scalar()
+        return results
+
+    def get_many(
+        self,
+        oin: str | None = None,
+        source_id: str | None = None,
+        ura_number: str | None = None,
+    ) -> Sequence[HealthcareProviderEntity]:
+        conditions = []
+
+        if oin:
+            conditions.append((HealthcareProviderEntity.oin == oin))
+
+        if source_id:
+            conditions.append((HealthcareProviderEntity.source_id == source_id))
+
+        if ura_number is not None:
+            conditions.append((HealthcareProviderEntity.ura_number == ura_number))
+
+        stmt = (
+            select(HealthcareProviderEntity)
+            .where(and_(*conditions))
+            .where(HealthcareProviderEntity.deleted_at.is_(None))
+        )
+        results = self.db_session.session.execute(stmt).scalars().all()
         return results
 
     def update(self, id: UUID, **kwargs: object) -> HealthcareProviderEntity | None:
