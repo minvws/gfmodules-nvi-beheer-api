@@ -137,7 +137,7 @@ function http_request() {
 function split_response() {
     local raw="$1"
     HTTP_CODE=$(echo "$raw" | tail -1)
-    BODY=$(echo "$raw" | head -n -1)
+    BODY=$(echo "$raw" | sed '$d')
 }
 
 function health_check() {
