@@ -15,6 +15,22 @@ APP_URL="${FUNCTIONAL_MANAGEMENT_APP_URL:-http://localhost:8502}"
 PROVIDERS_ENDPOINT="$APP_URL/healthcare-providers"
 OUTPUT_FORMAT="json"
 
+declare -A LIST_OPTION_MAP=(
+    ["--oin"]="OIN_FILTER"
+    ["--source-id"]="SOURCE_ID_FILTER"
+    ["--ura-number"]="URA_NUMBER_FILTER"
+)
+
+declare -A PROVIDER_OPTION_MAP=(
+    ["--ura-number"]="URA_NUMBER"
+    ["--source-id"]="SOURCE_ID"
+    ["--is-source"]="IS_SOURCE"
+    ["--is-viewer"]="IS_VIEWER"
+    ["--oin"]="OIN"
+    ["--common-name"]="COMMON_NAME"
+    ["--status"]="STATUS"
+)
+
 function usage() {
     echo -e "Usage: ./functional_management.sh <command> [options]\n"
     echo -e "Commands:"
@@ -31,22 +47,104 @@ function usage() {
     echo -e "  --table                     Render output as a table (if supported tools (jq and column, or miller, or python3) are available)"
     echo -e ""
     echo -e "Options for add / update:"
-    echo -e "  --ura-number  <value>       URA number (max 8 digits)"
-    echo -e "  --source-id   <value>       Source ID"
-    echo -e "  --is-source   <true|false>  Whether this provider is a source"
-    echo -e "  --is-viewer   <true|false>  Whether this provider is a viewer"
-    echo -e "  --oin         <value>       OIN number"
-    echo -e "  --common-name <value>       Common name"
-    echo -e "  --status      <value>       One of: active | soft-freeze | suspended | hard-blocked"
+    echo -e "  --ura-number=<value>   URA number (max 8 digits)"
+    echo -e "  --source-id=<value>    Source ID"
+    echo -e "  --is-source=<true|false>  Whether this provider is a source"
+    echo -e "  --is-viewer=<true|false>  Whether this provider is a viewer"
+    echo -e "  --oin=<value>          OIN number"
+    echo -e "  --common-name=<value>  Common name"
+    echo -e "  --status=<value>       One of: active | soft-freeze | suspended | hard-blocked"
     echo -e ""
     echo -e "Filter options for list:"
-    echo -e "  --oin <value>                Filter providers by OIN (Max 20 characters)" 
-    echo -e "  --source-id <value>          Filter providers by Source ID" 
-    echo -e "  --ura-number <value>         Filter providers by URA number (Max 8 digits)" 
+    echo -e "  --oin=<value>         Filter providers by OIN (Max 20 characters)"
+    echo -e "  --source-id=<value>   Filter providers by Source ID"
+    echo -e "  --ura-number=<value>  Filter providers by URA number (Max 8 digits)"
     echo -e ""
     echo -e "App URL (current: ${CYAN}${APP_URL}${NC}):"
     echo -e "  Set via env var : ${DIM}export FUNCTIONAL_MANAGEMENT_APP_URL=<url>${NC}"
     echo -e "  Or run          : ${DIM}eval \$(./functional_management.sh set-url <url>)${NC}"
+}
+
+function usage_list() {
+    echo -e "Usage: ./functional_management.sh list [filter options] [--pretty-json|--table]\n"
+    echo -e "List Zorgaanbieders."
+    echo -e ""
+    echo -e "Filter options:"
+    echo -e "  --oin=<value>         Filter providers by OIN (max 20 characters)"
+    echo -e "  --source-id=<value>   Filter providers by Source ID"
+    echo -e "  --ura-number=<value>  Filter providers by URA number (max 8 digits)"
+}
+
+function usage_add() {
+    echo -e "Usage: ./functional_management.sh add [options] [--pretty-json|--table]\n"
+    echo -e "Add a new Zorgaanbieder."
+    echo -e ""
+    echo -e "Required options:"
+    echo -e "  --ura-number=<value>   URA number (max 8 digits)"
+    echo -e "  --source-id=<value>    Source ID"
+    echo -e "  --is-source=<true|false>"
+    echo -e "  --is-viewer=<true|false>"
+    echo -e "  --oin=<value>          OIN number"
+    echo -e "  --common-name=<value>  Common name"
+    echo -e "  --status=<value>       One of: active | soft-freeze | suspended | hard-blocked"
+}
+
+function usage_get() {
+    echo -e "Usage: ./functional_management.sh get <id> [--pretty-json|--table]\n"
+    echo -e "Get a Zorgaanbieder by UUID."
+}
+
+function usage_update() {
+    echo -e "Usage: ./functional_management.sh update <id> [options] [--pretty-json|--table]\n"
+    echo -e "Update a Zorgaanbieder."
+    echo -e ""
+    echo -e "Required options:"
+    echo -e "  --ura-number=<value>   URA number (max 8 digits)"
+    echo -e "  --source-id=<value>    Source ID"
+    echo -e "  --is-source=<true|false>"
+    echo -e "  --is-viewer=<true|false>"
+    echo -e "  --oin=<value>          OIN number"
+    echo -e "  --common-name=<value>  Common name"
+    echo -e "  --status=<value>       One of: active | soft-freeze | suspended | hard-blocked"
+}
+
+function usage_remove() {
+    echo -e "Usage: ./functional_management.sh remove <id> [-y|--yes]\n"
+    echo -e "Remove a Zorgaanbieder by UUID."
+    echo -e ""
+    echo -e "Options:"
+    echo -e "  -y, --yes  Skip confirmation prompt"
+}
+
+function usage_set_url() {
+    echo -e "Usage: ./functional_management.sh set-url <url>\n"
+    echo -e "Print the export command to set the app URL."
+}
+
+function is_help_arg() {
+    local arg="${1:-}"
+    [[ "$arg" == "--help" || "$arg" == "-h" ]]
+}
+
+function usage_for_command() {
+    local cmd="${1:-}"
+    case "$cmd" in
+        list) usage_list ;;
+        add) usage_add ;;
+        get) usage_get ;;
+        update) usage_update ;;
+        remove) usage_remove ;;
+        set-url) usage_set_url ;;
+        *) usage ;;
+    esac
+}
+
+function should_skip_health_check() {
+    local cmd="${1:-}"
+    shift || true
+
+    [[ -z "$cmd" || "$cmd" == "help" || "$cmd" == "--help" || "$cmd" == "-h" || "$cmd" == "set-url" ]] && return 0
+    has_help_arg "$@"
 }
 
 function die() {
@@ -62,6 +160,54 @@ function require_arg() {
     if [[ -z "$value" ]]; then
         MISSING_ARGS+=("--${flag}")
     fi
+}
+
+function has_help_arg() {
+    local arg
+    for arg in "$@"; do
+        if is_help_arg "$arg"; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+function parse_long_options() {
+    local map_name="$1"
+    shift
+
+    local -n option_map="$map_name"
+    local arg flag value target_var
+
+    while [[ $# -gt 0 ]]; do
+        arg="$1"
+
+        case "$arg" in
+            --help | -h)
+                return 10
+                ;;
+            --*=*)
+                flag="${arg%%=*}"
+                value="${arg#*=}"
+                target_var="${option_map[$flag]:-}"
+
+                [[ -n "$target_var" ]] || die "Unknown option: $arg"
+                printf -v "$target_var" '%s' "$value"
+                ;;
+            --*)
+                if [[ -n "${option_map[$arg]:-}" ]]; then
+                    die "Use ${arg}=<value> instead of ${arg} <value>"
+                fi
+                die "Unknown option: $arg"
+                ;;
+            *)
+                die "Unknown option: $arg"
+                ;;
+        esac
+
+        shift
+    done
 }
 
 function assert_no_missing_args() {
@@ -157,32 +303,14 @@ function health_check() {
 
 function parse_list_args() {
     OIN_FILTER="" SOURCE_ID_FILTER="" URA_NUMBER_FILTER=""
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --oin)         OIN_FILTER="$2";         shift 2 ;;
-            --source-id)   SOURCE_ID_FILTER="$2";   shift 2 ;;
-            --ura-number)  URA_NUMBER_FILTER="$2";  shift 2 ;;
-            *) die "Unknown option: $1" ;;
-        esac
-    done
+    parse_long_options LIST_OPTION_MAP "$@"
 }
 
 function parse_provider_args() {
     URA_NUMBER="" SOURCE_ID="" IS_SOURCE="" IS_VIEWER="" OIN="" COMMON_NAME="" STATUS=""
     MISSING_ARGS=()
 
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --ura-number)  URA_NUMBER="$2";  shift 2 ;;
-            --source-id)   SOURCE_ID="$2";   shift 2 ;;
-            --is-source)   IS_SOURCE="$2";   shift 2 ;;
-            --is-viewer)   IS_VIEWER="$2";   shift 2 ;;
-            --oin)         OIN="$2";         shift 2 ;;
-            --common-name) COMMON_NAME="$2"; shift 2 ;;
-            --status)      STATUS="$2";      shift 2 ;;
-            *) die "Unknown option: $1" ;;
-        esac
-    done
+    parse_long_options PROVIDER_OPTION_MAP "$@"
 
     require_arg "ura-number"  "$URA_NUMBER"
     require_arg "source-id"   "$SOURCE_ID"
@@ -233,6 +361,11 @@ function build_query_params() {
 }
 
 function cmd_list() {
+    if has_help_arg "$@"; then
+        usage_list
+        return
+    fi
+
     parse_list_args "$@"
 
     echo -e "${GREEN}Getting all Zorgaanbieders...${NC}"
@@ -253,6 +386,11 @@ function cmd_list() {
 }
 
 function cmd_add() {
+    if has_help_arg "$@"; then
+        usage_add
+        return
+    fi
+
     parse_provider_args "$@"
 
     echo -e "${GREEN}Adding a new Zorgaanbieder...${NC}"
@@ -272,7 +410,11 @@ function cmd_add() {
 
 function cmd_get() {
     local id="${1:-}"
-    if [[ -z "$id" ]]; then die "Usage: $0 get <id>"; fi
+    if is_help_arg "$id" || [[ -z "$id" ]]; then
+        usage_get
+        [[ -n "$id" ]] && return
+        exit 1
+    fi
 
     echo -e "${GREEN}Getting Zorgaanbieder ${id}...${NC}"
     local raw
@@ -288,8 +430,17 @@ function cmd_get() {
 
 function cmd_update() {
     local id="${1:-}"
-    if [[ -z "$id" ]]; then die "Usage: $0 update <id> [options]"; fi
+    if is_help_arg "$id" || [[ -z "$id" ]]; then
+        usage_update
+        [[ -n "$id" ]] && return
+        exit 1
+    fi
     shift
+
+    if has_help_arg "$@"; then
+        usage_update
+        return
+    fi
 
     parse_provider_args "$@"
 
@@ -307,7 +458,11 @@ function cmd_update() {
 
 function cmd_remove() {
     local id="${1:-}"
-    if [[ -z "$id" ]]; then die "Usage: $0 remove <id> [-y]"; fi
+    if is_help_arg "$id" || [[ -z "$id" ]]; then
+        usage_remove
+        [[ -n "$id" ]] && return
+        exit 1
+    fi
 
     local skip_confirm=false
     if [[ "${2:-}" == "-y" || "${2:-}" == "--yes" ]]; then
@@ -332,7 +487,11 @@ function cmd_remove() {
 }
 function cmd_set_url() {
     local url="${1:-}"
-    if [[ -z "$url" ]]; then die "Usage: $0 set-url <url>"; fi
+    if is_help_arg "$url" || [[ -z "$url" ]]; then
+        usage_set_url
+        [[ -n "$url" ]] && return
+        exit 1
+    fi
     echo "export FUNCTIONAL_MANAGEMENT_APP_URL=$url"
 }
 
@@ -355,7 +514,14 @@ function main() {
     set -- "${filtered_args[@]+"${filtered_args[@]}"}"
 
     case "$cmd" in
-        help | --help | -h) usage ;;
+        help)
+            if [[ $# -gt 0 ]]; then
+                usage_for_command "$1"
+            else
+                usage
+            fi
+            ;;
+        --help | -h) usage ;;
         list)   cmd_list   "$@" ;;
         add)    cmd_add    "$@" ;;
         get)    cmd_get    "$@" ;;
@@ -382,7 +548,7 @@ if [[ -z "$cmd" || "$cmd" == "help" || "$cmd" == "--help" || "$cmd" == "-h" ]]; 
     echo -e "  ${BOLD}Zorgaanbieder Management CLI${NC}  ${DIM}│  ${APP_URL}${NC}"
     echo -e ""
 fi
-if [[ "$cmd" != "set-url" && "$cmd" != "help" && "$cmd" != "--help" && "$cmd" != "-h" && -n "$cmd" ]]; then
+if ! should_skip_health_check "$cmd" "${@:2}"; then
     health_check
     echo -e ""
 fi
