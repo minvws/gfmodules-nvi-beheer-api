@@ -5,13 +5,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.application import setup_fastapi
-from app.config import ConfigDatabase
+from app.config import ConfigDatabase, set_config
 from app.db.db import Database
 from app.db.models.healthcare_provider import HealthcareProviderEntity
 from app.db.repository.healthcare_provider import HealthcareProvidersRepository
 from app.models.oin_number import OinNumber
 from app.models.ura_number import UraNumber
 from app.services.healthcare_provider import HeatlhcareProviderService
+from tests.test_config import get_test_config
 
 
 @pytest.fixture()
@@ -22,9 +23,13 @@ def database() -> Generator[Database, Any, None]:
     yield db
     db.close()
 
+@pytest.fixture()
+def load_config() -> None:
+    test_config = get_test_config()
+    set_config(test_config)
 
 @pytest.fixture()
-def client(database: Database) -> Generator[TestClient, Any, None]:
+def client(load_config: None,database: Database) -> Generator[TestClient, Any, None]:
     inject.clear()
 
     def test_container_config(binder: inject.Binder) -> None:
