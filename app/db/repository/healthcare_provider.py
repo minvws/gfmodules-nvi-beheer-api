@@ -1,7 +1,7 @@
 from typing import List, Sequence
 from uuid import UUID
 
-from sqlalchemy import and_, select, update
+from sqlalchemy import BinaryExpression, ColumnElement, and_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.decorator import repository
@@ -37,16 +37,16 @@ class HealthcareProvidersRepository(RepositoryBase):
         ura_number: str | None = None,
         status: List[str] | None = None,
     ) -> Sequence[HealthcareProviderEntity]:
-        conditions = [(HealthcareProviderEntity.deleted_at.is_(None))]
+        conditions: list[ColumnElement[bool]] = [HealthcareProviderEntity.deleted_at.is_(None)]
 
         if oin:
-            conditions.append((HealthcareProviderEntity.oin.is_(oin)))
+            conditions.append((HealthcareProviderEntity.oin == oin))
 
         if source_id:
-            conditions.append((HealthcareProviderEntity.source_id.is_(source_id)))
+            conditions.append((HealthcareProviderEntity.source_id == source_id))
 
         if ura_number is not None:
-            conditions.append((HealthcareProviderEntity.ura_number.is_(ura_number)))
+            conditions.append((HealthcareProviderEntity.ura_number == ura_number))
 
         if status is not None:
             conditions.append(HealthcareProviderEntity.status.in_(status))
