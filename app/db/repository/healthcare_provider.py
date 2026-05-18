@@ -40,13 +40,13 @@ class HealthcareProvidersRepository(RepositoryBase):
         conditions = [(HealthcareProviderEntity.deleted_at.is_(None))]
 
         if oin:
-            conditions.append((HealthcareProviderEntity.oin == oin))
+            conditions.append((HealthcareProviderEntity.oin.is_(oin)))
 
         if source_id:
-            conditions.append((HealthcareProviderEntity.source_id == source_id))
+            conditions.append((HealthcareProviderEntity.source_id.is_(source_id)))
 
         if ura_number is not None:
-            conditions.append((HealthcareProviderEntity.ura_number == ura_number))
+            conditions.append((HealthcareProviderEntity.ura_number.is_(ura_number)))
 
         if status is not None:
             conditions.append(HealthcareProviderEntity.status.in_(status))

@@ -1,3 +1,4 @@
+from typing import Any, Dict
 from uuid import uuid4
 
 import pytest
@@ -7,7 +8,7 @@ from app.models.healthcare_provider import Status
 
 
 @pytest.fixture()
-def test_provider_data() -> dict:
+def test_provider_data() -> Dict[str, Any]:
     return {
         "ura_number": "00000123",
         "source_id": "source_1",
@@ -19,7 +20,7 @@ def test_provider_data() -> dict:
     }
 
 
-def test_post_create_provider_success(client: TestClient, test_provider_data: dict) -> None:
+def test_post_create_provider_success(client: TestClient, test_provider_data: Dict[str, Any]) -> None:
     response = client.post("/healthcare-providers", json=test_provider_data)
 
     assert response.status_code == 200
@@ -37,7 +38,7 @@ def test_get_list_providers_empty(client: TestClient) -> None:
     assert response.json() == []
 
 
-def test_get_list_providers_with_data(client: TestClient, test_provider_data: dict) -> None:
+def test_get_list_providers_with_data(client: TestClient, test_provider_data: Dict[str, Any]) -> None:
     client.post("/healthcare-providers", json=test_provider_data)
     response = client.get("/healthcare-providers")
 
@@ -62,7 +63,7 @@ def test_get_list_providers_with_data(client: TestClient, test_provider_data: di
     ],
 )
 def test_get_list_providers_with_query_params(
-    client: TestClient, test_provider_data: dict, query_params: dict, expected_count: int
+    client: TestClient, test_provider_data: Dict[str, Any], query_params: Dict[str, Any], expected_count: int
 ) -> None:
     client.post("/healthcare-providers", json=test_provider_data)
     response = client.get("/healthcare-providers", params=query_params)
@@ -71,7 +72,7 @@ def test_get_list_providers_with_query_params(
     assert len(data) == expected_count
 
 
-def test_get_provider_by_id_success(client: TestClient, test_provider_data: dict) -> None:
+def test_get_provider_by_id_success(client: TestClient, test_provider_data: Dict[str, Any]) -> None:
     create_response = client.post("/healthcare-providers", json=test_provider_data)
     provider_id = create_response.json()["id"]
 
@@ -89,7 +90,7 @@ def test_get_provider_by_id_not_found(client: TestClient) -> None:
     assert response.status_code == 404
 
 
-def test_put_update_provider_success(client: TestClient, test_provider_data: dict) -> None:
+def test_put_update_provider_success(client: TestClient, test_provider_data: Dict[str, Any]) -> None:
     create_response = client.post("/healthcare-providers", json=test_provider_data)
     provider_id = create_response.json()["id"]
 
@@ -102,14 +103,14 @@ def test_put_update_provider_success(client: TestClient, test_provider_data: dic
     assert data["common_name"] == "Updated Provider"
 
 
-def test_put_update_provider_not_found(client: TestClient, test_provider_data: dict) -> None:
+def test_put_update_provider_not_found(client: TestClient, test_provider_data: Dict[str, Any]) -> None:
     update_data = {**test_provider_data, "common_name": "Updated Provider"}
     response = client.put(f"/healthcare-providers/{uuid4()}", json=update_data)
 
     assert response.status_code == 404
 
 
-def test_delete_provider_success(client: TestClient, test_provider_data: dict) -> None:
+def test_delete_provider_success(client: TestClient, test_provider_data: Dict[str, Any]) -> None:
     create_response = client.post("/healthcare-providers", json=test_provider_data)
     provider_id = create_response.json()["id"]
 
