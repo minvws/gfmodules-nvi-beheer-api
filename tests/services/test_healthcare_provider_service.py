@@ -1,6 +1,7 @@
 from uuid import UUID, uuid4
 
 from app.db.models.healthcare_provider import HealthcareProviderEntity
+from app.models.healthcare_provider import Status
 from app.services.healthcare_provider import HeatlhcareProviderService
 
 
@@ -15,7 +16,7 @@ def test_create_one_should_succeed(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
 
     for key in healthcare_provider_entity.__table__.columns.keys():
@@ -40,7 +41,7 @@ def test_get_one_should_succeed(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
 
     actual = healthcare_provider_service.get_one(expected.id)
@@ -63,7 +64,7 @@ def test_get_one_should_return_none_when_does_not_exist(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
 
     actual = healthcare_provider_service.get_one(uuid4())
@@ -82,7 +83,7 @@ def test_delete_one_should_succeed(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
 
     healthcare_provider_service.delete_one(data.id)
@@ -102,7 +103,7 @@ def test_update_one_should_succeed(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
 
     expected = healthcare_provider_service.update_one(data.id, common_name="some-other-name")
@@ -122,7 +123,7 @@ def test_update_one_should_ignore_unkown_attrs(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
 
     expected = healthcare_provider_service.update_one(data.id, some_attr="fake data")
@@ -140,7 +141,7 @@ def test_update_one_should_return_none_when_nothing_to_update(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
 
     expected = healthcare_provider_service.update_one(data.id)
@@ -158,7 +159,7 @@ def test_get_should_succeed_and_return_all_records(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
     data2 = healthcare_provider_service.create_one(
         ura_number="00000456",
@@ -167,7 +168,7 @@ def test_get_should_succeed_and_return_all_records(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
 
     expected = healthcare_provider_service.get()
@@ -194,7 +195,7 @@ def test_get_should_return_only_non_deleted_data(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
     healthcare_provider_service.delete_one(data.id)
 
@@ -213,7 +214,7 @@ def test_get_should_return_exact_as_per_args(
         is_viewer=healthcare_provider_entity.is_viewer,
         oin=healthcare_provider_entity.oin,
         common_name=healthcare_provider_entity.common_name,
-        status=healthcare_provider_entity.status,
+        status=Status(healthcare_provider_entity.status),
     )
     healthcare_provider_service.create_one(
         ura_number="00000456",
@@ -222,7 +223,7 @@ def test_get_should_return_exact_as_per_args(
         is_viewer=True,
         oin="some-other-oin",
         common_name="some-other-common-name",
-        status="active",
+        status=Status("active"),
     )
 
     results = healthcare_provider_service.get(oin=data.oin, source_id=data.source_id)

@@ -51,7 +51,7 @@ class HeatlhcareProviderService:
                 is_source=is_source,
                 oin=oin,
                 common_name=common_name,
-                status=status.value if isinstance(status, Status) else status,
+                status=status.value,
             )
             new_provider = repo.add_one(target)
 
