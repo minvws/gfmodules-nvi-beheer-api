@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 
 from pydantic import BaseModel, field_validator
 
@@ -10,7 +10,7 @@ class HealthcareProvidersQueryParams(BaseModel):
     oin: str | None = None
     source_id: str | None = None
     ura_number: str | None = None
-    status: Status | None = None
+    status: List[Status] | None = None
 
     @field_validator("ura_number")
     @classmethod

@@ -21,13 +21,13 @@ def test_serialize_should_succeed(ura_number: UraNumber) -> None:
 
 def test_deserialize_should_succeed(ura_number: UraNumber) -> None:
     expected = HealthcareProvidersQueryParams(
-        oin="000000912345678", source_id="some-id", ura_number=ura_number.value, status=Status.ACTIVE
+        oin="000000912345678", source_id="some-id", ura_number=ura_number.value, status=[Status.ACTIVE]
     )
     data = {
         "oin": "000000912345678",
         "source_id": "some-id",
         "ura_number": ura_number.value,
-        "status": Status.ACTIVE.value,
+        "status": [Status.ACTIVE.value],
     }
 
     actual = HealthcareProvidersQueryParams.model_validate(data)

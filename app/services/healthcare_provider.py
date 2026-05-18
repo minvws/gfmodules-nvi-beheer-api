@@ -24,11 +24,12 @@ class HeatlhcareProviderService:
         oin: str | None = None,
         source_id: str | None = None,
         ura_number: str | None = None,
-        status: Status | None = None,
+        status: List[Status] | None = None,
     ) -> List[HealthcareProviderEntity]:
         with self.db.get_db_session() as session:
             repository = session.get_repository(HealthcareProvidersRepository)
-            healthcare_provider = repository.get_many(oin, source_id, ura_number, status.value if status else None)
+            status_values = [s.value for s in status] if status else None
+            healthcare_provider = repository.get_many(oin, source_id, ura_number, status_values)
             return list(healthcare_provider)
 
     def create_one(
