@@ -23,13 +23,15 @@ def database() -> Generator[Database, Any, None]:
     yield db
     db.close()
 
+
 @pytest.fixture()
 def load_config() -> None:
     test_config = get_test_config()
     set_config(test_config)
 
+
 @pytest.fixture()
-def client(load_config: None,database: Database) -> Generator[TestClient, Any, None]:
+def client(load_config: None, database: Database) -> Generator[TestClient, Any, None]:
     inject.clear()
 
     def test_container_config(binder: inject.Binder) -> None:
