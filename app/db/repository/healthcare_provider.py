@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import List, Sequence
 from uuid import UUID
 
 from sqlalchemy import and_, select, update
@@ -35,23 +35,23 @@ class HealthcareProvidersRepository(RepositoryBase):
         oin: str | None = None,
         source_id: str | None = None,
         ura_number: str | None = None,
+        status: List[str] | None = None,
     ) -> Sequence[HealthcareProviderEntity]:
-        conditions = []
+        conditions = [(HealthcareProviderEntity.deleted_at.is_(None))]
 
         if oin:
-            conditions.append((HealthcareProviderEntity.oin == oin))
+            conditions.append((HealthcareProviderEntity.oin.is_(oin)))
 
         if source_id:
-            conditions.append((HealthcareProviderEntity.source_id == source_id))
+            conditions.append((HealthcareProviderEntity.source_id.is_(source_id)))
 
         if ura_number is not None:
-            conditions.append((HealthcareProviderEntity.ura_number == ura_number))
+            conditions.append((HealthcareProviderEntity.ura_number.is_(ura_number)))
 
-        stmt = (
-            select(HealthcareProviderEntity)
-            .where(and_(*conditions))
-            .where(HealthcareProviderEntity.deleted_at.is_(None))
-        )
+        if status is not None:
+            conditions.append(HealthcareProviderEntity.status.in_(status))
+
+        stmt = select(HealthcareProviderEntity).where(and_(*conditions))
         results = self.db_session.session.execute(stmt).scalars().all()
         return results
 
