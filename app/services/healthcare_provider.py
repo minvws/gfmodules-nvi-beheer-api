@@ -5,6 +5,7 @@ from uuid import UUID
 from app.db.db import Database
 from app.db.models.healthcare_provider import HealthcareProviderEntity
 from app.db.repository.healthcare_provider import HealthcareProvidersRepository
+from app.models.healthcare_provider import Status
 
 
 class HeatlhcareProviderService:
@@ -23,10 +24,11 @@ class HeatlhcareProviderService:
         oin: str | None = None,
         source_id: str | None = None,
         ura_number: str | None = None,
+        status: Status | None = None,
     ) -> List[HealthcareProviderEntity]:
         with self.db.get_db_session() as session:
             repository = session.get_repository(HealthcareProvidersRepository)
-            healthcare_provider = repository.get_many(oin, source_id, ura_number)
+            healthcare_provider = repository.get_many(oin, source_id, ura_number, status.value if status else None)
             return list(healthcare_provider)
 
     def create_one(
@@ -36,7 +38,7 @@ class HeatlhcareProviderService:
         is_viewer: bool,
         oin: str,
         common_name: str,
-        status: str,
+        status: Status,
         source_id: str | None = None,
     ) -> HealthcareProviderEntity:
         with self.db.get_db_session() as session:
@@ -48,7 +50,7 @@ class HeatlhcareProviderService:
                 is_source=is_source,
                 oin=oin,
                 common_name=common_name,
-                status=status,
+                status=status.value if isinstance(status, Status) else status,
             )
             new_provider = repo.add_one(target)
 

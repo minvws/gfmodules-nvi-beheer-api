@@ -1,7 +1,10 @@
 from typing import Any, Generator
 
+import inject
 import pytest
+from fastapi.testclient import TestClient
 
+from app.application import setup_fastapi
 from app.config import ConfigDatabase
 from app.db.db import Database
 from app.db.models.healthcare_provider import HealthcareProviderEntity
@@ -14,12 +17,28 @@ from app.services.healthcare_provider import HeatlhcareProviderService
 @pytest.fixture()
 def database() -> Generator[Database, Any, None]:
     config_database = ConfigDatabase(dsn="sqlite:///:memory:", retry_backoff=[])
-    try:
-        db = Database(config_database=config_database)
-        db.generate_tables()
-        yield db
-    except Exception as e:
-        raise e
+    db = Database(config_database=config_database)
+    db.generate_tables()
+    yield db
+    db.close()
+
+
+@pytest.fixture()
+def client(database: Database) -> Generator[TestClient, Any, None]:
+    inject.clear()
+
+    def test_container_config(binder: inject.Binder) -> None:
+        binder.bind(Database, database)
+        binder.bind(HeatlhcareProviderService, HeatlhcareProviderService(database))
+
+    inject.configure(test_container_config, once=False)
+
+    app = setup_fastapi()
+    client = TestClient(app)
+
+    yield client
+
+    inject.clear()
 
 
 @pytest.fixture()

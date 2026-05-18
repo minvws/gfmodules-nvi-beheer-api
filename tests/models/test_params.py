@@ -1,5 +1,6 @@
 import pytest
 
+from app.models.healthcare_provider import Status
 from app.models.params import HealthcareProvidersQueryParams
 from app.models.ura_number import UraNumber
 
@@ -9,6 +10,7 @@ def test_serialize_should_succeed(ura_number: UraNumber) -> None:
         "oin": "000000912345678",
         "source_id": "some-id",
         "ura_number": ura_number.value,
+        "status": None,
     }
     data = HealthcareProvidersQueryParams(oin="000000912345678", source_id="some-id", ura_number=ura_number.value)
 
@@ -18,11 +20,14 @@ def test_serialize_should_succeed(ura_number: UraNumber) -> None:
 
 
 def test_deserialize_should_succeed(ura_number: UraNumber) -> None:
-    expected = HealthcareProvidersQueryParams(oin="000000912345678", source_id="some-id", ura_number=ura_number.value)
+    expected = HealthcareProvidersQueryParams(
+        oin="000000912345678", source_id="some-id", ura_number=ura_number.value, status=Status.ACTIVE
+    )
     data = {
         "oin": "000000912345678",
         "source_id": "some-id",
         "ura_number": ura_number.value,
+        "status": Status.ACTIVE.value,
     }
 
     actual = HealthcareProvidersQueryParams.model_validate(data)

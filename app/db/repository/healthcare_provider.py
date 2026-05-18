@@ -35,6 +35,7 @@ class HealthcareProvidersRepository(RepositoryBase):
         oin: str | None = None,
         source_id: str | None = None,
         ura_number: str | None = None,
+        status: str | None = None,
     ) -> Sequence[HealthcareProviderEntity]:
         conditions = []
 
@@ -47,9 +48,12 @@ class HealthcareProvidersRepository(RepositoryBase):
         if ura_number is not None:
             conditions.append((HealthcareProviderEntity.ura_number == ura_number))
 
+        if status is not None:
+            conditions.append((HealthcareProviderEntity.status == status))
+
         stmt = (
             select(HealthcareProviderEntity)
-            .where(and_(*conditions))
+            .where(and_(True, *conditions))
             .where(HealthcareProviderEntity.deleted_at.is_(None))
         )
         results = self.db_session.session.execute(stmt).scalars().all()
