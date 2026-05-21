@@ -1,5 +1,5 @@
 publiccodeYmlVersion: "0.5"
-name: NVI Beheer API
+name: Generieke Functies NVI Beheer API
 url: https://github.com/minvws/gfmodules-nvi-beheer-api
 platforms:
   - web
