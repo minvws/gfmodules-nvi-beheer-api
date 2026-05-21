@@ -20,32 +20,28 @@ description:
       Beheer-API voor de Nationale Verwijsindex waarmee zorgverleners kunnen
       worden beheerd via een REST-interface.
     longDescription: |
-      De NVI Beheer API is onderdeel van het 'Generieke Functies, lokalisatie
-      en addressering' project van het Ministerie van Volksgezondheid,
-      Welzijn en Sport. De FastAPI-service biedt een beheersinterface voor
-      de Nationale Verwijsindex (NVI) waarmee zorgverleners (healthcare
-      providers) kunnen worden aangemaakt, opgezocht, bijgewerkt en
-      verwijderd. De API ondersteunt beheerders bij het onderhouden van de
-      NVI-registratie.
+      De NVI Management API maakt deel uit van het project "Generieke functies, lokalisatie
+      en adressering" van het Ministerie van Volksgezondheid,
+      Welzijn en Sport. De FastAPI-service biedt een interne beheerinterface
+      waarmee beheerders registraties van zorgverleners kunnen beheren voor
+      gebruik binnen de NVI-omgeving. Met deze app kunnen beheerders 
+      registraties aanmaken, opzoeken, bijwerken en verwijderen.
     features:
       - CRUD-operaties voor zorgverleners in de NVI
-      - REST API voor beheer van NVI-registraties
-      - Integratie met de Nationale Verwijsindex database
+      - REST API en CLI voor beheer van zorgverlener-registraties
   en:
     shortDescription: >-
       Management API for the Nationale Verwijsindex enabling administration
       of healthcare providers via a REST interface.
     longDescription: |
-      The NVI Beheer API is part of the 'Generieke Functies, lokalisatie en
-      addressering' project of the Ministry of Health, Welfare and Sport. The
-      FastAPI service provides a management interface for the Nationale
-      Verwijsindex (NVI) through which healthcare providers can be created,
-      queried, updated, and deleted. The API supports administrators in
-      maintaining NVI registrations.
+      The NVI Management API is part of the "Generic Functions, Localization
+      and Addressing" project of the Ministry of Health,
+      Welfare and Sport. The FastAPI service provides an internal management interface
+      for administrators to manage healthcare providers registrations for usage in the NVI sphere.
+      This app lets admin register, look up, update, and delete registrions.
     features:
       - CRUD operations for healthcare providers in the NVI
-      - REST API for managing NVI registrations
-      - Integration with the Nationale Verwijsindex database
+      - REST API and CLI for managing healthcare registrations
 
 legal:
   license: EUPL-1.2
