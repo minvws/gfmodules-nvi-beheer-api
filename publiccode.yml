@@ -1,0 +1,63 @@
+publiccodeYmlVersion: "0.5"
+name: NVI Beheer API
+url: https://github.com/minvws/gfmodules-nvi-beheer-api
+platforms:
+  - web
+categories:
+  - application-development
+developmentStatus: development
+softwareType: standalone/backend
+intendedAudience:
+  countries:
+    - NL
+  scope:
+    - government
+    - healthcare
+
+description:
+  nl:
+    shortDescription: >-
+      Beheer-API voor de Nationale Verwijsindex waarmee zorgverleners kunnen
+      worden beheerd via een REST-interface.
+    longDescription: |
+      De NVI Beheer API is onderdeel van het 'Generieke Functies, lokalisatie
+      en addressering' project van het Ministerie van Volksgezondheid,
+      Welzijn en Sport. De FastAPI-service biedt een beheersinterface voor
+      de Nationale Verwijsindex (NVI) waarmee zorgverleners (healthcare
+      providers) kunnen worden aangemaakt, opgezocht, bijgewerkt en
+      verwijderd. De API ondersteunt beheerders bij het onderhouden van de
+      NVI-registratie.
+    features:
+      - CRUD-operaties voor zorgverleners in de NVI
+      - REST API voor beheer van NVI-registraties
+      - Integratie met de Nationale Verwijsindex database
+  en:
+    shortDescription: >-
+      Management API for the Nationale Verwijsindex enabling administration
+      of healthcare providers via a REST interface.
+    longDescription: |
+      The NVI Beheer API is part of the 'Generieke Functies, lokalisatie en
+      addressering' project of the Ministry of Health, Welfare and Sport. The
+      FastAPI service provides a management interface for the Nationale
+      Verwijsindex (NVI) through which healthcare providers can be created,
+      queried, updated, and deleted. The API supports administrators in
+      maintaining NVI registrations.
+    features:
+      - CRUD operations for healthcare providers in the NVI
+      - REST API for managing NVI registrations
+      - Integration with the Nationale Verwijsindex database
+
+legal:
+  license: EUPL-1.2
+  mainCopyrightOwner: Ministerie van Volksgezondheid, Welzijn en Sport
+
+maintenance:
+  type: internal
+  contacts:
+    - name: irealisatie.nl
+      email: helpdesk@irealisatie.nl
+
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - nl
