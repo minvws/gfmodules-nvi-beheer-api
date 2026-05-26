@@ -1,0 +1,64 @@
+publiccodeYmlVersion: "0.5"
+name: Generieke Functies NVI Beheer API
+url: https://github.com/minvws/gfmodules-nvi-beheer-api
+platforms:
+  - web
+categories:
+  - application-development
+developmentStatus: development
+softwareType: standalone/backend
+intendedAudience:
+  countries:
+    - NL
+  scope:
+    - government
+    - healthcare
+
+description:
+  nl:
+    shortDescription: >-
+      Beheer-API voor de Nationale Verwijsindex waarmee zorgverleners kunnen
+      worden beheerd via een REST-interface.
+    longDescription: |
+      De NVI Management API maakt deel uit van het project "Generieke functies, lokalisatie
+      en adressering" van het Ministerie van Volksgezondheid,
+      Welzijn en Sport. De FastAPI-service biedt een interne beheerinterface
+      waarmee beheerders registraties van zorgverleners kunnen beheren voor
+      gebruik binnen de NVI-omgeving. Met deze app kunnen beheerders 
+      registraties aanmaken, opzoeken, bijwerken en verwijderen.
+    features:
+      - CRUD-operaties voor zorgverleners in de NVI
+      - REST API en CLI voor beheer van zorgverlener-registraties
+  en:
+    shortDescription: >-
+      Management API for the Nationale Verwijsindex enabling administration
+      of healthcare providers via a REST interface.
+    longDescription: |
+      The NVI Management API is part of the "Generic Functions, Localization
+      and Addressing" project of the Ministry of Health,
+      Welfare and Sport. The FastAPI service provides an internal management interface
+      for administrators to manage healthcare providers registrations for usage in the NVI sphere.
+      This app lets admin register, look up, update, and delete registrions.
+    features:
+      - CRUD operations for healthcare providers in the NVI
+      - REST API and CLI for managing healthcare registrations
+
+legal:
+  license: EUPL-1.2
+  mainCopyrightOwner: Ministerie van Volksgezondheid, Welzijn en Sport
+
+maintenance:
+  type: internal
+  contacts:
+    - name: iRealisatie - Team Generieke Functies
+      email: maintainer@irealisatie.nl
+      affiliation: Ministerie van Volksgezondheid, Welzijn en Sport
+
+organisation:
+  uri: https://www.rijksoverheid.nl/ministeries/ministerie-van-volksgezondheid-welzijn-en-sport
+  name: Ministerie van Volksgezondheid, Welzijn en Sport
+
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en
