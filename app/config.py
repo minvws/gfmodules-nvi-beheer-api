@@ -49,6 +49,7 @@ class ConfigUvicorn(BaseModel):
     ssl_base_dir: str | None
     ssl_cert_file: str | None
     ssl_key_file: str | None
+    root_path: str = Field(default="")
 
 
 class ConfigTelemetry(BaseModel):
