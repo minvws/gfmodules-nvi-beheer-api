@@ -2,7 +2,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.base import INCLUDE_DELETED_DESCRIPTION, Base
+from app.models.base import INCLUDE_DELETED_DESCRIPTION, CommonModel
 from app.models.oin import Oin
 
 MANDATE_ID_DESCRIPTION = "The ID the client is mandated for: 'ORG_ID' or 'ORG_ID:DEVICE_ID'"
@@ -35,7 +35,7 @@ class ClientQueryParams(ClientOptionalFields):
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
-class Client(Base, ClientCreate):
+class Client(CommonModel, ClientCreate):
     organization_id: UUID
 
 

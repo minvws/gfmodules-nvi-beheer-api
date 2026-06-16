@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.base import INCLUDE_DELETED_DESCRIPTION, Base
+from app.models.base import INCLUDE_DELETED_DESCRIPTION, CommonModel
 
 REGISTER_ID_DESCRIPTION = "The identifier of the organization 'OIN' or 'URA'"
 NAME_DESCRIPTION = "The name of the organization"
@@ -27,5 +27,5 @@ class OrganizationQueryParams(BaseModel):
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
-class Organization(Base, OrganizationCreate):
+class Organization(CommonModel, OrganizationCreate):
     pass
