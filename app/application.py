@@ -7,9 +7,11 @@ from fastapi import FastAPI
 from app import container
 from app.config import get_config
 from app.middleware.stats import StatsdMiddleware
+from app.routers.client import router as client_router
 from app.routers.default import router as default_router
 from app.routers.health import router as health_router
-from app.routers.healthcare_provider import router as healthcare_provider_router
+from app.routers.organization import router as organization_router
+from app.routers.resolve import router as resolve_router
 
 
 def get_uvicorn_params() -> dict[str, Any]:
@@ -63,6 +65,7 @@ def setup_fastapi() -> FastAPI:
             docs_url=config.uvicorn.docs_url,
             redoc_url=config.uvicorn.redoc_url,
             title="NVI Beheer API",
+            root_path=config.uvicorn.root_path,
         )
         if config.uvicorn.swagger_enabled
         else FastAPI(docs_url=None, redoc_url=None)
@@ -70,7 +73,7 @@ def setup_fastapi() -> FastAPI:
 
     container.configure()
 
-    routers = [default_router, health_router, healthcare_provider_router]
+    routers = [default_router, health_router, organization_router, client_router, resolve_router]
 
     for router in routers:
         fastapi.include_router(router)

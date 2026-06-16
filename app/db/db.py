@@ -58,9 +58,3 @@ class Database:
 
     def get_db_session(self) -> DbSession:
         return DbSession(self.engine, self._config_database.retry_backoff)
-
-    def close(self) -> None:
-        """
-        Dispose the engine and close all pooled connections.
-        """
-        self.engine.dispose()
