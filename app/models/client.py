@@ -11,16 +11,18 @@ OIN_DESCRIPTION = "The OIN of the client"
 SCOPES_DESCRIPTION = "The space separated scopes granted to the client"
 
 
-class ClientCreate(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class ClientResolveRequest(BaseModel):
     oin: Oin = Field(..., description=OIN_DESCRIPTION)
     common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
     mandate_id: str = Field(..., description=MANDATE_ID_DESCRIPTION)
+
+
+class ClientCreate(ClientResolveRequest):
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
 
 class ClientOptionalFields(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     oin: Oin | None = Field(default=None, description=OIN_DESCRIPTION)
     common_name: str | None = Field(default=None, description=COMMON_NAME_DESCRIPTION)
     mandate_id: str | None = Field(default=None, description=MANDATE_ID_DESCRIPTION)
@@ -36,10 +38,5 @@ class ClientQueryParams(ClientOptionalFields):
 
 
 class Client(CommonModel, ClientCreate):
+    model_config = ConfigDict(from_attributes=True)
     organization_id: UUID
-
-
-class ClientResolveRequest(BaseModel):
-    oin: Oin = Field(..., description=OIN_DESCRIPTION)
-    common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
-    mandate_id: str = Field(..., description=MANDATE_ID_DESCRIPTION)

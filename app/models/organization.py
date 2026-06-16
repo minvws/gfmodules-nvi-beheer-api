@@ -8,8 +8,6 @@ SCOPES_DESCRIPTION = "The space separated scopes granted to the organization"
 
 
 class OrganizationCreate(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     register_id: str = Field(..., description=REGISTER_ID_DESCRIPTION)
     name: str = Field(..., description=NAME_DESCRIPTION)
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
@@ -20,12 +18,10 @@ class OrganizationUpdate(BaseModel):
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
 
-class OrganizationQueryParams(BaseModel):
+class OrganizationQueryParams(OrganizationUpdate):
     register_id: str | None = Field(default=None, description=REGISTER_ID_DESCRIPTION)
-    name: str | None = Field(default=None, description=NAME_DESCRIPTION)
-    scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
 class Organization(CommonModel, OrganizationCreate):
-    pass
+    model_config = ConfigDict(from_attributes=True)
