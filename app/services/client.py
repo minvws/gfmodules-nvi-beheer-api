@@ -23,7 +23,7 @@ class ClientService:
         organization_id: UUID,
         oin: Oin,
         common_name: str,
-        mandate_id: str,
+        source_id: str | None = None,
         scopes: str | None = None,
     ) -> ClientEntity:
         with self.db.get_db_session() as session:
@@ -31,7 +31,7 @@ class ClientService:
             repo = session.get_repository(ClientRepository)
             entity = ClientEntity(
                 organization_id=organization_id,
-                mandate_id=mandate_id,
+                source_id=source_id,
                 oin=str(oin),
                 common_name=common_name,
                 scopes=scopes,
@@ -48,7 +48,7 @@ class ClientService:
         organization_id: UUID,
         oin: Oin | None = None,
         common_name: str | None = None,
-        mandate_id: str | None = None,
+        source_id: str | None = None,
         scopes: str | None = None,
         include_deleted: bool = False,
     ) -> List[ClientEntity]:
@@ -59,7 +59,7 @@ class ClientService:
                     organization_id=organization_id,
                     oin=str(oin) if oin else None,
                     common_name=common_name,
-                    mandate_id=mandate_id,
+                    source_id=source_id,
                     scopes=scopes,
                     include_deleted=include_deleted,
                 )
@@ -87,9 +87,8 @@ class ClientService:
         self,
         oin: Oin,
         common_name: str,
-        mandate_id: str,
-    ) -> str | None:
+        org_ura: str,
+    ) -> ClientEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
-            result = repo.get_by_credentials(common_name=common_name, oin=str(oin), mandate_id=mandate_id)
-            return result.scopes if result is not None else None
+            return repo.get_by_credentials(common_name=common_name, oin=str(oin), org_ura=org_ura)

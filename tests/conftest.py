@@ -23,7 +23,7 @@ from app.services.organization import OrganizationService
 TEST_OIN = "00000099000000001000"
 TEST_REGISTER_ID = "test-register-001"
 TEST_ORG_NAME = "Test Organization"
-TEST_MANDATE_ID = "mandate-001"
+TEST_SOURCE_ID = "source-001"
 TEST_COMMON_NAME = "Test Client"
 VALID_OIN = TEST_OIN
 FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0)
@@ -72,7 +72,7 @@ def persisted_organization(organization_service: OrganizationService) -> Organiz
 def client_entity(persisted_organization: OrganizationEntity) -> ClientEntity:
     return ClientEntity(
         organization_id=persisted_organization.id,
-        mandate_id=TEST_MANDATE_ID,
+        source_id=TEST_SOURCE_ID,
         oin=TEST_OIN,
         common_name=TEST_COMMON_NAME,
     )
@@ -124,7 +124,7 @@ def make_client_entity(
     organization_id: UUID | None = None,
     oin: str = VALID_OIN,
     common_name: str = "Test Client",
-    mandate_id: str = "mandate-1",
+    source_id: str | None = None,
     scopes: str | None = None,
     deleted_at: datetime | None = None,
 ) -> ClientEntity:
@@ -133,7 +133,7 @@ def make_client_entity(
         organization_id=organization_id or uuid4(),
         oin=oin,
         common_name=common_name,
-        mandate_id=mandate_id,
+        source_id=source_id,
         scopes=scopes,
         created_at=FIXED_CREATED_AT,
         deleted_at=deleted_at,

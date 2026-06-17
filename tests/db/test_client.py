@@ -6,7 +6,7 @@ from sqlalchemy.exc import InvalidRequestError
 
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
-from tests.conftest import TEST_OIN
+from tests.conftest import TEST_COMMON_NAME, TEST_OIN, TEST_REGISTER_ID
 
 
 def test_add_one(
@@ -86,7 +86,6 @@ def test_get_many_returns_all(
 ) -> None:
     entity_2 = ClientEntity(
         organization_id=client_entity.organization_id,
-        mandate_id="mandate-002",
         oin=TEST_OIN,
         common_name="Another Client",
     )
@@ -102,7 +101,6 @@ def test_get_many_filters_by_oin(
 ) -> None:
     entity_2 = ClientEntity(
         organization_id=client_entity.organization_id,
-        mandate_id="mandate-002",
         oin="00000099000000002000",
         common_name="Another Client",
     )
@@ -155,3 +153,28 @@ def test_accessing_organization_raises_lazy_load(
         assert result is not None
         with pytest.raises(InvalidRequestError):
             _ = result.organization
+
+
+def test_get_by_credentials_matches_via_organization_register_id(
+    client_repository: ClientRepository,
+    client_entity: ClientEntity,
+) -> None:
+    with client_repository.db_session:
+        client_repository.add_one(client_entity)
+        result = client_repository.get_by_credentials(
+            common_name=TEST_COMMON_NAME, oin=TEST_OIN, org_ura=TEST_REGISTER_ID
+        )
+        assert result is not None
+        assert result.id == client_entity.id
+
+
+def test_get_by_credentials_unknown_org_ura_returns_none(
+    client_repository: ClientRepository,
+    client_entity: ClientEntity,
+) -> None:
+    with client_repository.db_session:
+        client_repository.add_one(client_entity)
+        result = client_repository.get_by_credentials(
+            common_name=TEST_COMMON_NAME, oin=TEST_OIN, org_ura="does-not-match-any-org"
+        )
+        assert result is None

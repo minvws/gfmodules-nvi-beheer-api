@@ -43,7 +43,7 @@ def register(
     except IntegrityError:
         raise HTTPException(
             status_code=409,
-            detail="A client with this mandate_id is already registered for this organization.",
+            detail="A client with this oin and common_name is already registered for this organization.",
         )
 
 

@@ -14,7 +14,7 @@ BASE = f"/organizations/{ORG_ID}/clients"
 
 
 def _create_body(**overrides: object) -> dict[str, object]:
-    body: dict[str, object] = {"oin": VALID_OIN, "common_name": "Client", "mandate_id": "mandate-1"}
+    body: dict[str, object] = {"oin": VALID_OIN, "common_name": "Client"}
     body.update(overrides)
     return body
 
@@ -22,7 +22,7 @@ def _create_body(**overrides: object) -> dict[str, object]:
 @pytest.mark.parametrize(
     "method, path, body",
     [
-        ("post", BASE, {"oin": VALID_OIN, "common_name": "C", "mandate_id": "m"}),
+        ("post", BASE, {"oin": VALID_OIN, "common_name": "C"}),
         ("get", f"{BASE}/{CLIENT_ID}", None),
         ("get", BASE, None),
         ("put", f"{BASE}/{CLIENT_ID}", {"common_name": "C"}),
@@ -44,7 +44,7 @@ def test_returns_404_when_organization_missing(
 
 @pytest.mark.parametrize("scopes", [None, "read"])
 def test_register_returns_201(api: TestClient, mock_client_service: MagicMock, scopes: str | None) -> None:
-    entity = make_client_entity(organization_id=UUID(ORG_ID), scopes=scopes)
+    entity = make_client_entity(organization_id=UUID(ORG_ID), source_id="source-1", scopes=scopes)
     mock_client_service.create_one.return_value = entity
 
     response = api.post(BASE, json=_create_body(**({"scopes": scopes} if scopes is not None else {})))
@@ -53,13 +53,13 @@ def test_register_returns_201(api: TestClient, mock_client_service: MagicMock, s
     data = response.json()
     assert data["id"] == str(entity.id)
     assert data["oin"] == VALID_OIN
-    assert data["mandate_id"] == "mandate-1"
+    assert data["source_id"] == "source-1"
 
     call = mock_client_service.create_one.call_args
     assert call.kwargs["organization_id"] == UUID(ORG_ID)
     assert str(call.kwargs["oin"]) == VALID_OIN
     assert call.kwargs["common_name"] == "Client"
-    assert call.kwargs["mandate_id"] == "mandate-1"
+    assert call.kwargs["source_id"] is None
     assert call.kwargs["scopes"] == scopes
 
 
@@ -78,10 +78,9 @@ def test_register_conflict_returns_409(api: TestClient, mock_client_service: Mag
 @pytest.mark.parametrize(
     "body",
     [
-        {"common_name": "C", "mandate_id": "m"},  # missing oin
-        {"oin": VALID_OIN, "mandate_id": "m"},  # missing common_name
-        {"oin": VALID_OIN, "common_name": "C"},  # missing mandate_id
-        {"oin": "invalid-oin", "common_name": "C", "mandate_id": "m"},  # malformed oin
+        {"common_name": "C"},  # missing oin
+        {"oin": VALID_OIN},  # missing common_name
+        {"oin": "invalid-oin", "common_name": "C"},  # malformed oin
     ],
 )
 def test_register_invalid_body_returns_422(
@@ -124,7 +123,7 @@ def test_get_by_id_invalid_uuid_returns_422(api: TestClient, path: str) -> None:
 @pytest.mark.parametrize("count", [0, 2])
 def test_get_many_returns_list(api: TestClient, mock_client_service: MagicMock, count: int) -> None:
     mock_client_service.get_many.return_value = [
-        make_client_entity(organization_id=UUID(ORG_ID), mandate_id=f"m-{i}") for i in range(count)
+        make_client_entity(organization_id=UUID(ORG_ID), source_id=f"source-{i}") for i in range(count)
     ]
     response = api.get(BASE)
     assert response.status_code == 200
@@ -138,7 +137,7 @@ def test_get_many_without_params_uses_defaults(api: TestClient, mock_client_serv
         organization_id=UUID(ORG_ID),
         oin=None,
         common_name=None,
-        mandate_id=None,
+        source_id=None,
         scopes=None,
         include_deleted=False,
     )
@@ -146,13 +145,13 @@ def test_get_many_without_params_uses_defaults(api: TestClient, mock_client_serv
 
 def test_get_many_passes_query_params(api: TestClient, mock_client_service: MagicMock) -> None:
     mock_client_service.get_many.return_value = []
-    api.get(f"{BASE}?oin={VALID_OIN}&common_name=CN-1&mandate_id=m-1&scopes=read+write&include_deleted=true")
+    api.get(f"{BASE}?oin={VALID_OIN}&common_name=CN-1&source_id=source-1&scopes=read+write&include_deleted=true")
 
     call = mock_client_service.get_many.call_args
     assert call.kwargs["organization_id"] == UUID(ORG_ID)
     assert str(call.kwargs["oin"]) == VALID_OIN
     assert call.kwargs["common_name"] == "CN-1"
-    assert call.kwargs["mandate_id"] == "m-1"
+    assert call.kwargs["source_id"] == "source-1"
     assert call.kwargs["scopes"] == "read write"
     assert call.kwargs["include_deleted"] is True
 
@@ -188,7 +187,7 @@ def test_update_ungranted_scope_returns_422(api: TestClient, mock_client_service
     [
         ({"common_name": "N"}, {"common_name": "N"}),
         ({"scopes": "read"}, {"scopes": "read"}),
-        ({"mandate_id": "m-2", "common_name": "N"}, {"mandate_id": "m-2", "common_name": "N"}),
+        ({"source_id": "source-2", "common_name": "N"}, {"source_id": "source-2", "common_name": "N"}),
         ({}, {}),  # nothing supplied -> nothing forwarded
     ],
 )
