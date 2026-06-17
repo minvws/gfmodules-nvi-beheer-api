@@ -12,6 +12,7 @@ from app.services.organization import OrganizationService
 from tests.conftest import TEST_OIN
 
 ALT_OIN = "00000099000000002000"
+SCOPED_ORG_REGISTER_ID = "00000099000000009000"
 
 
 def _create_client(
@@ -20,32 +21,32 @@ def _create_client(
     *,
     oin: str = TEST_OIN,
     common_name: str = "CN-1",
-    mandate_id: str = "mandate-1",
+    source_id: str | None = None,
     scopes: str | None = None,
 ) -> ClientEntity:
     return service.create_one(
         organization_id=organization_id,
         oin=Oin(oin),
         common_name=common_name,
-        mandate_id=mandate_id,
+        source_id=source_id,
         scopes=scopes,
     )
 
 
 def _scoped_org(organization_service: OrganizationService, scopes: str) -> OrganizationEntity:
-    return organization_service.create_one(register_id="00000099000000009000", name="Scoped Org", scopes=scopes)
+    return organization_service.create_one(register_id=SCOPED_ORG_REGISTER_ID, name="Scoped Org", scopes=scopes)
 
 
 def test_create_one_should_succeed(
     client_service: ClientService,
     persisted_organization: OrganizationEntity,
 ) -> None:
-    result = _create_client(client_service, persisted_organization.id)
+    result = _create_client(client_service, persisted_organization.id, source_id="source-1")
     assert isinstance(result.id, UUID)
     assert result.organization_id == persisted_organization.id
     assert result.oin == TEST_OIN
     assert result.common_name == "CN-1"
-    assert result.mandate_id == "mandate-1"
+    assert result.source_id == "source-1"
 
 
 @pytest.mark.parametrize(
@@ -99,18 +100,16 @@ def test_update_one(
         assert result is None
 
 
-def test_update_one_can_change_oin_and_mandate_id(
+def test_update_one_can_change_oin_and_source_id(
     client_service: ClientService,
     persisted_organization: OrganizationEntity,
 ) -> None:
-    created = _create_client(client_service, persisted_organization.id, mandate_id="mandate-old")
-    result = client_service.update_one(
-        created.id, persisted_organization.id, oin=Oin(ALT_OIN), mandate_id="mandate-new"
-    )
+    created = _create_client(client_service, persisted_organization.id, source_id="source-old")
+    result = client_service.update_one(created.id, persisted_organization.id, oin=Oin(ALT_OIN), source_id="source-new")
     assert result is not None
     assert result.oin == ALT_OIN
     assert isinstance(result.oin, str)
-    assert result.mandate_id == "mandate-new"
+    assert result.source_id == "source-new"
     assert client_service.get_one(created.id, persisted_organization.id) is not None
 
 
@@ -121,7 +120,7 @@ def test_get_many_returns_active_clients(
     count: int,
 ) -> None:
     for i in range(count):
-        _create_client(client_service, persisted_organization.id, mandate_id=f"mandate-{i}")
+        _create_client(client_service, persisted_organization.id, common_name=f"CN-{i}")
     assert len(client_service.get_many(organization_id=persisted_organization.id)) == count
 
 
@@ -151,7 +150,7 @@ def test_get_many_deleted_visibility(
     [
         ({"oin": Oin(TEST_OIN)}, "oin", TEST_OIN),
         ({"common_name": "CN-1"}, "common_name", "CN-1"),
-        ({"mandate_id": "mandate-a"}, "mandate_id", "mandate-a"),
+        ({"source_id": "source-a"}, "source_id", "source-a"),
     ],
 )
 def test_get_many_single_filter(
@@ -161,8 +160,8 @@ def test_get_many_single_filter(
     attr: str,
     expected: str,
 ) -> None:
-    _create_client(client_service, persisted_organization.id, oin=TEST_OIN, common_name="CN-1", mandate_id="mandate-a")
-    _create_client(client_service, persisted_organization.id, oin=ALT_OIN, common_name="CN-2", mandate_id="mandate-b")
+    _create_client(client_service, persisted_organization.id, oin=TEST_OIN, common_name="CN-1", source_id="source-a")
+    _create_client(client_service, persisted_organization.id, oin=ALT_OIN, common_name="CN-2", source_id="source-b")
     results = client_service.get_many(organization_id=persisted_organization.id, **filter_kwargs)
     assert len(results) == 1
     assert getattr(results[0], attr) == expected
@@ -184,8 +183,8 @@ def test_get_many_filters_by_scopes(
     expected_common_names: set[str],
 ) -> None:
     org = _scoped_org(organization_service, "read write")
-    _create_client(client_service, org.id, oin=TEST_OIN, common_name="CN-1", mandate_id="mandate-a", scopes="read")
-    _create_client(client_service, org.id, oin=ALT_OIN, common_name="CN-2", mandate_id="mandate-b", scopes="read write")
+    _create_client(client_service, org.id, oin=TEST_OIN, common_name="CN-1", scopes="read")
+    _create_client(client_service, org.id, oin=ALT_OIN, common_name="CN-2", scopes="read write")
     results = client_service.get_many(organization_id=org.id, scopes=query)
     assert {client.common_name for client in results} == expected_common_names
 
@@ -241,20 +240,30 @@ def test_update_one_scope_enforcement(
 
 
 @pytest.mark.parametrize(
-    "common_name, mandate_id, expected",
+    "common_name, org_ura, expected_scopes, expected_source_id",
     [
-        ("Scoped Client", "mandate-xyz", "read write"),
-        ("Nobody", "mandate-none", None),
+        # matched via the organization's register_id
+        ("Scoped Client", SCOPED_ORG_REGISTER_ID, "read write", "source-xyz"),
+        # wrong common_name -> no client
+        ("Nobody", SCOPED_ORG_REGISTER_ID, None, None),
+        # org_ura matches no organization -> no client
+        ("Scoped Client", "00000099000000008000", None, None),
     ],
 )
 def test_resolve(
     client_service: ClientService,
     organization_service: OrganizationService,
     common_name: str,
-    mandate_id: str,
-    expected: str | None,
+    org_ura: str,
+    expected_scopes: str | None,
+    expected_source_id: str | None,
 ) -> None:
     org = _scoped_org(organization_service, "read write delete")
-    _create_client(client_service, org.id, common_name="Scoped Client", mandate_id="mandate-xyz", scopes="read write")
-    resolved = client_service.resolve(oin=Oin(TEST_OIN), common_name=common_name, mandate_id=mandate_id)
-    assert resolved == expected
+    _create_client(client_service, org.id, common_name="Scoped Client", source_id="source-xyz", scopes="read write")
+    resolved = client_service.resolve(oin=Oin(TEST_OIN), common_name=common_name, org_ura=org_ura)
+    if expected_scopes is None:
+        assert resolved is None
+    else:
+        assert resolved is not None
+        assert resolved.scopes == expected_scopes
+        assert resolved.source_id == expected_source_id

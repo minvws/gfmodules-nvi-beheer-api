@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.decorator import repository
 from app.db.models.client import ClientEntity
+from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase, scopes_contains_conditions
 
 
@@ -28,14 +29,18 @@ class ClientRepository(RepositoryBase):
         stmt = select(select(ClientEntity.id).where(self._and_clause(organization_id, id)).exists())
         return bool(self.db_session.execute(stmt).scalar())
 
-    def get_by_credentials(self, common_name: str, oin: str, mandate_id: str) -> ClientEntity | None:
-        """Look up a client by the credentials used in an OAuth resolve request."""
-        stmt = select(ClientEntity).where(
-            and_(
-                ClientEntity.common_name == common_name,
-                ClientEntity.oin == oin,
-                ClientEntity.mandate_id == mandate_id,
-                ClientEntity.deleted_at.is_(None),
+    def get_by_credentials(self, common_name: str, oin: str, org_ura: str) -> ClientEntity | None:
+        stmt = (
+            select(ClientEntity)
+            .join(OrganizationEntity, ClientEntity.organization_id == OrganizationEntity.id)
+            .where(
+                and_(
+                    ClientEntity.common_name == common_name,
+                    ClientEntity.oin == oin,
+                    OrganizationEntity.register_id == org_ura,
+                    OrganizationEntity.deleted_at.is_(None),
+                    ClientEntity.deleted_at.is_(None),
+                )
             )
         )
         return self.db_session.execute(stmt).scalar()
@@ -45,7 +50,7 @@ class ClientRepository(RepositoryBase):
         organization_id: UUID,
         oin: str | None = None,
         common_name: str | None = None,
-        mandate_id: str | None = None,
+        source_id: str | None = None,
         scopes: str | None = None,
         include_deleted: bool = False,
     ) -> Sequence[ClientEntity]:
@@ -56,8 +61,8 @@ class ClientRepository(RepositoryBase):
             conditions.append(ClientEntity.oin == oin)
         if common_name:
             conditions.append(ClientEntity.common_name == common_name)
-        if mandate_id:
-            conditions.append(ClientEntity.mandate_id == mandate_id)
+        if source_id:
+            conditions.append(ClientEntity.source_id == source_id)
         conditions.extend(scopes_contains_conditions(ClientEntity.scopes, scopes))
         stmt = select(ClientEntity).where(and_(*conditions))
         return self.db_session.execute(stmt).scalars().all()
