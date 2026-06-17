@@ -3,13 +3,13 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.conftest import VALID_OIN, make_client_entity
+from tests.conftest import TEST_REGISTER_ID, VALID_OIN, make_client_entity
 
 RESOLVE = "/clients/resolve"
 
 
 def _body(**overrides: object) -> dict[str, object]:
-    body: dict[str, object] = {"oin": VALID_OIN, "common_name": "Client", "org_ura": "00000099000000001000"}
+    body: dict[str, object] = {"oin": str(VALID_OIN), "common_name": "Client", "org_ura": str(TEST_REGISTER_ID)}
     body.update(overrides)
     return body
 
@@ -23,9 +23,9 @@ def test_resolve_returns_scopes_and_source_id(api: TestClient, mock_client_servi
     assert response.status_code == 200
     assert response.json() == {"scopes": scopes, "source_id": "source-1"}
     call = mock_client_service.resolve.call_args
-    assert str(call.kwargs["oin"]) == VALID_OIN
+    assert str(call.kwargs["oin"]) == str(VALID_OIN)
     assert call.kwargs["common_name"] == "Client"
-    assert call.kwargs["org_ura"] == "00000099000000001000"
+    assert str(call.kwargs["org_ura"]) == str(TEST_REGISTER_ID)
 
 
 def test_resolve_returns_no_source_id_when_absent(api: TestClient, mock_client_service: MagicMock) -> None:
@@ -54,10 +54,10 @@ def test_resolve_client_without_scopes_returns_404(api: TestClient, mock_client_
 @pytest.mark.parametrize(
     "body",
     [
-        {"common_name": "C", "org_ura": "m"},  # missing oin
-        {"oin": VALID_OIN, "org_ura": "m"},  # missing common_name
-        {"oin": VALID_OIN, "common_name": "C"},  # missing org_ura
-        {"oin": "invalid-oin", "common_name": "C", "org_ura": "m"},  # malformed oin
+        {"common_name": "CN", "org_ura": str(TEST_REGISTER_ID)},  # missing oin
+        {"oin": str(VALID_OIN), "org_ura": str(TEST_REGISTER_ID)},  # missing common_name
+        {"oin": str(VALID_OIN), "common_name": "C"},  # missing org_ura
+        {"oin": "invalid-oin", "common_name": "C", "org_ura": str(TEST_REGISTER_ID)},  # malformed oin
     ],
 )
 def test_resolve_invalid_body_returns_422(

@@ -6,6 +6,7 @@ from sqlalchemy.exc import InvalidRequestError
 
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
+from app.models.ura import UraNumber
 from tests.conftest import TEST_COMMON_NAME, TEST_OIN, TEST_REGISTER_ID
 
 
@@ -175,6 +176,6 @@ def test_get_by_credentials_unknown_org_ura_returns_none(
     with client_repository.db_session:
         client_repository.add_one(client_entity)
         result = client_repository.get_by_credentials(
-            common_name=TEST_COMMON_NAME, oin=TEST_OIN, org_ura="does-not-match-any-org"
+            common_name=TEST_COMMON_NAME, oin=TEST_OIN, org_ura=UraNumber("99999999")
         )
         assert result is None

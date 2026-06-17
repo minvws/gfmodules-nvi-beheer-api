@@ -89,7 +89,7 @@ def test_get_many_returns_all(
     organization_repository: OrganizationRepository,
     organization_entity: OrganizationEntity,
 ) -> None:
-    entity_2 = OrganizationEntity(register_id="test-register-002", name="Another Organization")
+    entity_2 = OrganizationEntity(register_id="87654321", name="Another Organization")
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)
         organization_repository.add_one(entity_2)
@@ -100,7 +100,7 @@ def test_get_many_filters_by_register_id(
     organization_repository: OrganizationRepository,
     organization_entity: OrganizationEntity,
 ) -> None:
-    entity_2 = OrganizationEntity(register_id="test-register-002", name="Another Organization")
+    entity_2 = OrganizationEntity(register_id="87654321", name="Another Organization")
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)
         organization_repository.add_one(entity_2)

@@ -10,7 +10,7 @@ from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
 
 def test_create_should_succeed() -> None:
     model = OrganizationCreate(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
-    assert model.register_id == TEST_REGISTER_ID
+    assert str(model.register_id) == str(TEST_REGISTER_ID)
     assert model.name == TEST_ORG_NAME
     assert model.scopes is None
 

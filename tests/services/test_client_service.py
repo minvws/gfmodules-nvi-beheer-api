@@ -6,27 +6,28 @@ import pytest
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.models.oin import Oin
+from app.models.ura import UraNumber
 from app.services.client import ClientService
 from app.services.exceptions import ScopesNotGrantedError
 from app.services.organization import OrganizationService
 from tests.conftest import TEST_OIN
 
-ALT_OIN = "00000099000000002000"
-SCOPED_ORG_REGISTER_ID = "00000099000000009000"
+ALT_OIN = Oin("00000099000000002000")
+SCOPED_ORG_REGISTER_ID = UraNumber("12349000")
 
 
 def _create_client(
     service: ClientService,
     organization_id: UUID,
     *,
-    oin: str = TEST_OIN,
+    oin: Oin = TEST_OIN,
     common_name: str = "CN-1",
     source_id: str | None = None,
     scopes: str | None = None,
 ) -> ClientEntity:
     return service.create_one(
         organization_id=organization_id,
-        oin=Oin(oin),
+        oin=oin,
         common_name=common_name,
         source_id=source_id,
         scopes=scopes,
@@ -44,7 +45,7 @@ def test_create_one_should_succeed(
     result = _create_client(client_service, persisted_organization.id, source_id="source-1")
     assert isinstance(result.id, UUID)
     assert result.organization_id == persisted_organization.id
-    assert result.oin == TEST_OIN
+    assert str(result.oin) == str(TEST_OIN)
     assert result.common_name == "CN-1"
     assert result.source_id == "source-1"
 
@@ -105,10 +106,10 @@ def test_update_one_can_change_oin_and_source_id(
     persisted_organization: OrganizationEntity,
 ) -> None:
     created = _create_client(client_service, persisted_organization.id, source_id="source-old")
-    result = client_service.update_one(created.id, persisted_organization.id, oin=Oin(ALT_OIN), source_id="source-new")
+    result = client_service.update_one(created.id, persisted_organization.id, oin=ALT_OIN, source_id="source-new")
     assert result is not None
-    assert result.oin == ALT_OIN
-    assert isinstance(result.oin, str)
+    assert str(result.oin) == str(ALT_OIN)
+    assert isinstance(result.oin, Oin)
     assert result.source_id == "source-new"
     assert client_service.get_one(created.id, persisted_organization.id) is not None
 
@@ -148,7 +149,7 @@ def test_get_many_deleted_visibility(
 @pytest.mark.parametrize(
     "filter_kwargs, attr, expected",
     [
-        ({"oin": Oin(TEST_OIN)}, "oin", TEST_OIN),
+        ({"oin": TEST_OIN}, "oin", TEST_OIN),
         ({"common_name": "CN-1"}, "common_name", "CN-1"),
         ({"source_id": "source-a"}, "source_id", "source-a"),
     ],
@@ -164,7 +165,11 @@ def test_get_many_single_filter(
     _create_client(client_service, persisted_organization.id, oin=ALT_OIN, common_name="CN-2", source_id="source-b")
     results = client_service.get_many(organization_id=persisted_organization.id, **filter_kwargs)
     assert len(results) == 1
-    assert getattr(results[0], attr) == expected
+    actual = getattr(results[0], attr)
+    if attr == "oin":
+        assert str(actual) == str(expected)
+    else:
+        assert actual == expected
 
 
 @pytest.mark.parametrize(
@@ -247,20 +252,20 @@ def test_update_one_scope_enforcement(
         # wrong common_name -> no client
         ("Nobody", SCOPED_ORG_REGISTER_ID, None, None),
         # org_ura matches no organization -> no client
-        ("Scoped Client", "00000099000000008000", None, None),
+        ("Scoped Client", UraNumber("99999999"), None, None),
     ],
 )
 def test_resolve(
     client_service: ClientService,
     organization_service: OrganizationService,
     common_name: str,
-    org_ura: str,
+    org_ura: UraNumber,
     expected_scopes: str | None,
     expected_source_id: str | None,
 ) -> None:
     org = _scoped_org(organization_service, "read write delete")
     _create_client(client_service, org.id, common_name="Scoped Client", source_id="source-xyz", scopes="read write")
-    resolved = client_service.resolve(oin=Oin(TEST_OIN), common_name=common_name, org_ura=org_ura)
+    resolved = client_service.resolve(oin=TEST_OIN, common_name=common_name, org_ura=org_ura)
     if expected_scopes is None:
         assert resolved is None
     else:

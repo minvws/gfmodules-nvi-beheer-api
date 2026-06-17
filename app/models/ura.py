@@ -36,7 +36,7 @@ class UraNumber:
 
     def __hash__(self) -> int:
         return hash(self.value)
-    
+
     @classmethod
     def __get_pydantic_core_schema__(cls, _source_type: Any, _handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
         return core_schema.no_info_plain_validator_function(

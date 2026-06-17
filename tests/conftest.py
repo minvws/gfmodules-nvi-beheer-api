@@ -14,14 +14,16 @@ from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.models.oin import Oin
+from app.models.ura import UraNumber
 from app.routers.client import router as client_router
 from app.routers.organization import router as organization_router
 from app.routers.resolve import router as resolve_router
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
 
-TEST_OIN = "00000099000000001000"
-TEST_REGISTER_ID = "test-register-001"
+TEST_OIN = Oin("00000099000000001000")
+TEST_REGISTER_ID = UraNumber("12345678")
 TEST_ORG_NAME = "Test Organization"
 TEST_SOURCE_ID = "source-001"
 TEST_COMMON_NAME = "Test Client"
@@ -103,7 +105,7 @@ def api(mock_client_service: MagicMock, mock_organization_service: MagicMock) ->
 def make_organization_entity(
     *,
     id: UUID | None = None,
-    register_id: str = VALID_OIN,
+    register_id: UraNumber = TEST_REGISTER_ID,
     name: str = "Test Organization",
     scopes: str | None = None,
     deleted_at: datetime | None = None,
@@ -122,7 +124,7 @@ def make_client_entity(
     *,
     id: UUID | None = None,
     organization_id: UUID | None = None,
-    oin: str = VALID_OIN,
+    oin: Oin = VALID_OIN,
     common_name: str = "Test Client",
     source_id: str | None = None,
     scopes: str | None = None,
