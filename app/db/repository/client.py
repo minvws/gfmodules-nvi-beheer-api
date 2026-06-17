@@ -8,6 +8,8 @@ from app.db.decorator import repository
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase, scopes_contains_conditions
+from app.models.oin import Oin
+from app.models.ura import UraNumber
 
 
 @repository(ClientEntity)
@@ -29,7 +31,7 @@ class ClientRepository(RepositoryBase):
         stmt = select(select(ClientEntity.id).where(self._and_clause(organization_id, id)).exists())
         return bool(self.db_session.execute(stmt).scalar())
 
-    def get_by_credentials(self, common_name: str, oin: str, org_ura: str) -> ClientEntity | None:
+    def get_by_credentials(self, common_name: str, oin: Oin, org_ura: UraNumber) -> ClientEntity | None:
         stmt = (
             select(ClientEntity)
             .join(OrganizationEntity, ClientEntity.organization_id == OrganizationEntity.id)
@@ -48,7 +50,7 @@ class ClientRepository(RepositoryBase):
     def get_many(
         self,
         organization_id: UUID,
-        oin: str | None = None,
+        oin: Oin | None = None,
         common_name: str | None = None,
         source_id: str | None = None,
         scopes: str | None = None,

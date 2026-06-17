@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db.decorator import repository
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase, scopes_contains_conditions
+from app.models.ura import UraNumber
 
 
 @repository(OrganizationEntity)
@@ -28,7 +29,7 @@ class OrganizationRepository(RepositoryBase):
         stmt = select(select(OrganizationEntity.id).where(self._and_clause(id)).exists())
         return bool(self.db_session.execute(stmt).scalar())
 
-    def get_one_by_register_id(self, register_id: str) -> OrganizationEntity | None:
+    def get_one_by_register_id(self, register_id: UraNumber) -> OrganizationEntity | None:
         stmt = select(OrganizationEntity).where(
             and_(
                 OrganizationEntity.register_id == register_id,
@@ -39,7 +40,7 @@ class OrganizationRepository(RepositoryBase):
 
     def get_many(
         self,
-        register_id: str | None = None,
+        register_id: UraNumber | None = None,
         name: str | None = None,
         scopes: str | None = None,
         include_deleted: bool = False,

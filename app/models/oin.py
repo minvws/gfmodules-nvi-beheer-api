@@ -35,6 +35,9 @@ class Oin:
     _SHORT_SUFFIX = "000"  # used when mainnumber is 9 digits
 
     def __init__(self, value: Any) -> None:
+        if isinstance(value, Oin):
+            value = value.value
+
         if not isinstance(value, (int, str)):
             raise ValueError(f"OIN must be a string or integer, got {type(value).__name__}")
 

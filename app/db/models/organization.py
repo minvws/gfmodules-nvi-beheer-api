@@ -6,6 +6,8 @@ from sqlalchemy import Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.models.base import CommonColumns
+from app.db.types.ura_type import UraType
+from app.models.ura import UraNumber
 
 if TYPE_CHECKING:
     from app.db.models.client import ClientEntity
@@ -23,9 +25,7 @@ class OrganizationEntity(CommonColumns):
         ),
     )
 
-    register_id: Mapped[str] = mapped_column(
-        "register_id", String
-    )  # ID of the organization: {OIN} for PRS - {URA} for NVI
+    register_id: Mapped[UraNumber] = mapped_column("register_id", UraType)
     name: Mapped[str] = mapped_column("name", String)
 
     clients: Mapped[List["ClientEntity"]] = relationship(

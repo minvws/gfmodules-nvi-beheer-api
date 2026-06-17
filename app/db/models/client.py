@@ -8,6 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
 from app.db.models.base import CommonColumns
+from app.db.types.oin_type import OinType
+from app.models.oin import Oin
 
 if TYPE_CHECKING:
     from app.db.models.organization import OrganizationEntity
@@ -29,7 +31,7 @@ class ClientEntity(CommonColumns):
 
     organization_id: Mapped[UUID] = mapped_column("organization_id", Uuid, ForeignKey("organizations.id"))
 
-    oin: Mapped[str] = mapped_column("oin", String)  # OIN of the client
+    oin: Mapped[Oin] = mapped_column("oin", OinType)
     common_name: Mapped[str] = mapped_column("common_name", String)
     source_id: Mapped[str | None] = mapped_column("source_id", String, nullable=True)
 
