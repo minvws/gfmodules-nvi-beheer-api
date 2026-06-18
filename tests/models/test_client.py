@@ -7,25 +7,25 @@ from app.models.client import (
     ClientResolveRequest,
     ClientUpdate,
 )
-from app.models.oin import Oin
+from app.models.ura import UraNumber
 from tests.conftest import TEST_OIN
 
 
 def test_create_should_succeed() -> None:
-    model = ClientCreate(oin=Oin(TEST_OIN), common_name="Test Client")
-    assert str(model.oin) == TEST_OIN
+    model = ClientCreate(oin=TEST_OIN, common_name="Test Client")
+    assert str(model.oin) == str(TEST_OIN)
     assert model.common_name == "Test Client"
     assert model.source_id is None
     assert model.scopes is None
 
 
 def test_create_source_id_is_optional() -> None:
-    model = ClientCreate(oin=Oin(TEST_OIN), common_name="Test Client", source_id="source-1")
+    model = ClientCreate(oin=TEST_OIN, common_name="Test Client", source_id="source-1")
     assert model.source_id == "source-1"
 
 
 def test_create_with_scopes_should_succeed() -> None:
-    model = ClientCreate(oin=Oin(TEST_OIN), common_name="Test Client", scopes="read")
+    model = ClientCreate(oin=TEST_OIN, common_name="Test Client", scopes="read")
     assert model.scopes == "read"
 
 
@@ -36,7 +36,7 @@ def test_create_missing_oin_should_raise() -> None:
 
 def test_create_missing_common_name_should_raise() -> None:
     with pytest.raises(ValidationError):
-        ClientCreate(oin=Oin(TEST_OIN))  # type: ignore[call-arg]
+        ClientCreate(oin=TEST_OIN)  # type: ignore[call-arg]
 
 
 def test_update_is_partial_all_fields_optional() -> None:
@@ -53,8 +53,8 @@ def test_update_only_tracks_supplied_fields() -> None:
 
 
 def test_update_can_set_oin_and_source_id() -> None:
-    model = ClientUpdate(oin=Oin(TEST_OIN), source_id="source-1")
-    assert str(model.oin) == TEST_OIN
+    model = ClientUpdate(oin=TEST_OIN, source_id="source-1")
+    assert str(model.oin) == str(TEST_OIN)
     assert model.source_id == "source-1"
 
 
@@ -65,18 +65,19 @@ def test_query_params_all_optional_and_track_supplied_only() -> None:
 
 
 def test_resolve_request_should_succeed() -> None:
+    org_ura = UraNumber("12345678")
     model = ClientResolveRequest(
-        oin=Oin(TEST_OIN),
+        oin=TEST_OIN,
         common_name="Test Client",
-        org_ura="00000099000000001000",
+        org_ura=org_ura,
     )
-    assert str(model.oin) == TEST_OIN
-    assert model.org_ura == "00000099000000001000"
+    assert str(model.oin) == str(TEST_OIN)
+    assert str(model.org_ura) == str(org_ura)
 
 
 def test_resolve_request_missing_org_ura_should_raise() -> None:
     with pytest.raises(ValidationError):
         ClientResolveRequest(  # type: ignore[call-arg]
-            oin=Oin(TEST_OIN),
+            oin=TEST_OIN,
             common_name="Test Client",
         )

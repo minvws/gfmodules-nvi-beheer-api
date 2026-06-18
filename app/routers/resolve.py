@@ -22,6 +22,7 @@ def resolve(
         org_ura=data.org_ura,
     )
     if client is None or client.scopes is None:
+        logger.warning("Client not found or has no granted scopes")
         raise HTTPException(status_code=404, detail="Client not found.")
 
     return client

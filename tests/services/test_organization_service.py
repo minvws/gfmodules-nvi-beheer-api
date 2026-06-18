@@ -1,10 +1,11 @@
 from uuid import UUID, uuid4
 
 from app.db.models.organization import OrganizationEntity
+from app.models.ura import UraNumber
 from app.services.organization import OrganizationService
 from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
 
-SECOND_ORG_REG_ID = "test-register-002"
+SECOND_ORG_REG_ID = UraNumber("87654321")
 SECOND_ORG_NAME = "Second Test Organization"
 
 

@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.base import INCLUDE_DELETED_DESCRIPTION, CommonModel
 from app.models.oin import Oin
+from app.models.ura import UraNumber
 
 ORG_URA_DESCRIPTION = "The URA (register_id) of the organization the client acts on behalf of"
 COMMON_NAME_DESCRIPTION = "The certificate CN of the client"
@@ -15,7 +16,7 @@ SCOPES_DESCRIPTION = "The space separated scopes granted to the client"
 class ClientResolveRequest(BaseModel):
     oin: Oin = Field(..., description=OIN_DESCRIPTION)
     common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
-    org_ura: str = Field(..., description=ORG_URA_DESCRIPTION)
+    org_ura: UraNumber = Field(..., description=ORG_URA_DESCRIPTION)
 
 
 class ClientResolveResponse(BaseModel):

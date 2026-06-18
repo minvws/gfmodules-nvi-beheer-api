@@ -14,7 +14,7 @@ BASE = f"/organizations/{ORG_ID}/clients"
 
 
 def _create_body(**overrides: object) -> dict[str, object]:
-    body: dict[str, object] = {"oin": VALID_OIN, "common_name": "Client"}
+    body: dict[str, object] = {"oin": str(VALID_OIN), "common_name": "Client"}
     body.update(overrides)
     return body
 
@@ -22,7 +22,7 @@ def _create_body(**overrides: object) -> dict[str, object]:
 @pytest.mark.parametrize(
     "method, path, body",
     [
-        ("post", BASE, {"oin": VALID_OIN, "common_name": "C"}),
+        ("post", BASE, {"oin": str(VALID_OIN), "common_name": "C"}),
         ("get", f"{BASE}/{CLIENT_ID}", None),
         ("get", BASE, None),
         ("put", f"{BASE}/{CLIENT_ID}", {"common_name": "C"}),
@@ -52,12 +52,12 @@ def test_register_returns_201(api: TestClient, mock_client_service: MagicMock, s
     assert response.status_code == 201
     data = response.json()
     assert data["id"] == str(entity.id)
-    assert data["oin"] == VALID_OIN
+    assert data["oin"] == str(VALID_OIN)
     assert data["source_id"] == "source-1"
 
     call = mock_client_service.create_one.call_args
     assert call.kwargs["organization_id"] == UUID(ORG_ID)
-    assert str(call.kwargs["oin"]) == VALID_OIN
+    assert str(call.kwargs["oin"]) == str(VALID_OIN)
     assert call.kwargs["common_name"] == "Client"
     assert call.kwargs["source_id"] is None
     assert call.kwargs["scopes"] == scopes
@@ -79,7 +79,7 @@ def test_register_conflict_returns_409(api: TestClient, mock_client_service: Mag
     "body",
     [
         {"common_name": "C"},  # missing oin
-        {"oin": VALID_OIN},  # missing common_name
+        {"oin": str(VALID_OIN)},  # missing common_name
         {"oin": "invalid-oin", "common_name": "C"},  # malformed oin
     ],
 )
@@ -145,11 +145,11 @@ def test_get_many_without_params_uses_defaults(api: TestClient, mock_client_serv
 
 def test_get_many_passes_query_params(api: TestClient, mock_client_service: MagicMock) -> None:
     mock_client_service.get_many.return_value = []
-    api.get(f"{BASE}?oin={VALID_OIN}&common_name=CN-1&source_id=source-1&scopes=read+write&include_deleted=true")
+    api.get(f"{BASE}?oin={str(VALID_OIN)}&common_name=CN-1&source_id=source-1&scopes=read+write&include_deleted=true")
 
     call = mock_client_service.get_many.call_args
     assert call.kwargs["organization_id"] == UUID(ORG_ID)
-    assert str(call.kwargs["oin"]) == VALID_OIN
+    assert str(call.kwargs["oin"]) == str(VALID_OIN)
     assert call.kwargs["common_name"] == "CN-1"
     assert call.kwargs["source_id"] == "source-1"
     assert call.kwargs["scopes"] == "read write"

@@ -6,6 +6,7 @@ from app import scope_utils
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
+from app.models.ura import UraNumber
 from app.services.exceptions import ScopesNotGrantedError
 
 
@@ -15,7 +16,7 @@ class OrganizationService:
 
     def create_one(
         self,
-        register_id: str,
+        register_id: UraNumber,
         name: str,
         scopes: str | None = None,
     ) -> OrganizationEntity:
@@ -36,7 +37,7 @@ class OrganizationService:
 
     def get_many(
         self,
-        register_id: str | None = None,
+        register_id: UraNumber | None = None,
         name: str | None = None,
         scopes: str | None = None,
         include_deleted: bool = False,

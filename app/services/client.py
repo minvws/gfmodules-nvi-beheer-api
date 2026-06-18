@@ -6,6 +6,7 @@ from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
 from app.models.oin import Oin
+from app.models.ura import UraNumber
 from app.services.organization import OrganizationService
 
 
@@ -32,7 +33,7 @@ class ClientService:
             entity = ClientEntity(
                 organization_id=organization_id,
                 source_id=source_id,
-                oin=str(oin),
+                oin=oin,
                 common_name=common_name,
                 scopes=scopes,
             )
@@ -57,7 +58,7 @@ class ClientService:
             return list(
                 repo.get_many(
                     organization_id=organization_id,
-                    oin=str(oin) if oin else None,
+                    oin=oin,
                     common_name=common_name,
                     source_id=source_id,
                     scopes=scopes,
@@ -70,8 +71,6 @@ class ClientService:
             repo = session.get_repository(ClientRepository)
             if not repo.exists(organization_id, id):
                 return None
-            if "oin" in kwargs:
-                kwargs["oin"] = str(kwargs["oin"])
             if "scopes" in kwargs:
                 self.org_service.assert_scopes_granted(organization_id, kwargs["scopes"])  # type: ignore[arg-type]
             return repo.update(organization_id, id, **kwargs)
@@ -87,8 +86,8 @@ class ClientService:
         self,
         oin: Oin,
         common_name: str,
-        org_ura: str,
+        org_ura: UraNumber,
     ) -> ClientEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
-            return repo.get_by_credentials(common_name=common_name, oin=str(oin), org_ura=org_ura)
+            return repo.get_by_credentials(common_name=common_name, oin=oin, org_ura=org_ura)
