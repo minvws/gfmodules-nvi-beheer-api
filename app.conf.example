@@ -1,6 +1,8 @@
 [app]
 # Loglevel can be one of: debug, info, warning, error, critical
 loglevel=debug
+# list of possible scopes according to the NVI 
+scopes = nvi:create nvi:read nvi:update nvi:delete nvi:localize 
 
 [database]
 # Dsn for database connection

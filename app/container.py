@@ -17,7 +17,7 @@ def container_config(binder: inject.Binder) -> None:
     db = Database(config_database=config.database)
     binder.bind(Database, db)
 
-    organization_service = OrganizationService(db)
+    organization_service = OrganizationService(db, config.app.scopes)
     binder.bind(OrganizationService, organization_service)
 
     client_service = ClientService(db, organization_service)

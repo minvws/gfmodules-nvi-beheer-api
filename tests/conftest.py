@@ -52,7 +52,7 @@ def client_repository(database: Database) -> ClientRepository:
 
 @pytest.fixture()
 def organization_service(database: Database) -> OrganizationService:
-    return OrganizationService(database)
+    return OrganizationService(database, allowed_scopes=["read", "write", "delete"])
 
 
 @pytest.fixture()
@@ -66,7 +66,9 @@ def organization_entity() -> OrganizationEntity:
 
 
 @pytest.fixture()
-def persisted_organization(organization_service: OrganizationService) -> OrganizationEntity:
+def persisted_organization(
+    organization_service: OrganizationService,
+) -> OrganizationEntity:
     return organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
 
 
