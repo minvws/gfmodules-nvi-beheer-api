@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select, update
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import joinedload
 
 from app.db.decorator import repository
 from app.db.models.client import ClientEntity
@@ -44,6 +45,7 @@ class ClientRepository(RepositoryBase):
                     ClientEntity.deleted_at.is_(None),
                 )
             )
+            .options(joinedload(ClientEntity.organization))
         )
         return self.db_session.execute(stmt).scalar()
 
