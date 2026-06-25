@@ -36,3 +36,7 @@ class ClientEntity(CommonColumns):
     source_id: Mapped[str | None] = mapped_column("source_id", String, nullable=True)
 
     organization: Mapped["OrganizationEntity"] = relationship(back_populates="clients", lazy="raise")
+
+    @property
+    def organization_name(self) -> str | None:
+        return self.organization.name if self.organization else None

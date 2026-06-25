@@ -131,14 +131,16 @@ def make_client_entity(
     source_id: str | None = None,
     scopes: str | None = None,
     deleted_at: datetime | None = None,
+    org_entity: OrganizationEntity | None = None,
 ) -> ClientEntity:
     return ClientEntity(
         id=id or uuid4(),
-        organization_id=organization_id or uuid4(),
+        organization_id=organization_id or (org_entity.id if org_entity else uuid4()),
         oin=oin,
         common_name=common_name,
         source_id=source_id,
         scopes=scopes,
         created_at=FIXED_CREATED_AT,
         deleted_at=deleted_at,
+        organization=org_entity,
     )
