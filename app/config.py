@@ -46,6 +46,15 @@ class ConfigDatabase(BaseModel):
     pool_recycle: int = Field(default=3600, ge=0)
 
 
+class ConfigLogging(BaseModel):
+    app_path: str | None = Field(default=None)
+    siem_path: str | None = Field(default=None)
+    public_inspect_path: str | None = Field(default=None)
+    debug_path: str | None = Field(default=None)
+    include_traces: bool = Field(default=False)
+    debug_logs_in_console: bool = Field(default=False)
+
+
 class ConfigUvicorn(BaseModel):
     swagger_enabled: bool = Field(default=False)
     docs_url: str = Field(default="/docs")
@@ -82,6 +91,7 @@ class Config(BaseModel):
     telemetry: ConfigTelemetry
     stats: ConfigStats
     uvicorn: ConfigUvicorn
+    logging: ConfigLogging
 
 
 def read_ini_file(path: str) -> Any:

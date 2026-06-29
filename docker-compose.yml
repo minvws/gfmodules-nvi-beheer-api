@@ -35,3 +35,14 @@ services:
       start_interval: 1s
     ports:
       - 5432:5432
+
+  syslog:
+    image: balabit/syslog-ng:latest
+    ports:
+        - "5514:5514/udp" # App logs
+        - "5515:5515/udp" # SIEM
+        - "5516:5516/udp" # Public inspection
+        - "5517:5517/udp" # Debug
+    volumes:
+      - ./docker/syslog-ng.conf:/etc/syslog-ng/syslog-ng.conf
+      - ./logs:/var/log/app
