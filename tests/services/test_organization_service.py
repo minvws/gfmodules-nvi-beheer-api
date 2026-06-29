@@ -1,9 +1,13 @@
 from uuid import UUID, uuid4
 
+import pytest
+
 from app.db.models.organization import OrganizationEntity
 from app.models.ura import UraNumber
+from app.services.client import ClientService
+from app.services.exceptions import OrganizationHasActiveClientsError
 from app.services.organization import OrganizationService
-from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
+from tests.conftest import TEST_COMMON_NAME, TEST_OIN, TEST_ORG_NAME, TEST_REGISTER_ID
 
 SECOND_ORG_REG_ID = UraNumber("87654321")
 SECOND_ORG_NAME = "Second Test Organization"
@@ -72,6 +76,41 @@ def test_delete_one_returns_none_when_not_found(
 ) -> None:
     result = organization_service.delete_one(uuid4())
     assert result is None
+
+
+def test_delete_one_rejects_when_active_clients_exist(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+    organization_entity: OrganizationEntity,
+) -> None:
+    created = organization_service.create_one(
+        register_id=organization_entity.register_id,
+        name=organization_entity.name,
+    )
+    client_service.create_one(organization_id=created.id, oin=TEST_OIN, common_name=TEST_COMMON_NAME)
+
+    with pytest.raises(OrganizationHasActiveClientsError):
+        organization_service.delete_one(created.id)
+
+    assert organization_service.get_one(created.id) is not None
+
+
+def test_delete_one_allows_when_clients_are_deleted(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+    organization_entity: OrganizationEntity,
+) -> None:
+    created = organization_service.create_one(
+        register_id=organization_entity.register_id,
+        name=organization_entity.name,
+    )
+    client = client_service.create_one(organization_id=created.id, oin=TEST_OIN, common_name=TEST_COMMON_NAME)
+    client_service.delete_one(client.id, created.id)
+
+    result = organization_service.delete_one(created.id)
+
+    assert result is not None
+    assert organization_service.get_one(created.id) is None
 
 
 def test_update_one_should_succeed(

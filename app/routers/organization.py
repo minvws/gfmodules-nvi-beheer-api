@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.container import get_organization_service
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
+from app.services.exceptions import OrganizationHasActiveClientsError
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,10 @@ def delete(
     id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Response:
-    result = service.delete_one(id)
+    try:
+        result = service.delete_one(id)
+    except OrganizationHasActiveClientsError as error:
+        raise HTTPException(status_code=409, detail=str(error))
     if result is None:
         raise HTTPException(status_code=404)
     return Response(status_code=204)

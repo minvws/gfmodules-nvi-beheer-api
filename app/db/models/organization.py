@@ -28,6 +28,4 @@ class OrganizationEntity(CommonColumns):
     register_id: Mapped[UraNumber] = mapped_column("register_id", UraType)
     name: Mapped[str] = mapped_column("name", String)
 
-    clients: Mapped[List["ClientEntity"]] = relationship(
-        back_populates="organization", cascade="all, delete-orphan", lazy="raise"
-    )
+    clients: Mapped[List["ClientEntity"]] = relationship(back_populates="organization", lazy="raise")

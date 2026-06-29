@@ -7,7 +7,11 @@ from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
 from app.models.ura import UraNumber
-from app.services.exceptions import ScopeNotAllowedError, ScopesNotGrantedError
+from app.services.exceptions import (
+    OrganizationHasActiveClientsError,
+    ScopeNotAllowedError,
+    ScopesNotGrantedError,
+)
 
 
 class OrganizationService:
@@ -31,10 +35,11 @@ class OrganizationService:
             entity = OrganizationEntity(register_id=register_id, name=name, scopes=scopes)
             return repo.add_one(entity)
 
-    def get_one(self, id: UUID) -> OrganizationEntity | None:
+    def get_one(self, id: UUID, with_clients: bool = False) -> OrganizationEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            return repo.get_one(id)
+            entity = repo.get_one(id, with_clients=with_clients)
+            return entity
 
     def exists(self, id: UUID) -> bool:
         with self.db.get_db_session() as session:
@@ -73,6 +78,11 @@ class OrganizationService:
     def delete_one(self, id: UUID) -> OrganizationEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
+            org = repo.get_one(id, with_clients=True)
+            if org is None:
+                return None
+            if org.clients and any(client.deleted_at is None for client in org.clients):
+                raise OrganizationHasActiveClientsError(id)
             return repo.update(id, deleted_at=datetime.now())
 
     def assert_scopes_granted(self, organization_id: UUID, requested: str | None) -> None:

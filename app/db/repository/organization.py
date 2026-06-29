@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select, update
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import joinedload
 
 from app.db.decorator import repository
 from app.db.models.organization import OrganizationEntity
@@ -21,9 +22,14 @@ class OrganizationRepository(RepositoryBase):
             self.db_session.rollback()
             raise e
 
-    def get_one(self, id: UUID) -> OrganizationEntity | None:
-        stmt = select(OrganizationEntity).where(self._and_clause(id))
-        return self.db_session.execute(stmt).scalar()
+    def get_one(self, id: UUID, with_clients: bool = False) -> OrganizationEntity | None:
+        stmt = select(OrganizationEntity)
+        if not with_clients:
+            stmt = stmt.where(self._and_clause(id))
+        else:
+            stmt = stmt.where(OrganizationEntity.id == id).options(joinedload(OrganizationEntity.clients))
+
+        return self.db_session.execute(stmt).unique().scalar()
 
     def exists(self, id: UUID) -> bool:
         stmt = select(select(OrganizationEntity.id).where(self._and_clause(id)).exists())

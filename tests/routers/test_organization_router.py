@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
+from app.services.exceptions import OrganizationHasActiveClientsError
 from tests.conftest import TEST_REGISTER_ID, make_organization_entity
 
 ORG_ID = "11111111-1111-1111-1111-111111111111"
@@ -165,6 +166,12 @@ def test_delete_not_found_returns_404(api: TestClient, mock_organization_service
     mock_organization_service.delete_one.return_value = None
     response = api.delete(f"/organizations/{ORG_ID}")
     assert response.status_code == 404
+
+
+def test_delete_with_active_clients_returns_409(api: TestClient, mock_organization_service: MagicMock) -> None:
+    mock_organization_service.delete_one.side_effect = OrganizationHasActiveClientsError(ORG_ID)
+    response = api.delete(f"/organizations/{ORG_ID}")
+    assert response.status_code == 409
 
 
 def test_delete_invalid_uuid_returns_422(api: TestClient) -> None:
