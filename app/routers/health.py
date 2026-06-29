@@ -1,10 +1,12 @@
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from app.container import get_database
 from app.db.db import Database
+from app.logging.events import Log
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -56,8 +58,10 @@ def ok_or_error(value: bool) -> str:
     },
     tags=["Health"],
 )
-def health(db: Database = Depends(get_database)) -> JSONResponse:
-    logger.info("Checking database health")
+def health(
+    db: Annotated[Database, Depends(get_database)],
+) -> JSONResponse:
+    logger.info("Checking application health")
 
     components = {
         "database": ok_or_error(db.is_healthy()),
@@ -66,8 +70,13 @@ def health(db: Database = Depends(get_database)) -> JSONResponse:
     content = {"status": healthy, "components": components}
     if healthy == "ok":
         return JSONResponse(content=content)
-    logger.warning(f"Some components unhealthy: {components}")
-    return JSONResponse(
-        status_code=503,
-        content=content,
+    unhealthy = [name for name, status in components.items() if status != "ok"]
+    Log.event(
+        logger,
+        Log.HEALTH_UNHEALTHY,
+        "Health check unhealthy",
+        component=",".join(unhealthy),
+        status="error",
+        error_detail=f"unhealthy components: {', '.join(unhealthy)}",
     )
+    return JSONResponse(status_code=503, content=content)
