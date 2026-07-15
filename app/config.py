@@ -36,6 +36,13 @@ class ConfigApp(BaseModel):
         return trimmed_value.split(" ")
 
 
+class ConfigLogging(BaseModel):
+    syslog_path: str | None = Field(default=None)
+    application_id: str | None = Field(default=None)
+    include_traces: bool = Field(default=True)
+    debug_logs_in_console: bool = Field(default=False)
+
+
 class ConfigDatabase(BaseModel):
     dsn: str
     create_tables: bool = Field(default=False)
@@ -44,15 +51,6 @@ class ConfigDatabase(BaseModel):
     max_overflow: int = Field(default=10, ge=0, lt=100)
     pool_pre_ping: bool = Field(default=False)
     pool_recycle: int = Field(default=3600, ge=0)
-
-
-class ConfigLogging(BaseModel):
-    app_path: str | None = Field(default=None)
-    siem_path: str | None = Field(default=None)
-    public_inspect_path: str | None = Field(default=None)
-    debug_path: str | None = Field(default=None)
-    include_traces: bool = Field(default=False)
-    debug_logs_in_console: bool = Field(default=False)
 
 
 class ConfigUvicorn(BaseModel):
@@ -87,11 +85,11 @@ class ConfigStats(BaseModel):
 
 class Config(BaseModel):
     app: ConfigApp
+    logging: ConfigLogging = Field(default_factory=ConfigLogging)
     database: ConfigDatabase
     telemetry: ConfigTelemetry
     stats: ConfigStats
     uvicorn: ConfigUvicorn
-    logging: ConfigLogging
 
 
 def read_ini_file(path: str) -> Any:

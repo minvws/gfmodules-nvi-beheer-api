@@ -217,3 +217,31 @@ def test_off_spec_extras_dropped_from_all_streams(
 
     # CLIENT_ONBOARDED is not routed to PUB (stroom 1)
     assert pub_buf.getvalue() == ""
+
+
+def test_records_carry_stream_id_and_application_id() -> None:
+    # On the shared syslog channel the log server tells streams and
+    # applications apart by the stream_id/application_id stamped per record.
+    buf = io.StringIO()
+    handler = logging.StreamHandler(buf)
+    handler.setFormatter(
+        JsonFormatter(
+            include_traces=False,
+            stream=LoggingStreams.APP,
+            stream_id="app",
+            application_id="nvi-beheer-api",
+        )
+    )
+
+    logger = logging.getLogger("app.test_stream_routing_ids")
+    logger.setLevel(logging.DEBUG)
+    logger.handlers = [handler]
+    logger.propagate = False
+    try:
+        Log.event(logger, Log.SYS_APP_STARTED, "started", version="1.0.0")
+    finally:
+        logger.handlers = []
+
+    record = json.loads(buf.getvalue())
+    assert record["stream_id"] == "app"
+    assert record["application_id"] == "nvi-beheer-api"
