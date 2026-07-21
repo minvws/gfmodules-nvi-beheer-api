@@ -17,7 +17,7 @@ ORGANIZATION_NAME_DESCRIPTION = "The name of the organization the client acts on
 class ClientResolveRequest(BaseModel):
     oin: Oin = Field(..., description=OIN_DESCRIPTION)
     common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
-    org_ura: UraNumber = Field(..., description=ORG_URA_DESCRIPTION)
+    org_id: UraNumber = Field(..., description=ORG_URA_DESCRIPTION)
 
 
 class ClientResolveResponse(BaseModel):

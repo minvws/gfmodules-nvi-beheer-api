@@ -69,13 +69,13 @@ def test_resolve_request_should_succeed() -> None:
     model = ClientResolveRequest(
         oin=TEST_OIN,
         common_name="Test Client",
-        org_ura=org_ura,
+        org_id=org_ura,
     )
     assert str(model.oin) == str(TEST_OIN)
-    assert str(model.org_ura) == str(org_ura)
+    assert str(model.org_id) == str(org_ura)
 
 
-def test_resolve_request_missing_org_ura_should_raise() -> None:
+def test_resolve_request_missing_org_id_should_raise() -> None:
     with pytest.raises(ValidationError):
         ClientResolveRequest(  # type: ignore[call-arg]
             oin=TEST_OIN,

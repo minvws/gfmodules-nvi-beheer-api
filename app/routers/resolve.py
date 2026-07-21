@@ -19,7 +19,7 @@ def resolve(
     client = service.resolve(
         oin=data.oin,
         common_name=data.common_name,
-        org_ura=data.org_ura,
+        org_ura=data.org_id,
     )
     if client is None or client.scopes is None:
         logger.warning("Client not found or has no granted scopes")
