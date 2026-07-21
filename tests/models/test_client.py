@@ -67,17 +67,17 @@ def test_query_params_all_optional_and_track_supplied_only() -> None:
 def test_resolve_request_should_succeed() -> None:
     org_ura = UraNumber("12345678")
     model = ClientResolveRequest(
-        oin=TEST_OIN,
-        common_name="Test Client",
-        org_ura=org_ura,
+        client_organization_id=TEST_OIN,
+        client_common_name="Test Client",
+        organization_id=org_ura,
     )
-    assert str(model.oin) == str(TEST_OIN)
-    assert str(model.org_ura) == str(org_ura)
+    assert str(model.client_organization_id) == str(TEST_OIN)
+    assert str(model.organization_id) == str(org_ura)
 
 
-def test_resolve_request_missing_org_ura_should_raise() -> None:
+def test_resolve_request_missing_org_id_should_raise() -> None:
     with pytest.raises(ValidationError):
         ClientResolveRequest(  # type: ignore[call-arg]
-            oin=TEST_OIN,
-            common_name="Test Client",
+            client_organization_id=TEST_OIN,
+            client_common_name="Test Client",
         )

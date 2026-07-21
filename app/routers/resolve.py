@@ -17,9 +17,9 @@ def resolve(
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
     client = service.resolve(
-        oin=data.oin,
-        common_name=data.common_name,
-        org_ura=data.org_ura,
+        oin=data.client_organization_id,
+        common_name=data.client_common_name,
+        org_ura=data.organization_id,
     )
     if client is None or client.scopes is None:
         logger.warning("Client not found or has no granted scopes")
