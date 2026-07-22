@@ -1,7 +1,7 @@
 import logging
 import random
 from time import sleep
-from typing import Any, Callable, List, ParamSpec, Tuple, Type, TypeVar
+from typing import Any, Callable, ParamSpec, Tuple, Type, TypeVar
 
 from sqlalchemy import Delete, Engine, Insert, Result
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
@@ -49,9 +49,9 @@ R = TypeVar("R", bound=Tuple[Any, ...])
 
 class DbSession:
     _engine: Engine
-    _retry_backoff: List[float]
+    _retry_backoff: list[float]
 
-    def __init__(self, engine: Engine, retry_backoff: List[float]) -> None:
+    def __init__(self, engine: Engine, retry_backoff: list[float]) -> None:
         self._engine = engine
         self._retry_backoff = retry_backoff
 

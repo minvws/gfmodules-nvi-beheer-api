@@ -19,7 +19,7 @@ def configure_allowed_scopes() -> Generator[Any, Any, Any]:
 
 def test_create_with_disallowed_scopes_should_raise() -> None:
     with pytest.raises(ValidationError):
-        OrganizationCreate(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="admin")
+        OrganizationCreate(external_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="admin")
 
 
 def test_update_with_disallowed_scopes_should_raise() -> None:
@@ -28,14 +28,14 @@ def test_update_with_disallowed_scopes_should_raise() -> None:
 
 
 def test_create_should_succeed() -> None:
-    model = OrganizationCreate(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
-    assert str(model.register_id) == str(TEST_REGISTER_ID)
+    model = OrganizationCreate(external_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
+    assert str(model.external_id) == str(TEST_REGISTER_ID)
     assert model.name == TEST_ORG_NAME
     assert model.scopes is None
 
 
 def test_create_with_scopes_should_succeed() -> None:
-    model = OrganizationCreate(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="read write")
+    model = OrganizationCreate(external_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="read write")
     assert model.scopes == "read write"
 
 
@@ -46,7 +46,8 @@ def test_create_missing_register_id_should_raise() -> None:
 
 def test_create_missing_name_should_raise() -> None:
     with pytest.raises(ValidationError):
-        OrganizationCreate(register_id=TEST_REGISTER_ID)  # type: ignore[call-arg]
+        # type: ignore[call-arg]
+        OrganizationCreate(external_id=TEST_REGISTER_ID)
 
 
 def test_update_should_succeed() -> None:
