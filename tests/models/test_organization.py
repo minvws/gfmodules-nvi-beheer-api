@@ -1,11 +1,30 @@
 from datetime import datetime as now
+from typing import Any, Generator
 from uuid import uuid4
 
+import inject
 import pytest
 from pydantic import ValidationError
 
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
+
+
+@pytest.fixture(autouse=True)
+def configure_allowed_scopes() -> Generator[Any, Any, Any]:
+    inject.clear_and_configure(lambda binder: binder.bind("allowed_scopes", {"read", "write"}))
+    yield
+    inject.clear()
+
+
+def test_create_with_disallowed_scopes_should_raise() -> None:
+    with pytest.raises(ValidationError):
+        OrganizationCreate(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="admin")
+
+
+def test_update_with_disallowed_scopes_should_raise() -> None:
+    with pytest.raises(ValidationError):
+        OrganizationUpdate(scopes="admin")
 
 
 def test_create_should_succeed() -> None:
@@ -58,3 +77,18 @@ def test_response_model_from_entity_with_none_scopes() -> None:
 
     model = Organization.model_validate(_Entity())
     assert model.scopes is None
+
+
+def test_response_model_allows_scopes_no_longer_configured() -> None:
+    """Narrowing the configured allow-list must not make existing records unreadable."""
+
+    class _Entity:
+        id = uuid4()
+        register_id = TEST_REGISTER_ID
+        name = TEST_ORG_NAME
+        scopes = "admin"
+        created_at = now.now()
+        deleted_at = None
+
+    model = Organization.model_validate(_Entity())
+    assert model.scopes == "admin"

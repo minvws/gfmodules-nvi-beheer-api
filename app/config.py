@@ -2,7 +2,7 @@ import configparser
 import logging
 import os
 from enum import Enum
-from typing import Any, List
+from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
@@ -24,16 +24,15 @@ class LogLevel(str, Enum):
 
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
-    scopes: List[str] = Field(default=[])
+    scopes: set[str] = Field(default=set(), description="The possible space separated scopes")
 
     @field_validator("scopes", mode="before")
     @classmethod
-    def validate_scopes(cls, value: Any) -> List[str]:
+    def validate_scopes(cls, value: Any) -> set[str]:
         if not isinstance(value, str):
             raise ValueError("only space separated str are allowed. Check config file..")
 
-        trimmed_value = value.lstrip().rstrip()
-        return trimmed_value.split(" ")
+        return set(value.split())
 
 
 class ConfigLogging(BaseModel):

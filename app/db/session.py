@@ -83,7 +83,7 @@ class DbSession:
         :param entry:
         :return:
         """
-        self._retry(self.session.add, entry)
+        self._run_once(self.session.add, entry)
 
     def delete(self, entry: Base) -> None:
         """
@@ -93,7 +93,7 @@ class DbSession:
         :return:
         """
         # database cascading will take care of the rest
-        self._retry(self.session.delete, entry)
+        self._run_once(self.session.delete, entry)
 
     def commit(self) -> None:
         """
@@ -101,7 +101,7 @@ class DbSession:
 
         :return:
         """
-        self._retry(self.session.commit)
+        self._run_once(self.session.commit)
 
     def rollback(self) -> None:
         """
@@ -137,9 +137,32 @@ class DbSession:
         """
         return self._retry(self.session.begin)
 
+    def _run_once(self, f: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+        """
+        Run an operation that depends on the session's pending unit of work, without retrying.
+
+        A failed flush poisons the transaction, and the rollback needed to clear it discards
+        everything that was staged. Retrying afterwards would commit an empty session and
+        report success while nothing was written, so fail loudly instead.
+        """
+        try:
+            return f(*args, **kwargs)
+        except (OperationalError, PendingRollbackError) as e:
+            logger.error("Transaction failed, discarding its pending work: %s", e)
+            self.session.rollback()
+            raise DatabaseError("Transaction failed, nothing was committed", None, e) from e
+        except Exception:
+            logger.exception("Unexpected error during transaction, discarding its pending work")
+            self.session.rollback()
+            raise
+
     def _retry(self, f: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
         """
-        Retry a function call in case of database errors
+        Retry a function call in case of database errors.
+
+        Only safe for operations that can be re-run from scratch, such as reads: a rollback
+        between attempts must not lose work. Use :meth:`_run_once` for anything that depends
+        on pending session state.
         """
         backoff = self._retry_backoff
 
