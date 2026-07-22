@@ -14,10 +14,13 @@ def container_config(binder: inject.Binder) -> None:
     config = get_config()
     binder.bind(Config, config)
 
+    allowed_scopes = config.app.scopes
+    binder.bind("allowed_scopes", allowed_scopes)
+
     db = Database(config_database=config.database)
     binder.bind(Database, db)
 
-    organization_service = OrganizationService(db, config.app.scopes)
+    organization_service = OrganizationService(db)
     binder.bind(OrganizationService, organization_service)
 
     client_service = ClientService(db, organization_service)
@@ -26,6 +29,10 @@ def container_config(binder: inject.Binder) -> None:
 
 def get_database() -> Database:
     return inject.instance(Database)
+
+
+def get_allowed_scopes() -> set[str]:
+    return inject.instance("allowed_scopes")  # type: ignore
 
 
 def get_organization_service() -> OrganizationService:

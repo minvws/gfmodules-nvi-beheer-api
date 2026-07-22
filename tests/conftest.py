@@ -52,7 +52,7 @@ def client_repository(database: Database) -> ClientRepository:
 
 @pytest.fixture()
 def organization_service(database: Database) -> OrganizationService:
-    return OrganizationService(database, allowed_scopes=["read", "write", "delete"])
+    return OrganizationService(database)
 
 
 @pytest.fixture()

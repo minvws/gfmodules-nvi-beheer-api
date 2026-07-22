@@ -9,15 +9,13 @@ from app.db.repository.organization import OrganizationRepository
 from app.models.ura import UraNumber
 from app.services.exceptions import (
     OrganizationHasActiveClientsError,
-    ScopeNotAllowedError,
     ScopesNotGrantedError,
 )
 
 
 class OrganizationService:
-    def __init__(self, db: Database, allowed_scopes: List[str]) -> None:
+    def __init__(self, db: Database) -> None:
         self.db = db
-        self.allowed_scopes = allowed_scopes
 
     def create_one(
         self,
@@ -25,11 +23,6 @@ class OrganizationService:
         name: str,
         scopes: str | None = None,
     ) -> OrganizationEntity:
-        if scopes:
-            scope_allowed = scope_utils.check_allowed(self.allowed_scopes, scopes)
-            if not scope_allowed:
-                raise ScopeNotAllowedError(scopes)
-
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
             entity = OrganizationEntity(register_id=register_id, name=name, scopes=scopes)
@@ -65,12 +58,6 @@ class OrganizationService:
             )
 
     def update_one(self, id: UUID, **kwargs: Any) -> OrganizationEntity | None:
-        if "scopes" in kwargs:
-            scopes: str = kwargs["scopes"]
-            valid_scope = scope_utils.check_allowed(self.allowed_scopes, scopes)
-            if not valid_scope:
-                raise ScopeNotAllowedError(scopes)
-
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
             return repo.update(id, **kwargs)

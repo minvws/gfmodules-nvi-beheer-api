@@ -1,6 +1,8 @@
+from typing import Any, Generator
 from unittest.mock import MagicMock
 from uuid import UUID
 
+import inject
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
@@ -9,6 +11,13 @@ from app.services.exceptions import OrganizationHasActiveClientsError
 from tests.conftest import TEST_REGISTER_ID, make_organization_entity
 
 ORG_ID = "11111111-1111-1111-1111-111111111111"
+
+
+@pytest.fixture(autouse=True)
+def configure_allowed_scopes() -> Generator[Any, Any, Any]:
+    inject.clear_and_configure(lambda binder: binder.bind("allowed_scopes", {"read", "write"}))
+    yield
+    inject.clear()
 
 
 @pytest.mark.parametrize("scopes", [None, "read write"])
@@ -54,6 +63,37 @@ def test_register_invalid_body_returns_422(
     mock_organization_service.create_one.assert_not_called()
 
 
+def test_register_disallowed_scopes_returns_422(api: TestClient, mock_organization_service: MagicMock) -> None:
+    response = api.post("/organizations", json={"register_id": str(TEST_REGISTER_ID), "name": "Org", "scopes": "admin"})
+    assert response.status_code == 422
+    assert "Requested scopes admin are not allowed" in response.text
+    mock_organization_service.create_one.assert_not_called()
+
+
+def test_update_disallowed_scopes_returns_422(api: TestClient, mock_organization_service: MagicMock) -> None:
+    response = api.put(f"/organizations/{ORG_ID}", json={"scopes": "admin"})
+    assert response.status_code == 422
+    assert "Requested scopes admin are not allowed" in response.text
+    mock_organization_service.update_one.assert_not_called()
+
+
+def test_update_null_scopes_is_accepted(api: TestClient, mock_organization_service: MagicMock) -> None:
+    mock_organization_service.update_one.return_value = make_organization_entity(scopes=None)
+    response = api.put(f"/organizations/{ORG_ID}", json={"scopes": None})
+    assert response.status_code == 200
+    mock_organization_service.update_one.assert_called_once_with(UUID(ORG_ID), scopes=None)
+
+
+def test_register_scopes_with_extra_whitespace_is_accepted(
+    api: TestClient, mock_organization_service: MagicMock
+) -> None:
+    mock_organization_service.create_one.return_value = make_organization_entity(scopes="read  write")
+    response = api.post(
+        "/organizations", json={"register_id": str(TEST_REGISTER_ID), "name": "Org", "scopes": "read  write"}
+    )
+    assert response.status_code == 201
+
+
 def test_get_by_id_returns_200(api: TestClient, mock_organization_service: MagicMock) -> None:
     entity = make_organization_entity()
     mock_organization_service.get_one.return_value = entity
@@ -63,6 +103,19 @@ def test_get_by_id_returns_200(api: TestClient, mock_organization_service: Magic
     assert response.status_code == 200
     assert response.json()["id"] == str(entity.id)
     mock_organization_service.get_one.assert_called_once_with(entity.id)
+
+
+def test_get_by_id_returns_200_for_scopes_no_longer_configured(
+    api: TestClient, mock_organization_service: MagicMock
+) -> None:
+    """Narrowing the configured allow-list must not make existing organizations unreadable."""
+    entity = make_organization_entity(scopes="admin")
+    mock_organization_service.get_one.return_value = entity
+
+    response = api.get(f"/organizations/{entity.id}")
+
+    assert response.status_code == 200
+    assert response.json()["scopes"] == "admin"
 
 
 def test_get_by_id_not_found_returns_404(api: TestClient, mock_organization_service: MagicMock) -> None:
