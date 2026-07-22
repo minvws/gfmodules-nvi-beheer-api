@@ -24,3 +24,4 @@ def import_submodules(package_name: str) -> None:
 
 
 import_submodules("app.db.repository")
+import_submodules("app.db.models")
