@@ -1,4 +1,4 @@
-from typing import Any, Callable, List
+from typing import Any, Callable, list
 from unittest.mock import patch
 
 import pytest
@@ -14,7 +14,7 @@ from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
 
 def _failing(*errors: Exception) -> Callable[..., Any]:
     """A callable raising each error in turn, then succeeding."""
-    remaining: List[Exception] = list(errors)
+    remaining: list[Exception] = list(errors)
 
     def call(*_args: Any, **_kwargs: Any) -> None:
         if remaining:

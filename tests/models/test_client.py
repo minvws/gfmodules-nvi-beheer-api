@@ -12,20 +12,20 @@ from tests.conftest import TEST_OIN
 
 
 def test_create_should_succeed() -> None:
-    model = ClientCreate(oin=TEST_OIN, common_name="Test Client")
-    assert str(model.oin) == str(TEST_OIN)
+    model = ClientCreate(external_id=TEST_OIN, common_name="Test Client")
+    assert str(model.external_id) == str(TEST_OIN)
     assert model.common_name == "Test Client"
     assert model.source_id is None
     assert model.scopes is None
 
 
 def test_create_source_id_is_optional() -> None:
-    model = ClientCreate(oin=TEST_OIN, common_name="Test Client", source_id="source-1")
+    model = ClientCreate(external_id=TEST_OIN, common_name="Test Client", source_id="source-1")
     assert model.source_id == "source-1"
 
 
 def test_create_with_scopes_should_succeed() -> None:
-    model = ClientCreate(oin=TEST_OIN, common_name="Test Client", scopes="read")
+    model = ClientCreate(external_id=TEST_OIN, common_name="Test Client", scopes="read")
     assert model.scopes == "read"
 
 
@@ -36,12 +36,12 @@ def test_create_missing_oin_should_raise() -> None:
 
 def test_create_missing_common_name_should_raise() -> None:
     with pytest.raises(ValidationError):
-        ClientCreate(oin=TEST_OIN)  # type: ignore[call-arg]
+        ClientCreate(external_id=TEST_OIN)  # type: ignore[call-arg]
 
 
 def test_update_is_partial_all_fields_optional() -> None:
     model = ClientUpdate()
-    assert model.oin is None
+    assert model.external_id is None
     assert model.common_name is None
     assert model.source_id is None
     assert model.scopes is None
@@ -53,8 +53,8 @@ def test_update_only_tracks_supplied_fields() -> None:
 
 
 def test_update_can_set_oin_and_source_id() -> None:
-    model = ClientUpdate(oin=TEST_OIN, source_id="source-1")
-    assert str(model.oin) == str(TEST_OIN)
+    model = ClientUpdate(external_id=TEST_OIN, source_id="source-1")
+    assert str(model.external_id) == str(TEST_OIN)
     assert model.source_id == "source-1"
 
 

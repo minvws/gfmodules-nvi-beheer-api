@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated, Any, List
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -19,15 +19,22 @@ from app.services.organization import OrganizationService
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
+# TODO: handle soft deleted organizations on create
 
-@router.post("", response_model=Organization, response_model_exclude_none=True, status_code=201)
+
+@router.post(
+    "",
+    response_model=Organization,
+    response_model_exclude_none=True,
+    status_code=201,
+)
 def register(
     data: Annotated[OrganizationCreate, Body()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
     try:
-        result = service.create_one(register_id=data.register_id, name=data.name, scopes=data.sanitized_scopes)
-        return Organization.from_entity(result)
+        result = service.create_one(data)
+        return result
     except IntegrityError:
         raise HTTPException(
             status_code=409,
@@ -46,17 +53,13 @@ def get_by_id(
     return Organization.from_entity(result)
 
 
-@router.get("", response_model=List[Organization], response_model_exclude_none=True)
+@router.get("", response_model=list[Organization], response_model_exclude_none=True)
 def get_many(
     params: Annotated[OrganizationQueryParams, Query()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    orgs = service.get_many(
-        register_id=params.register_id,
-        name=params.name,
-        scopes=params.sanitized_scopes,
-        include_deleted=params.include_deleted,
-    )
+    print(params.model_dump())
+    orgs = service.get_many(**params.model_dump())
     return [Organization.from_entity(org) for org in orgs]
 
 
@@ -66,7 +69,7 @@ def update(
     body: OrganizationUpdate,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    result = service.update_one(id=id, name=body.name, scope=body.sanitized_scopes)
+    result = service.update_one(id, dto=body)
     if result is None:
         raise HTTPException(status_code=404)
     return Organization.from_entity(result)

@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated, Any, List
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -37,14 +37,8 @@ def register(
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
     try:
-        result = service.create_one(
-            organization_id=organization_id,
-            oin=data.oin,
-            common_name=data.common_name,
-            source_id=data.source_id,
-            scopes=data.sanatized_scopes,
-        )
-        return Client.from_entity(result)
+        result = service.create_one(organization_id, data)
+        return result
     except ScopesNotGrantedError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except IntegrityError:
@@ -73,7 +67,7 @@ def get_by_id(
 
 @router.get(
     "",
-    response_model=List[Client],
+    response_model=list[Client],
     response_model_exclude_none=True,
     dependencies=[Depends(get_organization_or_404)],
 )
@@ -94,7 +88,7 @@ def get_many(
 
 @router.put(
     "/{id}",
-    # response_model=Client,
+    response_model=Client,
     response_model_exclude_none=True,
     dependencies=[Depends(get_organization_or_404)],
 )
@@ -109,7 +103,7 @@ def update(
             id=id,
             organization_id=organization_id,
             common_name=body.common_name,
-            oin=body.oin,
+            oin=body.external_id,
             source_id=body.source_id,
             scopes=body.sanatized_scopes,
         )
