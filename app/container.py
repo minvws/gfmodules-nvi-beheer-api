@@ -21,7 +21,7 @@ def container_config(binder: inject.Binder) -> None:
     db = Database(config_database=config.database)
     binder.bind(Database, db)
 
-    scope_service = ScopeService(allowed_scopes=config.app.scopes)
+    scope_service = ScopeService(db)
     binder.bind(ScopeService, scope_service)
 
     organization_service = OrganizationService(db, scope_service)

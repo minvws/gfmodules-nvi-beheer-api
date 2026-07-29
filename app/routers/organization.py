@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated, Any, List
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -20,7 +20,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
 
-@router.post("", response_model=Organization, response_model_exclude_none=True, status_code=201)
+@router.post(
+    "",
+    response_model=Organization,
+    response_model_exclude_none=True,
+    status_code=201,
+)
 def register(
     data: Annotated[OrganizationCreate, Body()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
@@ -46,7 +51,7 @@ def get_by_id(
     return Organization.from_entity(result)
 
 
-@router.get("", response_model=List[Organization], response_model_exclude_none=True)
+@router.get("", response_model=list[Organization], response_model_exclude_none=True)
 def get_many(
     params: Annotated[OrganizationQueryParams, Query()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],

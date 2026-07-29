@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated, Any, List
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -73,7 +73,7 @@ def get_by_id(
 
 @router.get(
     "",
-    response_model=List[Client],
+    response_model=list[Client],
     response_model_exclude_none=True,
     dependencies=[Depends(get_organization_or_404)],
 )
@@ -94,7 +94,7 @@ def get_many(
 
 @router.put(
     "/{id}",
-    # response_model=Client,
+    response_model=Client,
     response_model_exclude_none=True,
     dependencies=[Depends(get_organization_or_404)],
 )

@@ -2,7 +2,7 @@ CREATE TABLE scopes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(50) UNIQUE,
     created_at TIMESTAMP DEFAULT now() NOT NULL,
-    modified_at TIMESTAMP null,
+    modified_at TIMESTAMP NULL, 
     deleted_at TIMESTAMP NULL
 );
 /*Scopes as defined by the TO*/
@@ -15,15 +15,17 @@ INSERT INTO scopes (name) values
 CREATE TABLE organizations_scopes (
   organization_id UUID NOT NULL,
   scope_id UUID NOT NULL, 
-
+  
+  CONSTRAINT pk_organizations_scopes PRIMARY KEY (organization_id, scope_id),
   CONSTRAINT fk_organization_scopes_organization FOREIGN KEY (organization_id) REFERENCES organizations (id),
   CONSTRAINT fk_organization_scopes_scopes FOREIGN KEY (scope_id) REFERENCES scopes (id) 
 );
 
 CREATE TABLE clients_scopes (
-    client_id UUID,
-    scope_id UUID,
-
+    client_id UUID NOT NULL,
+    scope_id UUID NOT NULL,
+  
+    CONSTRAINT pk_clients_scopes PRIMARY KEY (client_id, scope_id),
     CONSTRAINT fk_clients_scopes_clients FOREIGN KEY (
         client_id
     ) REFERENCES clients (id),

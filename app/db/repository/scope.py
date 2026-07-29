@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 from sqlalchemy import select
 
@@ -14,4 +14,4 @@ class ScopeRepository(RepositoryBase):
         if scopes:
             stmt = stmt.where(ScopeEntity.name.in_(scopes))
 
-        return self.db_session.execute(stmt).scalars().all()
+        return self.db_session.session.execute(stmt).scalars().all()

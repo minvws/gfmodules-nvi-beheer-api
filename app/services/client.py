@@ -1,5 +1,4 @@
 import logging
-from typing import List
 from uuid import UUID
 
 from app.db.db import Database
@@ -31,7 +30,7 @@ class ClientService:
         oin: Oin,
         common_name: str,
         source_id: str | None = None,
-        scopes: List[str] | None = None,
+        scopes: list[str] | None = None,
     ) -> ClientEntity:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
@@ -74,9 +73,9 @@ class ClientService:
         oin: Oin | None = None,
         common_name: str | None = None,
         source_id: str | None = None,
-        scopes: List[str] | None = None,
+        scopes: list[str] | None = None,
         include_deleted: bool = False,
-    ) -> List[ClientEntity]:
+    ) -> list[ClientEntity]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
             return list(
@@ -97,14 +96,13 @@ class ClientService:
         common_name: str,
         oin: Oin,
         source_id: str | None = None,
-        scopes: List[str] | None = None,
+        scopes: list[str] | None = None,
     ) -> ClientEntity:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.find_one_with_specific_client(organization_id, id)
-            if not org:
+            if org is None:
                 raise RecordNotFoundError(organization_id)
-
             client = org.clients[0] if org.clients else None
             if client is None:
                 raise RecordNotFoundError(id)
@@ -112,7 +110,6 @@ class ClientService:
             client.common_name = common_name
             client.oin = oin
             client.source_id = source_id
-
             if not scopes:
                 client.scopes = []
 
@@ -121,23 +118,22 @@ class ClientService:
                 return client
 
             OrganizationService.assert_scopes_granted(org, scopes)
-            new_scopes = ScopeService.make_client_scope_from_org(org, scopes)
+            new_scopes = ScopeService.make_client_scope_from_org(org, client, scopes)
             client.scopes = new_scopes
             session.add(client)
             session.commit()
 
-        return client
+            return client
 
     def delete_one(self, id: UUID, organization_id: UUID) -> None:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
             client_repo = session.get_repository(ClientRepository)
 
-            org = org_repo.find_one_with_specific_client(organization_id, id)
-            if org is None:
+            if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
 
-            client = org.clients[0] if org.clients else None
+            client = client_repo.find_one(organization_id, id)
             if client is None:
                 raise RecordNotFoundError(id)
 
@@ -146,7 +142,7 @@ class ClientService:
                 event=Log.CLIENT_OFFBOARDED,
                 message="Client offboarded",
                 oin=client.oin,
-                ura_number=org.register_id,
+                ura_number=client.organization.register_id,
                 deactivated_by="system",
                 reason="Deleted by system",
             )

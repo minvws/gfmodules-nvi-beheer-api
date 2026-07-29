@@ -1,27 +1,38 @@
-# from app.db.models.client_scope import ClientScopeEntity
-from typing import Sequence
+from collections.abc import Sequence
 
+from app.db.db import Database
+from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.models.scope import ScopeEntity
 
 
 class ScopeService:
-    def __init__(self, allowed_scopes: set[str]) -> None:
-        self.allowed_scopes = allowed_scopes
+    def __init__(self, db: Database) -> None:
+        self.db = db
 
     @staticmethod
-    def make_client_scope_from_org(org: OrganizationEntity, client: list[str]) -> list[ScopeEntity]:
-        target = [s for s in org.scopes if s.name in client] if org.scopes else []
+    def make_client_scope_from_org(
+        org: OrganizationEntity, client: ClientEntity, new_scopes: list[str]
+    ) -> list[ScopeEntity]:
+
+        client_scope_map = {s.name: s for s in client.scopes}
+        org_scope_map = {s.name: s for s in org.scopes}
+        target = []
+        for s in new_scopes:
+            if s in client_scope_map.keys():
+                existing_scope = client_scope_map[s]
+                target.append(existing_scope)
+                continue
+
+            if s in org_scope_map.keys():
+                new_client_scope = org_scope_map[s]
+                target.append(new_client_scope)
+
         return target
-        # return [ClientScopeEntity(scope=s) for s in target]
-
-    def check_incoming_scope(self, scopes: list[str]) -> bool:
-        scopes_set = set(scopes)
-        return scopes_set.issubset(self.allowed_scopes)
 
     @staticmethod
-    def validate_requested_scopes(exitsting: Sequence[ScopeEntity], incoming: list[str]) -> bool:
-        existing_set = set([s.name for s in exitsting])
+    def validate_requested_scopes(existing: Sequence[ScopeEntity], incoming: list[str]) -> bool:
+        existing_set = {s.name for s in existing}
         incoming_set = set(incoming)
 
         return incoming_set.issubset(existing_set)

@@ -1,4 +1,4 @@
-from typing import List, Self
+from typing import Self
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -40,7 +40,7 @@ class ClientCreate(BaseModel):
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
     @property
-    def sanatized_scopes(self) -> List[str] | None:
+    def sanatized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
 
@@ -54,7 +54,7 @@ class ClientOptionalFields(BaseModel):
 
 class ClientUpdate(ClientCreate):
     @property
-    def sanatized_scopes(self) -> List[str] | None:
+    def sanatized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
 
@@ -62,7 +62,7 @@ class ClientQueryParams(ClientOptionalFields):
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
     @property
-    def sanatized_scope(self) -> List[str] | None:
+    def sanatized_scope(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
 

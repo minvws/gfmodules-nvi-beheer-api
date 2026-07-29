@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Index, String, text
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -35,11 +35,10 @@ class OrganizationEntity(CommonColumns):
     register_id: Mapped[UraNumber] = mapped_column("register_id", UraType)
     name: Mapped[str] = mapped_column("name", String)
 
-    clients: Mapped[Optional[List["ClientEntity"]]] = relationship(
-        back_populates="organization", lazy="raise"
-    )
-    scopes: Mapped[Optional[List["ScopeEntity"]]] = relationship(
-        back_populates="organizations", secondary=organizations_scopes_association
+    clients: Mapped[Optional[list["ClientEntity"]]] = relationship(back_populates="organization", lazy="raise")
+    scopes: Mapped[list["ScopeEntity"]] = relationship(
+        secondary=organizations_scopes_association,
+        back_populates="organizations",
     )
 
     @hybrid_property

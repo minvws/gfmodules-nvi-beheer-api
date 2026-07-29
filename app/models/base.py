@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -13,7 +12,7 @@ class CommonModel(BaseModel):
     deleted_at: datetime | None = None
 
 
-def sanatize_model_scopes(scopes: str | None) -> List[str] | None:
+def sanatize_model_scopes(scopes: str | None) -> list[str] | None:
     if scopes is None:
         return None
 

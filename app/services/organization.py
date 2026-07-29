@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -7,7 +6,6 @@ from fastapi import HTTPException
 from app import scope_utils
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
-from app.db.models.scope import ScopeEntity
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.scope import ScopeRepository
 from app.models.ura import UraNumber
@@ -32,19 +30,23 @@ class OrganizationService:
     ) -> OrganizationEntity:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
-            entity = OrganizationEntity(register_id=register_id, name=name, scopes=[])
+            entity = OrganizationEntity(
+                register_id=register_id,
+                name=name,
+            )
             if scopes:
                 scopes_repo = session.get_repository(ScopeRepository)
                 app_scopes = scopes_repo.find_many()
-                # TODO: validate against scopes in db
                 valid_scopes = ScopeService.validate_requested_scopes(app_scopes, scopes)
                 if not valid_scopes:
                     raise ScopeNotAllowedError(scopes)
 
-                org_scopes = ScopeService.make_scope_subset(app_scopes, scopes)
+                org_scopes = [s for s in app_scopes if s.name in scopes]
                 entity.scopes = org_scopes
 
-            return org_repo.add_one(entity)
+            new_org = org_repo.add_one(entity)
+
+            return new_org
 
     def get_one(self, id: UUID, with_clients: bool = False) -> OrganizationEntity | None:
         with self.db.get_db_session() as session:
@@ -74,45 +76,32 @@ class OrganizationService:
             )
             return list(orgs)
 
-    def update_one(self, id: UUID, name: str, scope: List[str] | None = None) -> OrganizationEntity | None:
-        if scope:
-            valid_scope = self.scope_service.check_incoming_scope(scope)
-            if not valid_scope:
-                raise ScopeNotAllowedError(scope)
-
+    def update_one(self, id: UUID, name: str, scope: list[str] | None = None) -> OrganizationEntity | None:
         with self.db.get_db_session() as session:
-            repo = session.get_repository(OrganizationRepository)
-            org = repo.find_one(id)
+            org_repo = session.get_repository(OrganizationRepository)
+            scope_repo = session.get_repository(ScopeRepository)
+            app_scope = scope_repo.find_many()
+
+            org = org_repo.find_one(id)
             if not org:
                 raise HTTPException(status_code=404)
             org.name = name
 
-            if scope is None:
+            if not scope:
                 org.scopes = []
                 session.add(org)
                 session.commit()
                 return org
 
-            org_scope_map = {s.name: s for s in org.scopes} if org.scopes else {}
-            reconciled_scopes = []
-            for s in scope:
-                if s in org_scope_map:
-                    existing_scope = org_scope_map[s]
-                    reconciled_scopes.append(existing_scope)
+            valid_scopes = ScopeService.validate_requested_scopes(app_scope, scope)
+            if not valid_scopes:
+                raise ScopeNotAllowedError(scope)
 
-                else:
-                    new_scope = ScopeEntity(name=s)
-                    reconciled_scopes.append(new_scope)
+            org_scopes = [s for s in app_scope if s.name in scope]
+            org.scopes = org_scopes
+            updated_org = org_repo.add_one(org)
 
-            if org.scopes:
-                org.scopes.clear()
-                org.scopes.extend(reconciled_scopes)
-            else:
-                org.scopes = reconciled_scopes
-            session.add(org)
-            session.commit()
-
-            return org
+            return updated_org
 
     def delete_one(self, id: UUID) -> OrganizationEntity | None:
         with self.db.get_db_session() as session:
@@ -122,11 +111,20 @@ class OrganizationService:
                 return None
             if org.clients and any(client.deleted_at is None for client in org.clients):
                 raise OrganizationHasActiveClientsError(id)
-            return repo.update(id, deleted_at=datetime.now())
+
+            org.deleted_at = datetime.now()
+            org.scopes.clear()
+
+            session.add(org)
+            session.commit()
+            session.session.refresh(org)
+
+            return org
 
     # TODO: This does not belong here
+
     @staticmethod
-    def assert_scopes_granted(organization: OrganizationEntity, requested: List[str]) -> None:
+    def assert_scopes_granted(organization: OrganizationEntity, requested: list[str]) -> None:
         available = organization.org_scopes if organization is not None else None
         if not scope_utils.is_subset(available, requested):
             ungranted = set(requested) - set(available or [])

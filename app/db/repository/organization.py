@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, or_, select, update
@@ -7,8 +7,6 @@ from sqlalchemy.orm import contains_eager, joinedload, selectinload
 
 from app.db.decorator import repository
 from app.db.models.client import ClientEntity
-
-# from app.db.models.client_scope import ClientScopeEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.models.scope import ScopeEntity
 from app.db.repository.base import RepositoryBase
@@ -18,38 +16,29 @@ from app.models.ura import UraNumber
 @repository(OrganizationEntity)
 class OrganizationRepository(RepositoryBase):
     def add_one(self, data: OrganizationEntity) -> OrganizationEntity:
-        try:
+        try:  # TODO: move this  service
             self.db_session.add(data)
             self.db_session.commit()
+            self.db_session.session.refresh(data)
             return data
         except SQLAlchemyError as e:
             self.db_session.rollback()
             raise e
 
-    def find_one(
-        self, id: UUID, with_clients: bool = False
-    ) -> OrganizationEntity | None:
-        stmt = select(OrganizationEntity).options(
-            selectinload(OrganizationEntity.scopes)
-        )
+    def find_one(self, id: UUID, with_clients: bool = False) -> OrganizationEntity | None:
+        stmt = select(OrganizationEntity).options(selectinload(OrganizationEntity.scopes))
         if not with_clients:
             stmt = stmt.where(self._and_clause(id))
         else:
-            stmt = stmt.where(OrganizationEntity.id == id).options(
-                joinedload(OrganizationEntity.clients)
-            )
+            stmt = stmt.where(OrganizationEntity.id == id).options(joinedload(OrganizationEntity.clients))
 
         return self.db_session.execute(stmt).unique().scalar()
 
     def exists(self, id: UUID) -> bool:
-        stmt = select(
-            select(OrganizationEntity.id).where(self._and_clause(id)).exists()
-        )
+        stmt = select(select(OrganizationEntity.id).where(self._and_clause(id)).exists())
         return bool(self.db_session.execute(stmt).scalar())
 
-    def find_one_by_register_id(
-        self, register_id: UraNumber
-    ) -> OrganizationEntity | None:
+    def find_one_by_register_id(self, register_id: UraNumber) -> OrganizationEntity | None:
         stmt = select(OrganizationEntity).where(
             and_(
                 OrganizationEntity.register_id == register_id,
@@ -58,24 +47,19 @@ class OrganizationRepository(RepositoryBase):
         )
         return self.db_session.execute(stmt).scalar()
 
-    def find_one_with_specific_client(
-        self, id: UUID, client_id: UUID
-    ) -> OrganizationEntity | None:
+    def find_one_with_specific_client(self, id: UUID, client_id: UUID) -> OrganizationEntity | None:
         stmt = (
             select(OrganizationEntity)
-            .join(OrganizationEntity.clients)
-            .join(ClientEntity.scopes)
-            # .join(ClientScopeEntity.scope)
+            .outerjoin(OrganizationEntity.clients)
+            .outerjoin(ClientEntity.scopes)
             .where(OrganizationEntity.id == id, ClientEntity.id == client_id)
             .options(
                 selectinload(OrganizationEntity.scopes),
-                contains_eager(OrganizationEntity.clients).contains_eager(
-                    ClientEntity.scopes
-                ),
-                # .contains_eager(ClientScopeEntity.scope),
+                contains_eager(OrganizationEntity.clients).contains_eager(ClientEntity.scopes),
             )
         )
-        return self.db_session.execute(stmt).unique().scalar_one_or_none()
+        result = self.db_session.execute(stmt).unique().scalar_one_or_none()
+        return result
 
     def find_many(
         self,
@@ -97,10 +81,9 @@ class OrganizationRepository(RepositoryBase):
             conditions.append(or_(*scopes_conditions))
 
         stmt = (
-            select(OrganizationEntity)
-            .join(ScopeEntity)
-            .options(selectinload(OrganizationEntity.scopes))
+            select(OrganizationEntity).join(ScopeEntity.organizations).options(selectinload(OrganizationEntity.scopes))
         )
+
         if conditions:
             stmt = stmt.where(and_(*conditions))
 
@@ -108,19 +91,10 @@ class OrganizationRepository(RepositoryBase):
 
     def update(self, id: UUID, **kwargs: object) -> OrganizationEntity | None:
         try:
-            target = {
-                k: kwargs[k]
-                for k in OrganizationEntity.__table__.columns.keys()
-                if k in kwargs
-            }
+            target = {k: kwargs[k] for k in OrganizationEntity.__table__.columns.keys() if k in kwargs}
             if not target:
                 return None
-            stmt = (
-                update(OrganizationEntity)
-                .where(self._and_clause(id))
-                .values(target)
-                .returning(OrganizationEntity)
-            )
+            stmt = update(OrganizationEntity).where(self._and_clause(id)).values(target).returning(OrganizationEntity)
             result = self.db_session.execute(stmt).scalar_one_or_none()
             self.db_session.commit()
             return result

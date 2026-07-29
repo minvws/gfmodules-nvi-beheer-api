@@ -1,13 +1,10 @@
-from typing import List
-
-
 class ScopesNotGrantedError(Exception):
     def __init__(self, ungranted: set[str]) -> None:
         super().__init__(f"Scopes not granted by the organization: {', '.join(sorted(ungranted))}")
 
 
 class ScopeNotAllowedError(Exception):
-    def __init__(self, scope: List[str]) -> None:
+    def __init__(self, scope: list[str]) -> None:
         super().__init__(f"Scope `{', '.join(scope)}` is not allowed")
 
 

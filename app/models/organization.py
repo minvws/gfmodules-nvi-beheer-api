@@ -1,4 +1,4 @@
-from typing import List, Self
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -26,7 +26,7 @@ class OrganizationCreate(OrganizationFields):
     name: str = Field(..., description=NAME_DESCRIPTION)
 
     @property
-    def sanitized_scopes(self) -> List[str] | None:
+    def sanitized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
 
@@ -35,7 +35,7 @@ class OrganizationUpdate(BaseModel):
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
     @property
-    def sanitized_scopes(self) -> List[str] | None:
+    def sanitized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
 
@@ -46,7 +46,7 @@ class OrganizationQueryParams(BaseModel):
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
     @property
-    def sanitized_scopes(self) -> List[str] | None:
+    def sanitized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
 

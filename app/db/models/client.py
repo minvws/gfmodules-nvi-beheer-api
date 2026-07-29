@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import ForeignKey, Index, String, text
@@ -32,25 +32,19 @@ class ClientEntity(CommonColumns):
         ),
     )
 
-    organization_id: Mapped[UUID] = mapped_column(
-        "organization_id", Uuid, ForeignKey("organizations.id")
-    )
+    organization_id: Mapped[UUID] = mapped_column("organization_id", Uuid, ForeignKey("organizations.id"))
 
     oin: Mapped[Oin] = mapped_column("oin", OinType)
     common_name: Mapped[str] = mapped_column("common_name", String)
     source_id: Mapped[str | None] = mapped_column("source_id", String, nullable=True)
 
-    organization: Mapped["OrganizationEntity"] = relationship(
-        back_populates="clients", lazy="raise"
-    )
-    scopes: Mapped[Optional[List["ScopeEntity"]]] = relationship(
-        back_populates="clients", secondary=clients_scopes_association
-    )
+    organization: Mapped["OrganizationEntity"] = relationship(back_populates="clients", lazy="raise")
+    scopes: Mapped[list["ScopeEntity"]] = relationship(back_populates="clients", secondary=clients_scopes_association)
 
     @property
     def organization_name(self) -> str | None:
         return self.organization.name if self.organization else None
 
     @hybrid_property
-    def client_scopes(self) -> List[str] | None:
+    def client_scopes(self) -> list[str] | None:
         return [s.name for s in self.scopes] if self.scopes else None
