@@ -1,5 +1,5 @@
 import datetime
-from typing import List, Sequence
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, delete, or_, select, update
@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from app.db.decorator import repository
 from app.db.models.client import ClientEntity
+from app.db.models.client_scope import clients_scopes_association
 from app.db.models.organization import OrganizationEntity
 from app.db.models.scope import ScopeEntity
 from app.db.repository.base import RepositoryBase
@@ -22,29 +23,21 @@ class ClientRepository(RepositoryBase):
             self.db_session.add(data)
             self.db_session.commit()
             return data
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             self.db_session.rollback()
-            raise e
+            raise
 
     def find_one(self, organization_id: UUID, id: UUID) -> ClientEntity | None:
         stmt = (
-            select(ClientEntity)
-            # .options(selectinload(ClientEntity.scopes).selectinload(ClientScopeEntity.scope))
-            .where(self._and_clause(organization_id, id))
+            select(ClientEntity).options(selectinload(ClientEntity.scopes)).where(self._and_clause(organization_id, id))
         )
         return self.db_session.execute(stmt).scalar_one_or_none()
 
     def exists(self, organization_id: UUID, id: UUID) -> bool:
-        stmt = select(
-            select(ClientEntity.id)
-            .where(self._and_clause(organization_id, id))
-            .exists()
-        )
+        stmt = select(select(ClientEntity.id).where(self._and_clause(organization_id, id)).exists())
         return bool(self.db_session.execute(stmt).scalar())
 
-    def get_by_credentials(
-        self, common_name: str, oin: Oin, org_ura: UraNumber
-    ) -> ClientEntity | None:
+    def get_by_credentials(self, common_name: str, oin: Oin, org_ura: UraNumber) -> ClientEntity | None:
         stmt = (
             select(ClientEntity)
             .join(
@@ -70,15 +63,11 @@ class ClientRepository(RepositoryBase):
         oin: Oin | None = None,
         common_name: str | None = None,
         source_id: str | None = None,
-        scopes: List[str] | None = None,
+        scopes: list[str] | None = None,
         include_deleted: bool = False,
     ) -> Sequence[ClientEntity]:
-        stmt = select(ClientEntity).options(
-            selectinload(ClientEntity.scopes).selectinload(ClientScopeEntity.scope)
-        )
-        conditions: list[ColumnElement[bool]] = [
-            ClientEntity.organization_id == organization_id
-        ]
+        stmt = select(ClientEntity).options(selectinload(ClientEntity.scopes))
+        conditions: list[ColumnElement[bool]] = [ClientEntity.organization_id == organization_id]
         if not include_deleted:
             conditions.append(ClientEntity.deleted_at.is_(None))
         if oin:
@@ -88,29 +77,20 @@ class ClientRepository(RepositoryBase):
         if source_id:
             conditions.append(ClientEntity.source_id == source_id)
         if scopes:
-            stmt = stmt.join(ClientEntity.scopes).join(ClientScopeEntity.scope)
+            stmt = stmt.join(ClientEntity.scopes)
             scope_conditions = [(ScopeEntity.name == s) for s in scopes]
             conditions.append(or_(*scope_conditions))
 
         stmt = stmt.where(and_(*conditions))
         return self.db_session.execute(stmt).scalars().unique().all()
 
-    def update(
-        self, organization_id: UUID, id: UUID, **kwargs: object
-    ) -> ClientEntity | None:
+    def update(self, organization_id: UUID, id: UUID, **kwargs: object) -> ClientEntity | None:
         try:
-            target = {
-                k: kwargs[k]
-                for k in ClientEntity.__table__.columns.keys()
-                if k in kwargs
-            }
+            target = {k: kwargs[k] for k in ClientEntity.__table__.columns.keys() if k in kwargs}
             if not target:
                 return None
             stmt = (
-                update(ClientEntity)
-                .where(self._and_clause(organization_id, id))
-                .values(target)
-                .returning(ClientEntity)
+                update(ClientEntity).where(self._and_clause(organization_id, id)).values(target).returning(ClientEntity)
             )
             result = self.db_session.execute(stmt).scalar_one_or_none()
             self.db_session.commit()
@@ -121,16 +101,10 @@ class ClientRepository(RepositoryBase):
 
     def delete_one(self, id: UUID) -> None:
         try:
-            client_stmt = (
-                update(ClientEntity)
-                .where(ClientEntity.id == id)
-                .values(deleted_at=datetime.datetime.now())
-            )
+            client_stmt = update(ClientEntity).where(ClientEntity.id == id).values(deleted_at=datetime.datetime.now())
             self.db_session.session.execute(client_stmt)
 
-            scope_stmt = delete(ClientScopeEntity).where(
-                ClientScopeEntity.client_id == id
-            )
+            scope_stmt = delete(clients_scopes_association).where(clients_scopes_association.c.client_id == id)
             self.db_session.session.execute(scope_stmt)
 
             self.db_session.commit()

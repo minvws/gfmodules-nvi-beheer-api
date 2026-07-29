@@ -1,56 +1,45 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, Index, String, text
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
 from app.db.models.base import CommonColumns
+from app.db.models.client_certificate import clients_certificates_association
 from app.db.models.client_scope import clients_scopes_association
-from app.db.types.oin_type import OinType
-from app.models.oin import Oin
+from app.db.models.client_source import clients_sources_association
 
 if TYPE_CHECKING:
+    from app.db.models.certificate import CertificateEntity
     from app.db.models.organization import OrganizationEntity
     from app.db.models.scope import ScopeEntity
+    from app.db.models.source import SourceEntity
 
 
 class ClientEntity(CommonColumns):
     __tablename__ = "clients"
-    __table_args__ = (
-        Index(
-            "uq_clients_org_oin_cn_active",
-            "organization_id",
-            "oin",
-            "common_name",
-            unique=True,
-            sqlite_where=text("deleted_at IS NULL"),
-            postgresql_where=text("deleted_at IS NULL"),
-        ),
-    )
 
-    organization_id: Mapped[UUID] = mapped_column(
-        "organization_id", Uuid, ForeignKey("organizations.id")
-    )
+    name: Mapped[str] = mapped_column("name", String)
+    description: Mapped[str | None] = mapped_column("description", String)
+    organization_id: Mapped[UUID] = mapped_column("organization_id", Uuid, ForeignKey("organizations.id"))
 
-    oin: Mapped[Oin] = mapped_column("oin", OinType)
-    common_name: Mapped[str] = mapped_column("common_name", String)
-    source_id: Mapped[str | None] = mapped_column("source_id", String, nullable=True)
-
-    organization: Mapped["OrganizationEntity"] = relationship(
-        back_populates="clients", lazy="raise"
+    organization: Mapped["OrganizationEntity"] = relationship(back_populates="clients", lazy="raise")
+    scopes: Mapped[Optional[list["ScopeEntity"]]] = relationship(
+        secondary=clients_scopes_association,
+        primaryjoin="and_(ClientEntity.id == clients_scopes.c.client_id, ClientEntity.organization_id == clients_scopes.c.organization_id)",
+        secondaryjoin="ScopeEntity.id == clients_scopes.c.scope_id",
     )
-    scopes: Mapped[Optional[List["ScopeEntity"]]] = relationship(
-        back_populates="clients", secondary=clients_scopes_association
+    certificates: Mapped[Optional[list["CertificateEntity"]]] = relationship(
+        back_populates="clients", secondary=clients_certificates_association
     )
-
-    @property
-    def organization_name(self) -> str | None:
-        return self.organization.name if self.organization else None
+    sources: Mapped[Optional[list["SourceEntity"]]] = relationship(
+        back_populates="clients", secondary=clients_sources_association
+    )
 
     @hybrid_property
-    def client_scopes(self) -> List[str] | None:
+    def client_scopes(self) -> list[str] | None:
         return [s.name for s in self.scopes] if self.scopes else None
