@@ -4,15 +4,18 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import ForeignKey, Index, String, text
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
 from app.db.models.base import CommonColumns
+from app.db.models.client_scope import clients_scopes_association
 from app.db.types.oin_type import OinType
 from app.models.oin import Oin
 
 if TYPE_CHECKING:
     from app.db.models.organization import OrganizationEntity
+    from app.db.models.scope import ScopeEntity
 
 
 class ClientEntity(CommonColumns):
@@ -36,7 +39,12 @@ class ClientEntity(CommonColumns):
     source_id: Mapped[str | None] = mapped_column("source_id", String, nullable=True)
 
     organization: Mapped["OrganizationEntity"] = relationship(back_populates="clients", lazy="raise")
+    scopes: Mapped[list["ScopeEntity"]] = relationship(back_populates="clients", secondary=clients_scopes_association)
 
     @property
     def organization_name(self) -> str | None:
         return self.organization.name if self.organization else None
+
+    @hybrid_property
+    def client_scopes(self) -> list[str] | None:
+        return [s.name for s in self.scopes] if self.scopes else None

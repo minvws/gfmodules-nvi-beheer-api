@@ -1,16 +1,23 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Index, String, text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    relationship,
+)
 
 from app.db.models.base import CommonColumns
+from app.db.models.organization_scope import organizations_scopes_association
 from app.db.types.ura_type import UraType
 from app.models.ura import UraNumber
 
 if TYPE_CHECKING:
     from app.db.models.client import ClientEntity
+    from app.db.models.scope import ScopeEntity
 
 
 class OrganizationEntity(CommonColumns):
@@ -28,4 +35,12 @@ class OrganizationEntity(CommonColumns):
     register_id: Mapped[UraNumber] = mapped_column("register_id", UraType)
     name: Mapped[str] = mapped_column("name", String)
 
-    clients: Mapped[List["ClientEntity"]] = relationship(back_populates="organization", lazy="raise")
+    clients: Mapped[Optional[list["ClientEntity"]]] = relationship(back_populates="organization", lazy="raise")
+    scopes: Mapped[list["ScopeEntity"]] = relationship(
+        secondary=organizations_scopes_association,
+        back_populates="organizations",
+    )
+
+    @hybrid_property
+    def org_scopes(self) -> list[str] | None:
+        return [s.name for s in self.scopes] if self.scopes else None

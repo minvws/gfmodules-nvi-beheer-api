@@ -6,6 +6,7 @@ from app.config import Config, get_config
 from app.db.db import Database
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
+from app.services.scopes import ScopeService
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,10 @@ def container_config(binder: inject.Binder) -> None:
     db = Database(config_database=config.database)
     binder.bind(Database, db)
 
-    organization_service = OrganizationService(db)
+    scope_service = ScopeService(db)
+    binder.bind(ScopeService, scope_service)
+
+    organization_service = OrganizationService(db, scope_service)
     binder.bind(OrganizationService, organization_service)
 
     client_service = ClientService(db, organization_service)
@@ -41,6 +45,10 @@ def get_organization_service() -> OrganizationService:
 
 def get_client_service() -> ClientService:
     return inject.instance(ClientService)
+
+
+def get_scope_service() -> ScopeService:
+    return inject.instance(ScopeService)
 
 
 def configure() -> None:

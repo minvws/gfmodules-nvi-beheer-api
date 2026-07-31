@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated, Any, List
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -37,7 +37,14 @@ def register(
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
     try:
-        return service.create_one(organization_id=organization_id, **data.model_dump())
+        result = service.create_one(
+            organization_id=organization_id,
+            oin=data.oin,
+            common_name=data.common_name,
+            source_id=data.source_id,
+            scopes=data.sanatized_scopes,
+        )
+        return Client.from_entity(result)
     except ScopesNotGrantedError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except IntegrityError:
@@ -61,12 +68,12 @@ def get_by_id(
     result = service.get_one(id, organization_id)
     if result is None:
         raise HTTPException(status_code=404)
-    return result
+    return Client.from_entity(result)
 
 
 @router.get(
     "",
-    response_model=List[Client],
+    response_model=list[Client],
     response_model_exclude_none=True,
     dependencies=[Depends(get_organization_or_404)],
 )
@@ -75,7 +82,14 @@ def get_many(
     params: Annotated[ClientQueryParams, Query()],
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
-    return service.get_many(organization_id=organization_id, **params.model_dump())
+    results = service.get_many(
+        organization_id=organization_id,
+        oin=params.oin,
+        common_name=params.common_name,
+        source_id=params.source_id,
+        scopes=params.sanatized_scope,
+    )
+    return [Client.from_entity(e) for e in results]
 
 
 @router.put(
@@ -91,12 +105,19 @@ def update(
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
     try:
-        result = service.update_one(id, organization_id, **body.model_dump(exclude_unset=True))
+        result = service.update_one(
+            id=id,
+            organization_id=organization_id,
+            common_name=body.common_name,
+            oin=body.oin,
+            source_id=body.source_id,
+            scopes=body.sanatized_scopes,
+        )
     except ScopesNotGrantedError as error:
         raise HTTPException(status_code=422, detail=str(error))
     if result is None:
         raise HTTPException(status_code=404)
-    return result
+    return Client.from_entity(result)
 
 
 @router.delete(
@@ -108,7 +129,5 @@ def delete(
     id: UUID,
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Response:
-    result = service.delete_one(id, organization_id)
-    if result is None:
-        raise HTTPException(status_code=404)
+    service.delete_one(id, organization_id)
     return Response(status_code=204)
