@@ -10,7 +10,6 @@ from typing import Any
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.routing import Match
 
 from app.logging.context import (
     client_trace_id_var,
@@ -74,16 +73,10 @@ class RequestContextVars:
 
 
 def _get_router_path(request: Request) -> str:
-    current_path: str | None = None
-    for route in request.app.routes:
-        if route.matches(request.scope):
-            match, _ = route.matches(request.scope)
-            if match == Match.FULL:
-                return str(route.path)
-            elif match == Match.PARTIAL and current_path is None:
-                current_path = str(route.path)
-
-    return current_path if current_path else "-"
+    route = request.scope.get("route")
+    if route and hasattr(route, "path"):
+        return str(route.path)
+    return "-"
 
 
 async def _request_body(request: Request) -> str:
