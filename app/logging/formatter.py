@@ -10,6 +10,7 @@ from app.logging.context import (
     ip_var,
     method_var,
     request_id_var,
+    x_gf_act_cn_var,
 )
 from app.logging.filters import LoggingStreams
 
@@ -53,6 +54,7 @@ def _collect_context() -> dict[str, Any]:
         ("client_trace_id", client_trace_id_var),
         ("endpoint", endpoint_var),
         ("method", method_var),
+        ("gf-act-cn", x_gf_act_cn_var),
     ):
         value = var.get()
         if value != "-":

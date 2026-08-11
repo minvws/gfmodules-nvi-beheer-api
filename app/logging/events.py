@@ -67,9 +67,8 @@ class Log:
         "094500",
         logging.INFO,
         (_APP,),
-        {_APP: ("endpoint", "method")},
+        {_APP: ("endpoint", "method", "gf-act-cn")},
     )
-
     CLIENT_ONBOARDED = NVIEvent(  # NVI-OB-001
         "100607",
         logging.INFO,
@@ -93,17 +92,27 @@ class Log:
         },
     )
 
+    access_event_id = {
+        ("POST", "/organizations"): "100700",
+        ("PUT", "/organizations/{id}"): "100701",
+        ("DELETE", "/organizations"): "100702",
+        ("POST", "/organizations/{organization_id}/clients"): "100703",
+        ("PUT", "/organizations/{organization_id}/clients/{id}"): "100704",
+        ("DELETE", "/organizations/{organization_id}/clients/{id}"): "100705",
+    }
+
     @staticmethod
     def event(
         logger: logging.Logger,
         event: NVIEvent,
         message: str,
         *,
+        event_id: str | None = None,
         exc_info: Any = None,
         **fields: Any,
     ) -> None:
         extra: dict[str, Any] = {
-            "event_id": event.event_id,
+            "event_id": event_id if event_id else event.event_id,
             "stream": list(event.streams),
         }
         if event.fields:

@@ -10,10 +10,11 @@ from types import TracebackType
 from typing import Any, AsyncIterator
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Security
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
 
 from app import container
 from app.config import (
@@ -71,6 +72,15 @@ def get_uvicorn_params() -> dict[str, Any]:
         kwargs["ssl_keyfile"] = config.uvicorn.ssl_base_dir + "/" + config.uvicorn.ssl_key_file
         kwargs["ssl_certfile"] = config.uvicorn.ssl_base_dir + "/" + config.uvicorn.ssl_cert_file
     return kwargs
+
+
+def api_key_headers(document_gf_headers: bool) -> list[Any]:
+    headers = []
+    if document_gf_headers:
+        headers = [
+            "x-gf-act-cn",
+        ]
+    return [Security(APIKeyHeader(name=header, scheme_name=header, auto_error=False)) for header in headers]
 
 
 def run() -> None:
@@ -224,6 +234,7 @@ def setup_fastapi() -> FastAPI:
             title="NVI Beheer API",
             root_path=config.uvicorn.root_path,
             lifespan=_lifespan,
+            dependencies=api_key_headers(config.uvicorn.document_gf_headers),
         )
         if config.uvicorn.swagger_enabled
         else FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)

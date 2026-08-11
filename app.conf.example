@@ -56,6 +56,10 @@ module_name = nvi-beheer-api
 [uvicorn]
 # If true, the api docs will be enabled
 swagger_enabled = True
+# If set to true, swagger will show fields to provide x-gf headers
+# Should be disabled on production, this is not an security risk because
+# x-gf headers are stripped by the gateway
+document_gf_headers = True
 # Endpoint for swagger api docs
 docs_url = /docs
 # Endpoint for redoc api docs
