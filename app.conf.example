@@ -17,6 +17,8 @@ application_id = nvi-beheer-api
 include_traces = True
 # Whether to display debug logs in the console
 debug_logs_in_console = True
+# Log an error when a request arrives without an X-GF-Correlation-ID header
+correlation_id_expected = False
 
 [database]
 # Dsn for database connection

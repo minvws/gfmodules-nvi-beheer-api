@@ -247,7 +247,10 @@ def setup_fastapi() -> FastAPI:
     for router in routers:
         fastapi.include_router(router)
 
-    fastapi.add_middleware(RequestContextMiddleware)
+    fastapi.add_middleware(
+        RequestContextMiddleware,
+        correlation_id_expected=config.logging.correlation_id_expected,
+    )
     fastapi.add_exception_handler(Exception, _unhandled_exception_handler)
     fastapi.exception_handler(RequestValidationError)(request_validation_exception_handler)
 

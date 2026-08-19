@@ -12,6 +12,7 @@ from typing import Any
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 from app.logging.context import (
     CLIENT_CN_HEADER,
@@ -110,10 +111,22 @@ async def _request_body(request: Request) -> str:
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp, correlation_id_expected: bool = False) -> None:
+        super().__init__(app)
+        self.correlation_id_expected = correlation_id_expected
+
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         context = RequestContext.from_request(request)
 
         with _bind(context):
+            if self.correlation_id_expected and context.correlation_id == UNSET:
+                Log.event(
+                    logger,
+                    Log.SYS_MISSING_CORRELATION_ID,
+                    f"Request arrived without {CORRELATION_ID_HEADER}",
+                    endpoint=context.endpoint,
+                    method=context.method,
+                )
             body = await _request_body(request)
             response: Response | None = None
             start = time.perf_counter()
