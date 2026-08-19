@@ -34,6 +34,8 @@ _SAFE_HEADER_VALUE = re.compile(r"[^a-zA-Z0-9\-_]")
 _access_logger = logging.getLogger("app.access")
 logger = logging.getLogger(__name__)
 
+_REQUEST_CONTEXT_STATE_KEY = "request_context"
+
 
 def _sanitize(value: str) -> str:
     return _SAFE_HEADER_VALUE.sub("", value)[:64] or UNSET
@@ -93,6 +95,16 @@ def _bind(context: RequestContext) -> Generator[None]:
             var.reset(token)
 
 
+@contextmanager
+def bind_request_context(request: Request) -> Generator[RequestContext | None]:
+    context: RequestContext | None = getattr(request.state, _REQUEST_CONTEXT_STATE_KEY, None)
+    if context is None:
+        yield None
+        return
+    with _bind(context):
+        yield context
+
+
 def _get_router_path(request: Request) -> str:
     route = request.scope.get("route")
     if route and hasattr(route, "path"):
@@ -117,6 +129,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         context = RequestContext.from_request(request)
+        setattr(request.state, _REQUEST_CONTEXT_STATE_KEY, context)
 
         with _bind(context):
             if self.correlation_id_expected and context.correlation_id == UNSET:
