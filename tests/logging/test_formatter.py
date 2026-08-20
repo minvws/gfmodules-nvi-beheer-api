@@ -7,6 +7,7 @@ import pytest
 
 from app.logging.context import (
     client_trace_id_var,
+    correlation_id_var,
     endpoint_var,
     ip_var,
     method_var,
@@ -41,6 +42,7 @@ def context_vars() -> Iterator[None]:
     t3 = client_trace_id_var.set("trace-1")
     t4 = endpoint_var.set("/token")
     t5 = method_var.set("POST")
+    t6 = correlation_id_var.set("corr-1")
     try:
         yield
     finally:
@@ -49,6 +51,7 @@ def context_vars() -> Iterator[None]:
         client_trace_id_var.reset(t3)
         endpoint_var.reset(t4)
         method_var.reset(t5)
+        correlation_id_var.reset(t6)
 
 
 def _format_json(record: logging.LogRecord, include_traces: bool = True) -> Any:

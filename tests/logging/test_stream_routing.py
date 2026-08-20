@@ -13,7 +13,7 @@ from typing import Any, Iterator
 
 import pytest
 
-from app.logging.context import endpoint_var, ip_var, method_var, request_id_var
+from app.logging.context import correlation_id_var, endpoint_var, ip_var, method_var, request_id_var
 from app.logging.events import Log
 from app.logging.filters import (
     AppFilter,
@@ -50,6 +50,7 @@ def streams() -> Iterator[tuple[logging.Logger, io.StringIO, io.StringIO, io.Str
         ip_var.set("10.0.0.1"),
         endpoint_var.set("/token"),
         method_var.set("POST"),
+        correlation_id_var.set("corr-1"),
     ]
     try:
         yield logger, pub_buf, app_buf, siem_buf
@@ -59,6 +60,7 @@ def streams() -> Iterator[tuple[logging.Logger, io.StringIO, io.StringIO, io.Str
         ip_var.reset(tokens[1])
         endpoint_var.reset(tokens[2])
         method_var.reset(tokens[3])
+        correlation_id_var.reset(tokens[4])
 
 
 def _messages(buf: io.StringIO) -> list[dict[str, Any]]:
@@ -104,6 +106,7 @@ def test_client_onboarded_routes_fields_per_stream(
     for msg in (app_msg, siem_msg):
         assert msg["request_id"] == "req-1"
         assert msg["ip"] == "10.0.0.1"
+        assert msg["correlation_id"] == "corr-1"
 
 
 def test_client_offboarded_routes_to_app_and_siem(

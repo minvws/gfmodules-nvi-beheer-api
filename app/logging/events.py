@@ -62,6 +62,12 @@ class Log:
             _APP: ("exception_type", "table", "column", "value_length", "column_limit"),
         },
     )
+    SYS_MISSING_CORRELATION_ID = NVIEvent(  # NVI-SYS-006
+        "100606",
+        logging.ERROR,
+        (_APP, _SIEM),
+        {_APP: ("endpoint", "method"), _SIEM: ("endpoint", "method")},
+    )
 
     ACCESS_REQUEST = NVIEvent(  # NVI-AUTH-101
         "094500",

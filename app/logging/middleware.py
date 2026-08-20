@@ -3,16 +3,25 @@ import logging
 import re
 import time
 import uuid
-from contextvars import Token
-from types import TracebackType
+from collections.abc import Generator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 from app.logging.context import (
+    CLIENT_CN_HEADER,
+    CLIENT_TRACE_ID_HEADER,
+    CORRELATION_ID_HEADER,
+    REQUEST_ID_HEADER,
+    UNSET,
     client_trace_id_var,
+    correlation_id_var,
     endpoint_var,
     ip_var,
     method_var,
@@ -21,62 +30,74 @@ from app.logging.context import (
 )
 from app.logging.events import Log
 
-REQUEST_ID_HEADER = "X-Request-ID"
-CLIENT_TRACE_ID_HEADER = "X-Client-Trace-ID"
-CLIENT_CN_HEADER = "x-gf-act-cn"
-
 _SAFE_HEADER_VALUE = re.compile(r"[^a-zA-Z0-9\-_]")
 _access_logger = logging.getLogger("app.access")
 logger = logging.getLogger(__name__)
 
 
 def _sanitize(value: str) -> str:
-    return _SAFE_HEADER_VALUE.sub("", value)[:64]
+    return _SAFE_HEADER_VALUE.sub("", value)[:64] or UNSET
 
 
-class RequestContextVars:
-    token_id: Token[str]
-    token_ip: Token[str]
-    token_trace: Token[str]
-    token_endpoint: Token[str]
-    token_method: Token[str]
-    token_x_gf_act_cn: Token[str]
+@dataclass(frozen=True)
+class RequestContext:
+    request_id: str
+    ip: str
+    client_trace_id: str
+    correlation_id: str
+    endpoint: str
+    method: str
+    x_gf_act_cn: str
 
-    def __init__(
-        self,
-        request: Request,
-    ):
-        self.request = request
+    @classmethod
+    def from_request(cls, request: Request) -> "RequestContext":
+        # An upstream may already have stamped this request; reuse its id if so.
+        if "id" not in request.state:
+            request.state["id"] = uuid.uuid4()
+        return cls(
+            request_id=str(request.state["id"]),
+            ip=request.client.host if request.client else UNSET,
+            client_trace_id=_sanitize(request.headers.get(CLIENT_TRACE_ID_HEADER, UNSET)),
+            correlation_id=_sanitize(request.headers.get(CORRELATION_ID_HEADER, UNSET)),
+            endpoint=request.url.path,
+            method=request.method,
+            x_gf_act_cn=_sanitize(request.headers.get(CLIENT_CN_HEADER, UNSET)),
+        )
 
-    def __enter__(self) -> None:
-        if "id" not in self.request.state:
-            self.request.state["id"] = uuid.uuid4()
-        request_id = self.request.state["id"]
-        ip = self.request.client.host if self.request.client else "-"
-        client_trace_id = _sanitize(self.request.headers.get(CLIENT_TRACE_ID_HEADER, "-"))
-        client_cn_header = _sanitize(self.request.headers.get(CLIENT_CN_HEADER, "-"))
+    def apply_to(self, response: Response) -> None:
+        response.headers[REQUEST_ID_HEADER] = self.request_id
+        if self.client_trace_id != UNSET:
+            response.headers[CLIENT_TRACE_ID_HEADER] = self.client_trace_id
+        if self.correlation_id != UNSET:
+            response.headers[CORRELATION_ID_HEADER] = self.correlation_id
 
-        self.token_id = request_id_var.set(request_id)
-        self.token_ip = ip_var.set(ip)
-        self.token_trace = client_trace_id_var.set(client_trace_id)
-        self.token_endpoint = endpoint_var.set(self.request.url.path)
-        self.token_method = method_var.set(self.request.method)
-        self.token_x_gf_act_cn = x_gf_act_cn_var.set(client_cn_header)
 
-    def __exit__(self, exc_type: type, exc_value: Exception, traceback: TracebackType) -> None:
-        request_id_var.reset(self.token_id)
-        ip_var.reset(self.token_ip)
-        client_trace_id_var.reset(self.token_trace)
-        endpoint_var.reset(self.token_endpoint)
-        method_var.reset(self.token_method)
-        x_gf_act_cn_var.reset(self.token_x_gf_act_cn)
+_CONTEXT_VARS: tuple[tuple[str, ContextVar[str]], ...] = (
+    ("request_id", request_id_var),
+    ("ip", ip_var),
+    ("client_trace_id", client_trace_id_var),
+    ("correlation_id", correlation_id_var),
+    ("endpoint", endpoint_var),
+    ("method", method_var),
+    ("x_gf_act_cn", x_gf_act_cn_var),
+)
+
+
+@contextmanager
+def _bind(context: RequestContext) -> Generator[None]:
+    tokens = [(var, var.set(getattr(context, name))) for name, var in _CONTEXT_VARS]
+    try:
+        yield
+    finally:
+        for var, token in reversed(tokens):
+            var.reset(token)
 
 
 def _get_router_path(request: Request) -> str:
     route = request.scope.get("route")
     if route and hasattr(route, "path"):
         return str(route.path)
-    return "-"
+    return UNSET
 
 
 async def _request_body(request: Request) -> str:
@@ -90,17 +111,28 @@ async def _request_body(request: Request) -> str:
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp, correlation_id_expected: bool = False) -> None:
+        super().__init__(app)
+        self.correlation_id_expected = correlation_id_expected
+
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        with RequestContextVars(request):
-            client_trace_id = _sanitize(request.headers.get(CLIENT_TRACE_ID_HEADER, "-"))
+        context = RequestContext.from_request(request)
+
+        with _bind(context):
+            if self.correlation_id_expected and context.correlation_id == UNSET:
+                Log.event(
+                    logger,
+                    Log.SYS_MISSING_CORRELATION_ID,
+                    f"Request arrived without {CORRELATION_ID_HEADER}",
+                    endpoint=context.endpoint,
+                    method=context.method,
+                )
             body = await _request_body(request)
             response: Response | None = None
             start = time.perf_counter()
             try:
                 response = await call_next(request)
-                response.headers[REQUEST_ID_HEADER] = str(request.state["id"])
-                if client_trace_id != "-":
-                    response.headers[CLIENT_TRACE_ID_HEADER] = client_trace_id
+                context.apply_to(response)
                 return response
             finally:
                 duration_ms = round((time.perf_counter() - start) * 1000)
