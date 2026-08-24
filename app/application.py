@@ -24,7 +24,7 @@ from app.config import (
 )
 from app.logging.config_builder import LogConfigBuilder
 from app.logging.events import Log
-from app.logging.middleware import RequestContextMiddleware
+from app.logging.middleware import RequestContextMiddleware, restore_request_context
 from app.middleware.stats import StatsdMiddleware
 from app.routers.client import router as client_router
 from app.routers.default import router as default_router
@@ -211,6 +211,7 @@ def _emit_app_started() -> None:
     )
 
 
+@restore_request_context
 def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     Log.event(
         logger,
