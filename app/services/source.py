@@ -1,8 +1,10 @@
 import datetime
 
+from app import utils
 from app.db.models.organization import OrganizationEntity
 from app.db.models.source import SourceEntity
 from app.models.source import SourceUpdate
+from app.services.exceptions import ForbidenOperationError
 
 
 class SourceService:
@@ -41,3 +43,13 @@ class SourceService:
                 result.append(value)
 
         return result
+
+    @staticmethod
+    def get_client_sources_from_org(org: OrganizationEntity, sources: list[SourceUpdate]) -> list[SourceEntity]:
+        org_source_keys = [s.source_id for s in org.sources] if org.sources else []
+        client_source_keys = [s.source_id for s in sources]
+
+        if not utils.is_subset(org_source_keys, client_source_keys):
+            raise ForbidenOperationError("Client sources are not allowed to be assigned")
+
+        return [s for s in org.sources if s.source_id in client_source_keys] if org.sources else []

@@ -14,6 +14,7 @@ from app.services.certificate import CertificateService
 from app.services.exceptions import RecordNotFoundError
 from app.services.organization import OrganizationService
 from app.services.scopes import ScopeService
+from app.services.source import SourceService
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,10 @@ class ClientService:
                 client_certs = CertificateService.get_client_certs_from_org(org, dto.certificates)
                 target.certificates = client_certs
 
+            if dto.sources:
+                client_sources = SourceService.get_client_sources_from_org(org, dto.sources)
+                target.sources = client_sources
+
             client_repo = session.get_repository(ClientRepository)
             new_client = client_repo.add_one(target)
             Log.event(
@@ -59,44 +64,6 @@ class ClientService:
 
             return Client.from_entity(new_client)
 
-    # def create_one(
-    #     self,
-    #     organization_id: UUID,
-    #     oin: Oin,
-    #     common_name: str,
-    #     source_id: str | None = None,
-    #     scopes: list[str] | None = None,
-    # ) -> ClientEntity:
-    #     with self.db.get_db_session() as session:
-    #         org_repo = session.get_repository(OrganizationRepository)
-    #         org = org_repo.find_one(organization_id)
-    #         if not org:
-    #             raise RecordNotFoundError(f"Organization with id {organization_id} does not exist.")
-    #
-    #         if scopes:
-    #             OrganizationService.assert_scopes_granted(org, scopes)
-    #
-    #         repo = session.get_repository(ClientRepository)
-    #         client_scopes = ScopeService.make_client_scope_from_org(org, scopes or [])
-    #         entity = ClientEntity(
-    #             organization_id=organization_id,
-    #             source_id=source_id,
-    #             oin=oin,
-    #             common_name=common_name,
-    #             scopes=client_scopes,
-    #         )
-    #         Log.event(
-    #             logger=logger,
-    #             event=Log.CLIENT_ONBOARDED,
-    #             message="Client onboarded",
-    #             oin=oin,
-    #             ura_number=org.register_id,
-    #             source_identifier=source_id,
-    #             scopes=scopes,
-    #             approved_by="system",
-    #         )
-    #         return repo.add_one(entity)
-    #
     def get_one(self, id: UUID, organization_id: UUID) -> ClientEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)

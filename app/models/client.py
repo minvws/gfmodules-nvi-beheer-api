@@ -11,6 +11,7 @@ from app.models.base import (
 )
 from app.models.certificates import Certificate, CertificateCreate
 from app.models.oin import Oin
+from app.models.source import SourceCreate
 from app.models.ura import UraNumber
 
 ORG_URA_DESCRIPTION = "The URA (register_id) of the organization the client acts on behalf of"
@@ -41,10 +42,8 @@ class ClientFields(BaseModel):
 
 
 class ClientCreate(ClientFields):
-    name: str
-    description: str | None = Field(default=None)
-    scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
     certificates: list[CertificateCreate] | None = None
+    sources: list[SourceCreate] | None = None
 
     @property
     def sanatized_scopes(self) -> list[str] | None:
