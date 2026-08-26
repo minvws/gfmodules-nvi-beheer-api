@@ -1,3 +1,5 @@
+from pydantic import SecretStr
+
 from app.config import (
     Config,
     ConfigApp,
@@ -22,7 +24,7 @@ def get_test_config() -> Config:
             debug_logs_in_console=True,
         ),
         database=ConfigDatabase(
-            dsn="sqlite:///:memory:",
+            dsn=SecretStr("sqlite:///:memory:"),
             create_tables=True,
         ),
         telemetry=ConfigTelemetry(

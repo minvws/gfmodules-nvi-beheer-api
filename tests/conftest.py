@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app.config import ConfigDatabase
 from app.container import get_client_service, get_organization_service
@@ -33,7 +34,7 @@ FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0)
 
 @pytest.fixture()
 def database() -> Generator[Database, Any, None]:
-    config_database = ConfigDatabase(dsn="sqlite:///:memory:", retry_backoff=[])
+    config_database = ConfigDatabase(dsn=SecretStr("sqlite:///:memory:"), retry_backoff=[])
     db = Database(config_database=config_database)
     db.generate_tables()
     yield db
