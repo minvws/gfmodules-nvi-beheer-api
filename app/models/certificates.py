@@ -1,12 +1,21 @@
 from typing import Self
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.db.models.certificate import CertificateEntity
 from app.db.repository.certificate import CertificateIndexLookup
-from app.models.base import CommonModel
+from app.models.base import CommonModel, CommonQueryParams
 from app.models.oin import Oin
+
+
+class CertificateOptionalFields(BaseModel):
+    organization_identifier: Oin | None = Field(default=None)
+    domain: str | None = Field(default=None)
+
+
+class CertificateQueryParams(CommonQueryParams, CertificateOptionalFields):
+    pass
 
 
 class CertificateField(BaseModel):

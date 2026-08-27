@@ -4,7 +4,7 @@ import inject
 
 from app.config import Config, get_config
 from app.db.db import Database
-from app.services.certificate import CertificateService
+from app.services.certificate import ClientCertificateService, OrganizationCertificateService
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
 from app.services.scopes import ScopeService
@@ -31,8 +31,11 @@ def container_config(binder: inject.Binder) -> None:
     client_service = ClientService(db, organization_service)
     binder.bind(ClientService, client_service)
 
-    certificate_service = CertificateService(db)
-    binder.bind(CertificateService, certificate_service)
+    org_certificate_service = OrganizationCertificateService(db)
+    binder.bind(OrganizationCertificateService, org_certificate_service)
+
+    client_certificate_service = ClientCertificateService(db)
+    binder.bind(ClientCertificateService, client_certificate_service)
 
 
 def get_database() -> Database:
@@ -55,8 +58,12 @@ def get_scope_service() -> ScopeService:
     return inject.instance(ScopeService)
 
 
-def get_certificate_service() -> CertificateService:
-    return inject.instance(CertificateService)
+def get_org_certificate_service() -> OrganizationCertificateService:
+    return inject.instance(OrganizationCertificateService)
+
+
+def get_client_certificate_service() -> ClientCertificateService:
+    return inject.instance(ClientCertificateService)
 
 
 def configure() -> None:
