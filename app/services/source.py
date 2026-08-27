@@ -3,7 +3,7 @@ import datetime
 from app import utils
 from app.db.models.organization import OrganizationEntity
 from app.db.models.source import SourceEntity
-from app.models.source import SourceUpdate
+from app.models.source import SourceCreate, SourceUpdate
 from app.services.exceptions import ForbidenOperationError
 
 
@@ -45,7 +45,9 @@ class SourceService:
         return result
 
     @staticmethod
-    def get_client_sources_from_org(org: OrganizationEntity, sources: list[SourceUpdate]) -> list[SourceEntity]:
+    def get_client_sources_from_org(
+        org: OrganizationEntity, sources: list[SourceUpdate] | list[SourceCreate]
+    ) -> list[SourceEntity]:
         org_source_keys = [s.source_id for s in org.sources] if org.sources else []
         client_source_keys = [s.source_id for s in sources]
 

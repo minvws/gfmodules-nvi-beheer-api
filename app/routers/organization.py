@@ -50,7 +50,7 @@ def get_by_id(
     result = service.get_one(id)
     if result is None:
         raise HTTPException(status_code=404)
-    return Organization.from_entity(result)
+    return result
 
 
 @router.get("", response_model=list[Organization], response_model_exclude_none=True)
@@ -58,12 +58,11 @@ def get_many(
     params: Annotated[OrganizationQueryParams, Query()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    print(params.model_dump())
-    orgs = service.get_many(**params.model_dump())
-    return [Organization.from_entity(org) for org in orgs]
+    orgs = service.get_many(params)
+    return orgs
 
 
-@router.put("/{id}", response_model=Organization, response_model_exclude_none=True)
+@router.put("/{id}", response_model=OrganizationUpdate, response_model_exclude_none=True)
 def update(
     id: UUID,
     body: OrganizationUpdate,
@@ -72,7 +71,7 @@ def update(
     result = service.update_one(id, dto=body)
     if result is None:
         raise HTTPException(status_code=404)
-    return Organization.from_entity(result)
+    return result
 
 
 @router.delete("/{id}")

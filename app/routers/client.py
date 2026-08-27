@@ -60,9 +60,7 @@ def get_by_id(
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
     result = service.get_one(id, organization_id)
-    if result is None:
-        raise HTTPException(status_code=404)
-    return Client.from_entity(result)
+    return result
 
 
 @router.get(
@@ -78,12 +76,9 @@ def get_many(
 ) -> Any:
     results = service.get_many(
         organization_id=organization_id,
-        oin=params.oin,
-        common_name=params.common_name,
-        source_id=params.source_id,
-        scopes=params.sanatized_scope,
+        params=params,
     )
-    return [Client.from_entity(e) for e in results]
+    return results
 
 
 @router.put(
@@ -102,16 +97,13 @@ def update(
         result = service.update_one(
             id=id,
             organization_id=organization_id,
-            common_name=body.common_name,
-            oin=body.external_id,
-            source_id=body.source_id,
-            scopes=body.sanatized_scopes,
+            dto=body,
         )
     except ScopesNotGrantedError as error:
         raise HTTPException(status_code=422, detail=str(error))
     if result is None:
         raise HTTPException(status_code=404)
-    return Client.from_entity(result)
+    return result
 
 
 @router.delete(

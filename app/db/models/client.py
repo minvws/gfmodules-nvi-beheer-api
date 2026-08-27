@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import ForeignKey, String
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -28,18 +27,15 @@ class ClientEntity(CommonColumns):
     organization_id: Mapped[UUID] = mapped_column("organization_id", Uuid, ForeignKey("organizations.id"))
 
     organization: Mapped["OrganizationEntity"] = relationship(back_populates="clients", lazy="raise")
-    scopes: Mapped[Optional[list["ScopeEntity"]]] = relationship(
+    scopes: Mapped[list["ScopeEntity"]] = relationship(
         secondary=clients_scopes_association,
         primaryjoin="and_(ClientEntity.id == clients_scopes.c.client_id, ClientEntity.organization_id == clients_scopes.c.organization_id)",
         secondaryjoin="ScopeEntity.id == clients_scopes.c.scope_id",
+        lazy="raise",
     )
-    certificates: Mapped[Optional[list["CertificateEntity"]]] = relationship(
-        back_populates="clients", secondary=clients_certificates_association
+    certificates: Mapped[list["CertificateEntity"]] = relationship(
+        back_populates="clients", secondary=clients_certificates_association, lazy="raise"
     )
-    sources: Mapped[Optional[list["SourceEntity"]]] = relationship(
-        back_populates="clients", secondary=clients_sources_association
+    sources: Mapped[list["SourceEntity"]] = relationship(
+        back_populates="clients", secondary=clients_sources_association, lazy="raise"
     )
-
-    @hybrid_property
-    def client_scopes(self) -> list[str] | None:
-        return [s.name for s in self.scopes] if self.scopes else None

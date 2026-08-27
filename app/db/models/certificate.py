@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import ForeignKey, Index, String
@@ -31,9 +31,9 @@ class CertificateEntity(CommonColumns):
     domain: Mapped[str] = mapped_column("domain", String)
     organization_id: Mapped[UUID] = mapped_column("organization_id", Uuid, ForeignKey("organizations.id"))
 
-    organization: Mapped["OrganizationEntity"] = relationship(back_populates="certificates")
-    clients: Mapped[Optional[list["ClientEntity"]]] = relationship(
-        back_populates="certificates", secondary=clients_certificates_association
+    organization: Mapped["OrganizationEntity"] = relationship(back_populates="certificates", lazy="raise")
+    clients: Mapped[list["ClientEntity"]] = relationship(
+        back_populates="certificates", secondary=clients_certificates_association, lazy="raise"
     )
 
     @property

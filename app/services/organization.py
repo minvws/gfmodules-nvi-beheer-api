@@ -5,16 +5,23 @@ from fastapi import HTTPException
 
 from app.db.db import Database
 from app.db.models.certificate import CertificateEntity
+from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.query_builder.context.organization_context import (
+    OrganizationCertificateQueryContext,
+    OrganizationQueryContext,
+    OrganizationSourceQueryContext,
+)
 from app.db.repository.scope import ScopeRepository
 from app.db.repository.source import SourceRepository
-from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
-from app.models.ura import UraNumber
+from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
 from app.services.certificate import OrganizationCertificateService
+from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.exceptions import (
     ConflictError,
     OrganizationHasActiveClientsError,
+    RecordNotFoundError,
     ScopeNotAllowedError,
 )
 from app.services.scopes import ScopeService
@@ -31,7 +38,7 @@ class OrganizationService:
     ) -> Organization:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
-            entity = OrganizationEntity(
+            org_entity = OrganizationEntity(
                 external_id=dto.external_id,
                 name=dto.name,
             )
@@ -43,10 +50,10 @@ class OrganizationService:
                     raise ScopeNotAllowedError(dto.sanitized_scopes)
 
                 org_scopes = [s for s in app_scopes if s.name in dto.sanitized_scopes]
-                entity.scopes = org_scopes
+                org_entity.scopes = org_scopes
 
             if dto.certificates:
-                entity.certificates = [
+                org_entity.certificates = [
                     CertificateEntity(organization_identifier=c.organization_identifier, domain=c.domain)
                     for c in dto.certificates
                 ]
@@ -59,18 +66,43 @@ class OrganizationService:
                         f"Sources with source_id {[s.source_id for s in existing_sources]} already exists"
                     )
 
-                entity.sources = [s.into_entity() for s in dto.sources]
+                org_entity.sources = [s.into_entity() for s in dto.sources]
 
-            # TODO: add clients also
-            new_org = org_repo.add_one(entity)
+            if dto.clients:
+                for client in dto.clients:
+                    client_entitiy = ClientEntity(name=client.name, description=client.description)
+                    if client.scopes:
+                        # TODO: change santizied_scopes to return [] in case scope is empty
+                        ScopeService.assert_scopes_granted(org_entity, client.sanatized_scopes or [])
+                        client_scopes = ScopeService.make_client_scope_from_org(
+                            org_entity, client_entitiy, client.sanatized_scopes or []
+                        )
+                        client_entitiy.scopes = client_scopes
+
+                    if client.certificates:
+                        client_certs = ClientCertificateService.get_client_certs_from_org(
+                            org_entity, client.certificates
+                        )
+                        client_entitiy.certificates = client_certs
+
+                    if client.sources:
+                        client_sources = SourceService.get_client_sources_from_org(org_entity, client.sources or [])
+                        client_entitiy.sources = client_sources
+
+                    org_entity.clients.append(client_entitiy)
+
+            new_org = org_repo.add_one(org_entity)
 
             return Organization.from_entity(new_org)
 
-    def get_one(self, id: UUID, with_clients: bool = False) -> OrganizationEntity | None:
+    def get_one(self, id: UUID) -> Organization | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            entity = repo.find_one(id, with_clients=with_clients)
-            return entity
+            entity = repo.find_one(id)
+            if entity is None:
+                raise RecordNotFoundError(id)
+
+            return Organization.from_entity(entity)
 
     def exists(self, id: UUID) -> bool:
         with self.db.get_db_session() as session:
@@ -79,36 +111,30 @@ class OrganizationService:
 
     def get_many(
         self,
-        external_id: UraNumber | None = None,
-        name: str | None = None,
-        scopes: list[str] | None = None,
-        cert_identifier: str | None = None,
-        cert_domain: str | None = None,
-        include_deleted: bool = False,
-    ) -> list[OrganizationEntity]:
+        params: OrganizationQueryParams,
+    ) -> list[Organization]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
             orgs = repo.find_many(
-                external_id=external_id,
-                name=name,
-                scopes=scopes,
-                cert_identifier=cert_identifier,
-                cert_domain=cert_domain,
-                include_deleted=include_deleted,
+                ctx=params.into_organization_query_context(),
+                include_deleted=params.include_deleted,
             )
-            return list(orgs)
+            return [Organization.from_entity(org) for org in orgs]
 
-    def update_one(self, id: UUID, dto: OrganizationUpdate) -> OrganizationEntity:
+    def update_one(self, id: UUID, dto: OrganizationUpdate) -> OrganizationUpdate:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.find_one(id, include_deleted=True)
+            ctx = OrganizationQueryContext(
+                source_ctx=OrganizationSourceQueryContext.default(),
+                certificate_ctx=OrganizationCertificateQueryContext.default(),
+            )
+            org = org_repo.find(id, ctx)
             if not org:
                 raise HTTPException(status_code=404)
 
-            change_happened = not (OrganizationUpdate.from_entity(org) == dto)
+            change_happened = OrganizationUpdate.from_entity(org) != dto
             if change_happened is False:
-                print("\n\nNothin has changed here\n\n")
-                return org
+                return OrganizationUpdate.from_entity(org)
 
             org.name = dto.name
             if dto.sanitized_scopes:
@@ -143,23 +169,17 @@ class OrganizationService:
 
             session.add(org)
             session.commit()
-
-            # TODO: return dto with filtered deleted objects
-            updated_org = org_repo.find_one_by_id(org.id)
-            return updated_org
+            return OrganizationUpdate.from_entity(org)
 
     def delete_one(self, id: UUID) -> OrganizationEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            org = repo.find_one(id, with_clients=True)
+            org = repo.find_one(id)
             if org is None:
                 return None
 
             valid_for_delete = OrganizationService.validate_org_for_delete(org)
             if not valid_for_delete:
-                raise OrganizationHasActiveClientsError(id)
-
-            if org.clients and any(client.deleted_at is None for client in org.clients):
                 raise OrganizationHasActiveClientsError(id)
 
             org.deleted_at = datetime.now()
