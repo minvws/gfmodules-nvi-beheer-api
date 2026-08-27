@@ -91,6 +91,56 @@ class OrganizationRepository(RepositoryBase):
         result = self.db_session.execute(stmt).unique().scalar_one_or_none()
         return result
 
+    def find(
+        self,
+        id: UUID,
+        client_id: UUID | None = None,
+        certificate_id: UUID | None = None,
+        source_id: UUID | None = None,
+    ) -> OrganizationEntity | None:
+        load_options = []
+        if certificate_id:
+            load_options.append(
+                selectinload(
+                    OrganizationEntity.certificates.and_(
+                        CertificateEntity.id == certificate_id, CertificateEntity.deleted_at.is_(None)
+                    )
+                )
+            )
+
+        if source_id:
+            load_options.append(
+                selectinload(
+                    OrganizationEntity.sources.and_(SourceEntity.id == source_id, SourceEntity.deleted_at.is_(None))
+                )
+            )
+
+        if client_id:
+            client_load_option = selectinload(
+                OrganizationEntity.clients.and_(ClientEntity.id == client_id, ClientEntity.deleted_at.is_(None))
+            ).selectinload(ClientEntity.scopes)
+            if certificate_id:
+                client_load_option = client_load_option.selectinload(
+                    ClientEntity.certificates.and_(
+                        CertificateEntity.id == certificate_id, CertificateEntity.deleted_at.is_(None)
+                    )
+                )
+
+            if source_id:
+                client_load_option = client_load_option.selectinload(
+                    ClientEntity.sources.and_(SourceEntity.id == source_id, SourceEntity.deleted_at.is_(None))
+                )
+
+            load_options.append(client_load_option)
+
+        stmt = select(OrganizationEntity).where(
+            and_(OrganizationEntity.id == id, OrganizationEntity.deleted_at.is_(None))
+        )
+        if load_options:
+            stmt = stmt.options(*load_options)
+
+        return self.db_session.execute(stmt).scalar_one_or_none()
+
     def find_many(
         self,
         external_id: UraNumber | None = None,

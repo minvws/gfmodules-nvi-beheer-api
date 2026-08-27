@@ -64,10 +64,18 @@ class ClientService:
 
             return Client.from_entity(new_client)
 
-    def get_one(self, id: UUID, organization_id: UUID) -> ClientEntity | None:
+    def get_one(self, id: UUID, organization_id: UUID) -> Client:
         with self.db.get_db_session() as session:
-            repo = session.get_repository(ClientRepository)
-            return repo.find_one(organization_id, id)
+            repo = session.get_repository(OrganizationRepository)
+            org = repo.find(id=organization_id, client_id=id)
+            if org is None:
+                raise RecordNotFoundError(organization_id)
+
+            if not org.clients:
+                raise RecordNotFoundError(id)
+
+            client = org.clients[0]
+            return Client.from_entity(client)
 
     def get_many(
         self,

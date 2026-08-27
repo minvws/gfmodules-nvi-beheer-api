@@ -7,10 +7,12 @@ from sqlalchemy.exc import DatabaseError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.db.decorator import repository
+from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.client_scope import clients_scopes_association
 from app.db.models.organization import OrganizationEntity
 from app.db.models.scope import ScopeEntity
+from app.db.models.source import SourceEntity
 from app.db.repository.base import RepositoryBase
 from app.models.oin import Oin
 from app.models.ura import UraNumber
@@ -31,6 +33,37 @@ class ClientRepository(RepositoryBase):
         stmt = (
             select(ClientEntity).options(selectinload(ClientEntity.scopes)).where(self._and_clause(organization_id, id))
         )
+        return self.db_session.execute(stmt).scalar_one_or_none()
+
+    def find(
+        self,
+        id: UUID,
+        organization_id: UUID | None = None,
+        certificate_id: UUID | None = None,
+        source_id: UUID | None = None,
+    ) -> ClientEntity | None:
+        load_options = []
+        if certificate_id:
+            load_options.append(
+                selectinload(
+                    ClientEntity.certificates.and_(
+                        CertificateEntity.id == certificate_id, CertificateEntity.deleted_at.is_(None)
+                    )
+                )
+            )
+
+        if source_id:
+            load_options.append(
+                selectinload(ClientEntity.sources.and_(SourceEntity.id == source_id, SourceEntity.deleted_at.is_(None)))
+            )
+
+        stmt = select(ClientEntity).where(
+            ClientEntity.id == id,
+        )
+
+        if load_options:
+            stmt = stmt.options(*load_options)
+
         return self.db_session.execute(stmt).scalar_one_or_none()
 
     def exists(self, organization_id: UUID, id: UUID) -> bool:
