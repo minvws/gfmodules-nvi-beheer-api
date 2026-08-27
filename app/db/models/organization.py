@@ -36,7 +36,7 @@ class OrganizationEntity(CommonColumns):
     external_id: Mapped[UraNumber] = mapped_column("external_id", UraType)  # TODO check if this is unique
     name: Mapped[str] = mapped_column("name", String)
 
-    clients: Mapped[Optional[list["ClientEntity"]]] = relationship(back_populates="organization", lazy="raise")
+    clients: Mapped[list["ClientEntity"] | None] = relationship(back_populates="organization", lazy="raise")
     certificates: Mapped[Optional[list["CertificateEntity"]]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"
     )

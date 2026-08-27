@@ -60,9 +60,7 @@ def get_by_id(
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
     result = service.get_one(id, organization_id)
-    if result is None:
-        raise HTTPException(status_code=404)
-    return Client.from_entity(result)
+    return result
 
 
 @router.get(

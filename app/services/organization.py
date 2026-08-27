@@ -107,7 +107,6 @@ class OrganizationService:
 
             change_happened = not (OrganizationUpdate.from_entity(org) == dto)
             if change_happened is False:
-                print("\n\nNothin has changed here\n\n")
                 return org
 
             org.name = dto.name
