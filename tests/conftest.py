@@ -3,9 +3,12 @@ from typing import Any, Generator
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
+import gfmodules.logging as gflog
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from gfmodules.logging import ConfigLogging
+from gfmodules.logging.testing import reset_for_tests
 from pydantic import SecretStr
 
 from app.config import ConfigDatabase
@@ -15,6 +18,7 @@ from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.logging.events import ACT_CN, Log
 from app.models.oin import Oin
 from app.models.ura import UraNumber
 from app.routers.client import router as client_router
@@ -30,6 +34,21 @@ TEST_SOURCE_ID = "source-001"
 TEST_COMMON_NAME = "Test Client"
 VALID_OIN = TEST_OIN
 FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0)
+
+
+@pytest.fixture(autouse=True)
+def logging_catalogue() -> Generator[None, Any, None]:
+    gflog.configure(
+        config=ConfigLogging(debug_logs_in_console=True, access_logs=True),
+        loglevel="DEBUG",
+        catalogue=Log,
+        extra_context_fields=(ACT_CN,),
+        strict_fields=True,
+    )
+    try:
+        yield
+    finally:
+        reset_for_tests()
 
 
 @pytest.fixture()

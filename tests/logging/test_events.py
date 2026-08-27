@@ -1,84 +1,76 @@
-import json
 import logging
 
 import pytest
+from gfmodules.logging import DefaultEventCatalogue, LoggingStreams, declared_events
+from gfmodules.logging.testing import assert_catalogue_complete
 
-from app.logging.events import Log, NVIEvent
-from app.logging.filters import LoggingStreams
-from app.logging.formatter import JsonFormatter
+from app.logging.events import ACT_CN, Log
+
+_APP = LoggingStreams.APP
+_SIEM = LoggingStreams.SIEM
 
 
-def test_log_event_attaches_event_id_and_streams(caplog: pytest.LogCaptureFixture) -> None:
-    logger = logging.getLogger("app.test_events")
-    logger.setLevel(logging.DEBUG)
-    with caplog.at_level(logging.DEBUG, logger="app.test_events"):
-        Log.event(logger, Log.SYS_APP_STARTED, "started", version="1.0")
-
-    record = caplog.records[-1]
-    assert record.event_id == Log.SYS_APP_STARTED.event_id  # type: ignore
-    assert LoggingStreams.APP in record.stream  # type: ignore
-    assert record.version == "1.0"  # type: ignore
-    assert record.levelno == logging.INFO
+def test_the_catalogue_fills_every_required_slot() -> None:
+    """A slot left unfilled is invisible to mypy, so this is what catches it."""
+    assert_catalogue_complete(Log)
 
 
 @pytest.mark.parametrize(
-    "event,expected_level",
+    "name,event_id",
     [
-        (Log.SYS_APP_STARTED, logging.INFO),
-        (Log.HEALTH_UNHEALTHY, logging.ERROR),
-        (Log.SYS_UNHANDLED_EXCEPTION, logging.ERROR),
+        ("HEALTH_UNHEALTHY", "100600"),
+        ("SYS_APP_STARTED", "100601"),
+        ("SYS_APP_STOPPED", "100602"),
+        ("SYS_APP_CRASHED", "100602"),
+        ("DB_CONNECTION_FAILED", "100603"),
+        ("SYS_UNHANDLED_EXCEPTION", "100604"),
+        ("DB_SCHEMA_ERROR", "100605"),
+        ("SYS_MISSING_CORRELATION_ID", "100606"),
+        ("ACCESS_REQUEST", "094500"),
+        ("CLIENT_ONBOARDED", "100607"),
+        ("CLIENT_OFFBOARDED", "100608"),
+        ("CREDENTIAL_COUPLED", "100609"),
     ],
 )
-def test_log_event_uses_event_level(caplog: pytest.LogCaptureFixture, event: object, expected_level: int) -> None:
-    logger = logging.getLogger("app.test_events_levels")
-    logger.setLevel(logging.DEBUG)
-    with caplog.at_level(logging.DEBUG, logger="app.test_events_levels"):
-        Log.event(logger, event, "msg")  # type: ignore[arg-type]
-    assert caplog.records[-1].levelno == expected_level
+def test_events_carry_the_id_the_nvi_spec_assigns(name: str, event_id: str) -> None:
+    assert getattr(Log, name).event_id == event_id
 
 
-def test_log_event_attaches_field_streams_for_routed_events(caplog: pytest.LogCaptureFixture) -> None:
-    logger = logging.getLogger("app.test_events_routing")
-    logger.setLevel(logging.DEBUG)
-    with caplog.at_level(logging.DEBUG, logger="app.test_events_routing"):
-        Log.event(logger, Log.CLIENT_ONBOARDED, "onboarded", ura_number="12345678")
-
-    record = caplog.records[-1]
-    field_streams = record.field_streams  # type: ignore[attr-defined]
-    assert field_streams[LoggingStreams.APP] == ("oin", "ura_number", "source_identifier", "approved_by", "scopes")
-    assert field_streams[LoggingStreams.SIEM] == ("ura_number", "scopes")
-    assert LoggingStreams.PUBLIC_INSPECT not in field_streams
+def test_the_per_route_access_ids_cover_every_mutating_beheer_route() -> None:
+    assert Log.access_event_id[("POST", "/organizations")] == "100700"
+    assert Log.access_event_id[("DELETE", "/organizations/{organization_id}/clients/{id}")] == "100705"
 
 
-def test_log_event_omits_field_streams_for_plain_events(caplog: pytest.LogCaptureFixture) -> None:
-    plain_event = NVIEvent("000000", logging.INFO, (LoggingStreams.APP,))
-    logger = logging.getLogger("app.test_events_plain")
-    logger.setLevel(logging.DEBUG)
-    with caplog.at_level(logging.DEBUG, logger="app.test_events_plain"):
-        Log.event(logger, plain_event, "started")
+class TestTheOverriddenSlots:
+    def test_the_access_record_adds_the_acting_client(self) -> None:
+        added = set(Log.ACCESS_REQUEST.fields[_APP]) - set(DefaultEventCatalogue.ACCESS_REQUEST.fields[_APP])
+        assert added == {ACT_CN.name}
 
-    assert not hasattr(caplog.records[-1], "field_streams")
-
-
-def test_unhandled_exception_type_survives_app_routing() -> None:
-    record = logging.LogRecord(
-        name="app", level=logging.ERROR, pathname=__file__, lineno=1, msg="fail", args=(), exc_info=None
-    )
-    record.event_id = Log.SYS_UNHANDLED_EXCEPTION.event_id
-    record.field_streams = Log.SYS_UNHANDLED_EXCEPTION.fields
-    record.exception_type = "RuntimeError"
-
-    message = json.loads(JsonFormatter(stream=LoggingStreams.APP).format(record))["message"]
-    assert message["exception_type"] == "RuntimeError"
+    def test_every_other_system_slot_keeps_the_shared_routing(self) -> None:
+        rerouted = {
+            name
+            for name, event in vars(Log).items()
+            if not name.startswith("_")
+            and name in vars(DefaultEventCatalogue)
+            and event.replace(event_id="") != getattr(DefaultEventCatalogue, name)
+        }
+        assert rerouted == {"ACCESS_REQUEST"}
 
 
-def test_log_event_includes_exc_info(caplog: pytest.LogCaptureFixture) -> None:
-    logger = logging.getLogger("app.test_events_exc")
-    logger.setLevel(logging.DEBUG)
-    try:
-        raise ValueError("boom")
-    except ValueError as e:
-        with caplog.at_level(logging.DEBUG, logger="app.test_events_exc"):
-            Log.event(logger, Log.SYS_UNHANDLED_EXCEPTION, "fail", exc_info=e)
+class TestStreamRoutingIsDeclared:
+    def test_no_event_routes_to_public_inspect(self) -> None:
+        assert [name for name, event in declared_events(Log) if LoggingStreams.PUBLIC_INSPECT in event.streams] == []
 
-    assert caplog.records[-1].exc_info is not None
+    def test_every_siem_event_narrows_its_fields(self) -> None:
+        for name, event in declared_events(Log):
+            if _SIEM in event.streams:
+                assert event.fields, f"{name} routes to SIEM without a field allow-list"
+
+    def test_onboarding_keeps_the_oin_out_of_siem(self) -> None:
+        assert "oin" in Log.CLIENT_ONBOARDED.fields[_APP]
+        assert "oin" not in Log.CLIENT_ONBOARDED.fields[_SIEM]
+
+    def test_the_health_error_detail_is_app_only(self) -> None:
+        assert Log.HEALTH_UNHEALTHY.level == logging.ERROR
+        assert "error_detail" in Log.HEALTH_UNHEALTHY.fields[_APP]
+        assert "error_detail" not in Log.HEALTH_UNHEALTHY.fields[_SIEM]

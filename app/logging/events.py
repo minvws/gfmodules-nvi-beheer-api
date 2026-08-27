@@ -1,60 +1,41 @@
 import logging
-from collections.abc import Mapping
-from dataclasses import dataclass, field
-from typing import Any
 
-from app.logging.filters import LoggingStreams
+from gfmodules.logging import ContextField, DefaultEventCatalogue, LogEvent, LoggingStreams
 
 _APP = LoggingStreams.APP
 _SIEM = LoggingStreams.SIEM
 
+_Base = DefaultEventCatalogue
 
-@dataclass(frozen=True)
-class NVIEvent:
-    event_id: str
-    level: int
-    streams: tuple[LoggingStreams, ...]
-    # Per-stream allow-list of field names. PUB == "stroom 1", APP == "stroom 2", SIEM == "stroom 3".
-    # When empty, no per-field routing is applied and every field is sent to all streams in streams
-    fields: Mapping[LoggingStreams, tuple[str, ...]] = field(default_factory=dict)
+#: The acting client's common name
+ACT_CN = ContextField(name="gf-act-cn", header="x-gf-act-cn")
 
 
-class Log:
-    # System / Health (NVI-SYS / NVI-HEALTH)
-    HEALTH_UNHEALTHY = NVIEvent(  # NVI-HEALTH-001
+class Log(_Base):
+    SYS_APP_STARTED = _Base.SYS_APP_STARTED.with_id("100601")  # NVI-SYS-001
+    SYS_APP_STOPPED = _Base.SYS_APP_STOPPED.with_id("100602")  # NVI-SYS-002
+    SYS_APP_CRASHED = _Base.SYS_APP_CRASHED.with_id("100602")  # NVI-SYS-002
+    SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("100604")  # NVI-SYS-004
+    SYS_MISSING_CORRELATION_ID = _Base.SYS_MISSING_CORRELATION_ID.with_id("100606")  # NVI-SYS-006
+    # Overridden: the shared default's allow-list plus the acting client.
+    ACCESS_REQUEST = _Base.ACCESS_REQUEST.replace(  # NVI-AUTH-101
+        event_id="094500",
+        fields={_APP: (*_Base.ACCESS_REQUEST.fields[_APP], ACT_CN.name)},
+    )
+
+    HEALTH_UNHEALTHY = LogEvent(  # NVI-HEALTH-001
         "100600",
         logging.ERROR,
         (_APP, _SIEM),
         {_APP: ("component", "status", "error_detail"), _SIEM: ("component", "status")},
     )
-    SYS_APP_STARTED = NVIEvent(  # NVI-SYS-001
-        "100601", logging.INFO, (_APP,), {_APP: ("version", "config_path")}
-    )
-    SYS_APP_STOPPED = NVIEvent(  # NVI-SYS-002
-        "100602",
-        logging.INFO,
-        (_APP, _SIEM),
-        {_APP: ("shutdown_reason", "last_exception_type"), _SIEM: ("shutdown_reason",)},  # graceful/signal
-    )
-    SYS_APP_CRASHED = NVIEvent(  # NVI-SYS-002
-        "100602",
-        logging.CRITICAL,
-        (_APP, _SIEM),
-        {_APP: ("shutdown_reason", "last_exception_type"), _SIEM: ("shutdown_reason",)},  # crash
-    )
-    DB_CONNECTION_FAILED = NVIEvent(  # NVI-SYS-003
+    DB_CONNECTION_FAILED = LogEvent(  # NVI-SYS-003
         "100603",
         logging.ERROR,
         (_APP, _SIEM),
         {_APP: ("error_type", "retry_attempt", "backoff_seconds"), _SIEM: ("error_type",)},
     )
-    SYS_UNHANDLED_EXCEPTION = NVIEvent(  # NVI-SYS-004
-        "100604",
-        logging.ERROR,
-        (_APP, _SIEM),
-        {_APP: ("exception_type", "endpoint", "method"), _SIEM: ("exception_type", "endpoint", "method")},
-    )
-    DB_SCHEMA_ERROR = NVIEvent(  # NVI-SYS-005
+    DB_SCHEMA_ERROR = LogEvent(  # NVI-SYS-005
         "100605",
         logging.ERROR,
         (_APP,),
@@ -62,33 +43,20 @@ class Log:
             _APP: ("exception_type", "table", "column", "value_length", "column_limit"),
         },
     )
-    SYS_MISSING_CORRELATION_ID = NVIEvent(  # NVI-SYS-006
-        "100606",
-        logging.ERROR,
-        (_APP, _SIEM),
-        {_APP: ("endpoint", "method"), _SIEM: ("endpoint", "method")},
-    )
 
-    ACCESS_REQUEST = NVIEvent(  # NVI-AUTH-101
-        "094500",
-        logging.INFO,
-        (_APP,),
-        {_APP: ("endpoint", "method", "gf-act-cn")},
-    )
-    CLIENT_ONBOARDED = NVIEvent(  # NVI-OB-001
+    CLIENT_ONBOARDED = LogEvent(  # NVI-OB-001
         "100607",
         logging.INFO,
         (_APP, _SIEM),
         {_APP: ("oin", "ura_number", "source_identifier", "approved_by", "scopes"), _SIEM: ("ura_number", "scopes")},
     )
-    CLIENT_OFFBOARDED = NVIEvent(  # NVI-OB-002
+    CLIENT_OFFBOARDED = LogEvent(  # NVI-OB-002
         "100608",
         logging.WARNING,
         (_APP, _SIEM),
         {_APP: ("oin", "ura_number", "deactivated_by", "reason"), _SIEM: ("ura_number", "deactivated_by")},
     )
-    # Event below is not logged since code for this logic is not implemented yet. It is added here for future use.
-    CREDENTIAL_COUPLED = NVIEvent(  # NVI-OB-003
+    CREDENTIAL_COUPLED = LogEvent(  # NVI-OB-003
         "100609",
         logging.INFO,
         (_APP, _SIEM),
@@ -106,22 +74,3 @@ class Log:
         ("PUT", "/organizations/{organization_id}/clients/{id}"): "100704",
         ("DELETE", "/organizations/{organization_id}/clients/{id}"): "100705",
     }
-
-    @staticmethod
-    def event(
-        logger: logging.Logger,
-        event: NVIEvent,
-        message: str,
-        *,
-        event_id: str | None = None,
-        exc_info: Any = None,
-        **fields: Any,
-    ) -> None:
-        extra: dict[str, Any] = {
-            "event_id": event_id if event_id else event.event_id,
-            "stream": list(event.streams),
-        }
-        if event.fields:
-            extra["field_streams"] = event.fields
-        extra.update(fields)
-        logger.log(event.level, message, extra=extra, exc_info=exc_info)

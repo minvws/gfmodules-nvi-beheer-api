@@ -13,12 +13,18 @@ syslog_path = syslog:5514
 # Identifies this application in the JSON records (application_id field),
 # so the log server can tell apart applications sharing the channel.
 application_id = nvi-beheer-api
+# Emit an access record per request.
+access_logs = True
 # Include exception/stack traces in JSON logs
 include_traces = True
 # Whether to display debug logs in the console
 debug_logs_in_console = True
 # Log an error when a request arrives without an X-GF-Correlation-ID header
 correlation_id_expected = False
+# Read the client ip from X-Forwarded-For instead of the connection. The header
+# is set by the caller, so enable this only where a proxy in front of this
+# application rewrites it.
+trust_forwarded_for = False
 
 [database]
 # Dsn for database connection
