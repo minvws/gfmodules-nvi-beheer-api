@@ -1,18 +1,34 @@
 from datetime import datetime
 from uuid import UUID
 
-from app import utils
 from app.db.db import Database
 from app.db.models.certificate import CertificateEntity
 from app.db.models.organization import OrganizationEntity
+from app.db.repository.certificate import CertificateRepository
 from app.db.repository.organization import OrganizationRepository
-from app.models.certificates import Certificate, CertificateCreate, CertificateUpdate
-from app.services.exceptions import ConflictError, ForbidenOperationError, RecordNotFoundError
+from app.models.certificates import Certificate, CertificateCreate, CertificateQueryParams, CertificateUpdate
+from app.services.exceptions import ConflictError, RecordNotFoundError
 
 
-class CertificateService:
-    def __init__(self, db: Database) -> None:
-        self.db = db
+class OrganizationCertificateService:
+    def __init__(self, database: Database) -> None:
+        self.db = database
+
+    def get_one(self, id: UUID, organization_id: UUID) -> Certificate:
+        with self.db.get_db_session() as session:
+            repo = session.get_repository(CertificateRepository)
+            result = repo.find_one(id, organization_id)
+            if result is None:
+                raise RecordNotFoundError(id)
+
+            return Certificate.from_entity(result)
+
+    def get_many(self, organization_id: UUID, params: CertificateQueryParams) -> list[Certificate]:
+        with self.db.get_db_session() as session:
+            repo = session.get_repository(CertificateRepository)
+            results = repo.find_many(organization_id=organization_id, **params.model_dump())
+
+            return [Certificate.from_entity(e) for e in results]
 
     def create_one(self, organization_id: UUID, dto: CertificateCreate) -> Certificate:
         with self.db.get_db_session() as session:
@@ -56,6 +72,25 @@ class CertificateService:
 
             return Certificate.from_entity(new_cert)
 
+    def update_one(self, id: UUID, organization_id: UUID, dto: CertificateUpdate) -> Certificate:
+        with self.db.get_db_session() as session:
+            repo = session.get_repository(CertificateRepository)
+            target = repo.find_one(id, organization_id)
+            if target is None:
+                raise RecordNotFoundError(id)
+
+            if CertificateUpdate.from_entity(target) == dto:
+                return Certificate.from_entity(target)
+
+            if target.organization_identifier != dto.organization_identifier:
+                target.organization_identifier = dto.organization_identifier
+
+            if target.domain != target.domain:
+                target.domain = target.domain
+
+            session.commit()
+            return Certificate.from_entity(target)
+
     @staticmethod
     def compute_certs_to_update_from_org(
         org: OrganizationEntity, target: list[CertificateUpdate]
@@ -88,12 +123,3 @@ class CertificateService:
                 update_certs.append(value)
 
         return update_certs
-
-    @staticmethod
-    def get_client_certs_from_org(org: OrganizationEntity, certs: list[CertificateCreate]) -> list[CertificateEntity]:
-        org_cert_keys = [c.unique_key for c in org.certificates] if org.certificates else []
-        client_cert_keys = [c.make_unique_key(org.id) for c in certs]
-        if not utils.is_subset(org_cert_keys, client_cert_keys):
-            raise ForbidenOperationError("Client certs are not allowed to be assigned")
-
-        return [c for c in org.certificates if c.unique_key in client_cert_keys] if org.certificates else []

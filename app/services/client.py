@@ -10,7 +10,7 @@ from app.models.client import Client, ClientCreate
 from app.models.oin import Oin
 from app.models.ura import UraNumber
 from app.services import scopes
-from app.services.certificate import CertificateService
+from app.services.certificate import ClientCertificateService
 from app.services.exceptions import RecordNotFoundError
 from app.services.organization import OrganizationService
 from app.services.scopes import ScopeService
@@ -42,7 +42,7 @@ class ClientService:
                 target.scopes = target_scope
 
             if dto.certificates:
-                client_certs = CertificateService.get_client_certs_from_org(org, dto.certificates)
+                client_certs = ClientCertificateService.get_client_certs_from_org(org, dto.certificates)
                 target.certificates = client_certs
 
             if dto.sources:

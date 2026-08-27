@@ -11,7 +11,7 @@ from app.db.repository.scope import ScopeRepository
 from app.db.repository.source import SourceRepository
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from app.models.ura import UraNumber
-from app.services.certificate import CertificateService
+from app.services.certificate import OrganizationCertificateService
 from app.services.exceptions import (
     ConflictError,
     OrganizationHasActiveClientsError,
@@ -124,7 +124,7 @@ class OrganizationService:
                 org.scopes = []
 
             if dto.certificates:
-                update_certs = CertificateService.compute_certs_to_update_from_org(org, dto.certificates)
+                update_certs = OrganizationCertificateService.compute_certs_to_update_from_org(org, dto.certificates)
                 org.certificates = update_certs
             else:
                 if org.certificates:
