@@ -4,7 +4,7 @@ import os
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, SecretStr, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,8 @@ class ConfigLogging(BaseModel):
 
 
 class ConfigDatabase(BaseModel):
-    dsn: str
+    # SecretStr so the DSN password never appears in reprs or logs
+    dsn: SecretStr
     create_tables: bool = Field(default=False)
     retry_backoff: list[float] = Field(default=[0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 4.8, 6.4, 10.0])
     pool_size: int = Field(default=5, ge=0, lt=100)

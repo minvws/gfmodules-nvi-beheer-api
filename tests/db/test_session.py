@@ -2,6 +2,7 @@ from typing import Any, Callable, List
 from unittest.mock import patch
 
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import select
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
 
@@ -25,7 +26,7 @@ def _failing(*errors: Exception) -> Callable[..., Any]:
 @pytest.fixture()
 def retrying_database() -> Database:
     """A database with a non-empty backoff, so the retry loop is actually exercised."""
-    database = Database(config_database=ConfigDatabase(dsn="sqlite:///:memory:", retry_backoff=[0.01, 0.01]))
+    database = Database(config_database=ConfigDatabase(dsn=SecretStr("sqlite:///:memory:"), retry_backoff=[0.01, 0.01]))
     database.generate_tables()
     return database
 
@@ -67,7 +68,7 @@ def test_commit_failure_leaves_nothing_persisted(retrying_database: Database) ->
 
 def test_reads_are_still_retried_after_a_rollback() -> None:
     """Rollback-and-retry remains valid recovery for statements that re-run from scratch."""
-    database = Database(config_database=ConfigDatabase(dsn="sqlite:///:memory:", retry_backoff=[0.01]))
+    database = Database(config_database=ConfigDatabase(dsn=SecretStr("sqlite:///:memory:"), retry_backoff=[0.01]))
     database.generate_tables()
 
     with database.get_db_session() as session:
