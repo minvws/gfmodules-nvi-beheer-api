@@ -9,6 +9,7 @@ from app.models.base import (
     sanatize_model_scopes,
 )
 from app.models.certificates import Certificate, CertificateCreate, CertificateUpdate
+from app.models.client import Client
 from app.models.source import Source, SourceCreate, SourceUpdate
 from app.models.ura import UraNumber
 
@@ -96,14 +97,18 @@ class Organization(CommonModel, OrganizationFields):
 
     certificates: list[Certificate] | None = Field(default=None)
     sources: list[Source] | None = Field(default=None)
+    clients: list[Client] | None = Field(default=None)
 
     @classmethod
     def from_entity(cls, entity: OrganizationEntity) -> Self:
+        scopes = " ".join([s.name for s in entity.scopes]) if entity.scopes else None
         return cls(
             id=entity.id,
             external_id=entity.external_id,
             name=entity.name,
-            scopes=" ".join(entity.org_scopes) if entity.org_scopes else None,
+            scopes=scopes,
+            # scopes=" ".join(entity.org_scopes) if entity.org_scopes else None,
+            clients=[Client.from_entity(c) for c in entity.clients] if entity.clients else None,
             certificates=[Certificate.from_entity(c) for c in entity.certificates] if entity.certificates else None,
             sources=[Source.from_entity(s) for s in entity.sources] if entity.sources else None,
             created_at=entity.created_at,

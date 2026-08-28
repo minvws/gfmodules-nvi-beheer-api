@@ -77,12 +77,15 @@ class Client(CommonModel, ClientFields):
 
     @classmethod
     def from_entity(cls, entity: ClientEntity) -> Self:
+        scopes = " ".join([s.name for s in entity.scopes]) if entity.scopes else None
+
         return cls(
             id=entity.id,
             name=entity.name,
             description=entity.description,
             organization_id=entity.organization_id,
-            scopes=" ".join(entity.client_scopes) if entity.client_scopes else None,
+            scopes=scopes,
+            # scopes=" ".join(entity.client_scopes) if entity.client_scopes else None,
             certificates=[Certificate.from_entity(c) for c in entity.certificates] if entity.certificates else None,
             created_at=entity.created_at,
         )

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Index, String, text
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -36,17 +35,13 @@ class OrganizationEntity(CommonColumns):
     external_id: Mapped[UraNumber] = mapped_column("external_id", UraType)  # TODO check if this is unique
     name: Mapped[str] = mapped_column("name", String)
 
-    clients: Mapped[list["ClientEntity"] | None] = relationship(back_populates="organization", lazy="raise")
-    certificates: Mapped[Optional[list["CertificateEntity"]]] = relationship(
-        back_populates="organization", cascade="all, delete-orphan"
+    clients: Mapped[list["ClientEntity"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan", lazy="raise"
     )
-    scopes: Mapped[Optional[list["ScopeEntity"]]] = relationship(
-        secondary=organizations_scopes_association,
+    certificates: Mapped[list["CertificateEntity"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan", lazy="raise"
     )
-    sources: Mapped[Optional[list["SourceEntity"]]] = relationship(
-        back_populates="organization", cascade="all, delete-orphan"
+    scopes: Mapped[list["ScopeEntity"]] = relationship(secondary=organizations_scopes_association, lazy="raise")
+    sources: Mapped[list["SourceEntity"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan", lazy="raise"
     )
-
-    @hybrid_property
-    def org_scopes(self) -> list[str] | None:
-        return [s.name for s in self.scopes] if self.scopes else None

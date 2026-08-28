@@ -15,6 +15,7 @@ from app.services.certificate import OrganizationCertificateService
 from app.services.exceptions import (
     ConflictError,
     OrganizationHasActiveClientsError,
+    RecordNotFoundError,
     ScopeNotAllowedError,
 )
 from app.services.scopes import ScopeService
@@ -66,11 +67,14 @@ class OrganizationService:
 
             return Organization.from_entity(new_org)
 
-    def get_one(self, id: UUID, with_clients: bool = False) -> OrganizationEntity | None:
+    def get_one(self, id: UUID) -> Organization | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            entity = repo.find_one(id, with_clients=with_clients)
-            return entity
+            entity = repo.find_one(id)
+            if entity is None:
+                raise RecordNotFoundError(id)
+
+            return Organization.from_entity(entity)
 
     def exists(self, id: UUID) -> bool:
         with self.db.get_db_session() as session:
@@ -88,6 +92,14 @@ class OrganizationService:
     ) -> list[OrganizationEntity]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
+            # orgs = repo.find_many(
+            #     external_id=external_id,
+            #     name=name,
+            #     scopes=scopes,
+            #     cert_identifier=cert_identifier,
+            #     cert_domain=cert_domain,
+            #     include_deleted=include_deleted,
+            # )
             orgs = repo.find_many(
                 external_id=external_id,
                 name=name,
