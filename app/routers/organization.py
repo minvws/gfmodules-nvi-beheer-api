@@ -50,7 +50,7 @@ def get_by_id(
     result = service.get_one(id)
     if result is None:
         raise HTTPException(status_code=404)
-    return Organization.from_entity(result)
+    return result
 
 
 @router.get("", response_model=list[Organization], response_model_exclude_none=True)

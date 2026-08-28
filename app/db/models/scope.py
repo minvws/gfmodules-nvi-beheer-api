@@ -20,9 +20,10 @@ class ScopeEntity(Base):
     name: Mapped[str] = mapped_column("name", String)
     created_at: Mapped[datetime] = mapped_column("created_at", TIMESTAMP, server_default=func.now())
 
-    organizations: Mapped["OrganizationEntity"] = relationship(secondary=organizations_scopes_association)
+    organizations: Mapped["OrganizationEntity"] = relationship(secondary=organizations_scopes_association, lazy="raise")
     clients: Mapped["ClientEntity"] = relationship(
         secondary=clients_scopes_association,
         primaryjoin="ScopeEntity.id == clients_scopes.c.scope_id",
         secondaryjoin="ClientEntity.id == clients_scopes.c.client_id",
+        lazy="raise",
     )

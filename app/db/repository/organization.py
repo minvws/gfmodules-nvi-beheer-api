@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import contains_eager, joinedload, selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
 from app.db.decorator import repository
 from app.db.models.certificate import CertificateEntity
@@ -12,6 +12,7 @@ from app.db.models.organization import OrganizationEntity
 from app.db.models.scope import ScopeEntity
 from app.db.models.source import SourceEntity
 from app.db.repository.base import RepositoryBase
+from app.db.repository.query_builder.organization_query_builder import LoadStrategy, OrganizationQueryBuilder
 from app.models.ura import UraNumber
 
 
@@ -31,23 +32,40 @@ class OrganizationRepository(RepositoryBase):
             raise
 
     def find_one(
-        self, id: UUID, with_clients: bool = False, include_deleted: bool = False
+        self,
+        id: UUID,
+        include_deleted: bool = False,
     ) -> OrganizationEntity | None:
-        stmt = select(OrganizationEntity).options(
-            selectinload(OrganizationEntity.scopes), selectinload(OrganizationEntity.sources)
+        stmt = (
+            OrganizationQueryBuilder(include_deleted=include_deleted)
+            .with_id(id)
+            .include_clients()
+            .include_scopes()
+            .include_sources()
+            .include_certificate()
+            .build()
         )
-        if include_deleted:
-            stmt = stmt.options(selectinload(OrganizationEntity.certificates), selectinload(OrganizationEntity.sources))
-        else:
-            stmt = stmt.options(
-                selectinload(OrganizationEntity.certificates.and_(CertificateEntity.deleted_at.is_(None))),
-                selectinload(OrganizationEntity.sources.and_(SourceEntity.deleted_at.is_(None))),
-            )
 
-        if not with_clients:
-            stmt = stmt.where(self._and_clause(id))
-        else:
-            stmt = stmt.where(OrganizationEntity.id == id).options(joinedload(OrganizationEntity.clients))
+        # stmt = select(OrganizationEntity).options(
+        #     selectinload(OrganizationEntity.scopes), selectinload(
+        #         OrganizationEntity.sources)
+        # )
+        # if include_deleted:
+        #     stmt = stmt.options(selectinload(
+        #         OrganizationEntity.certificates), selectinload(OrganizationEntity.sources))
+        # else:
+        #     stmt = stmt.options(
+        #         selectinload(OrganizationEntity.certificates.and_(
+        #             CertificateEntity.deleted_at.is_(None))),
+        #         selectinload(OrganizationEntity.sources.and_(
+        #             SourceEntity.deleted_at.is_(None))),
+        #     )
+        #
+        # if not with_clients:
+        #     stmt = stmt.where(self._and_clause(id))
+        # else:
+        #     stmt = stmt.where(OrganizationEntity.id == id).options(
+        #         joinedload(OrganizationEntity.clients))
 
         return self.db_session.execute(stmt).unique().scalar()
 
@@ -98,48 +116,122 @@ class OrganizationRepository(RepositoryBase):
         certificate_id: UUID | None = None,
         source_id: UUID | None = None,
     ) -> OrganizationEntity | None:
-        load_options = []
-        if certificate_id:
-            load_options.append(
-                selectinload(
-                    OrganizationEntity.certificates.and_(
-                        CertificateEntity.id == certificate_id, CertificateEntity.deleted_at.is_(None)
-                    )
-                )
+        stmt = (
+            OrganizationQueryBuilder()
+            .with_id(id)
+            .include_certificate(certificate_id)
+            .include_clients(
+                id=client_id,
+                certificate_id=certificate_id,
+                source_id=source_id,
+                include_certificates=True,
+                include_sources=True,
             )
-
-        if source_id:
-            load_options.append(
-                selectinload(
-                    OrganizationEntity.sources.and_(SourceEntity.id == source_id, SourceEntity.deleted_at.is_(None))
-                )
-            )
-
-        if client_id:
-            client_load_option = selectinload(
-                OrganizationEntity.clients.and_(ClientEntity.id == client_id, ClientEntity.deleted_at.is_(None))
-            ).selectinload(ClientEntity.scopes)
-            if certificate_id:
-                client_load_option = client_load_option.selectinload(
-                    ClientEntity.certificates.and_(
-                        CertificateEntity.id == certificate_id, CertificateEntity.deleted_at.is_(None)
-                    )
-                )
-
-            if source_id:
-                client_load_option = client_load_option.selectinload(
-                    ClientEntity.sources.and_(SourceEntity.id == source_id, SourceEntity.deleted_at.is_(None))
-                )
-
-            load_options.append(client_load_option)
-
-        stmt = select(OrganizationEntity).where(
-            and_(OrganizationEntity.id == id, OrganizationEntity.deleted_at.is_(None))
+            .include_sources(source_id)
+            .include_certificate(certificate_id)
+            .build()
         )
-        if load_options:
-            stmt = stmt.options(*load_options)
+
+        # load_options = []
+        # if certificate_id:
+        #     load_options.append(
+        #         selectinload(
+        #             OrganizationEntity.certificates.and_(
+        #                 CertificateEntity.id == certificate_id, CertificateEntity.deleted_at.is_(
+        #                     None)
+        #             )
+        #         )
+        #     )
+        #
+        # if source_id:
+        #     load_options.append(
+        #         selectinload(
+        #             OrganizationEntity.sources.and_(
+        #                 SourceEntity.id == source_id, SourceEntity.deleted_at.is_(None))
+        #         )
+        #     )
+        #
+        # if client_id:
+        #     client_load_option = selectinload(
+        #         OrganizationEntity.clients.and_(
+        #             ClientEntity.id == client_id, ClientEntity.deleted_at.is_(None))
+        #     ).selectinload(ClientEntity.scopes)
+        #     if certificate_id:
+        #         client_load_option = client_load_option.selectinload(
+        #             ClientEntity.certificates.and_(
+        #                 CertificateEntity.id == certificate_id, CertificateEntity.deleted_at.is_(
+        #                     None)
+        #             )
+        #         )
+        #
+        #     if source_id:
+        # client_load_option = client_load_option.selectinload(
+        #             ClientEntity.sources.and_(
+        #                 SourceEntity.id == source_id, SourceEntity.deleted_at.is_(None))
+        #         )
+        #
+        #     load_options.append(client_load_option)
+        #
+        # stmt = select(OrganizationEntity).where(
+        #     and_(OrganizationEntity.id == id,
+        #          OrganizationEntity.deleted_at.is_(None))
+        # )
+        # if load_options:
+        #     stmt = stmt.options(*load_options)
 
         return self.db_session.execute(stmt).scalar_one_or_none()
+
+    # def find_many(
+    #     self,
+    #     external_id: UraNumber | None = None,
+    #     name: str | None = None,
+    #     scopes: list[str] | None = None,
+    #     cert_identifier: str | None = None,
+    #     cert_domain: str | None = None,
+    #     include_deleted: bool = False,
+    # ) -> Sequence[OrganizationEntity]:
+    #     children_conditions: list[ColumnElement[bool]] = []
+    #     parent_conditions: list[ColumnElement[bool]] = []
+    #
+    #     if not include_deleted:
+    #         parent_conditions.append(OrganizationEntity.deleted_at.is_(None))
+    #
+    #     if external_id:
+    #         parent_conditions.append(OrganizationEntity.external_id == external_id)
+    #     if name:
+    #         parent_conditions.append(OrganizationEntity.name == name)
+    #
+    #     if scopes:
+    #         scopes_conditions = [(ScopeEntity.name == s) for s in scopes]
+    #         children_conditions.append(or_(*scopes_conditions))
+    #
+    #     if cert_identifier:
+    #         children_conditions.append(CertificateEntity.organization_identifier == cert_identifier)
+    #
+    #     if cert_domain:
+    #         children_conditions.append(CertificateEntity.domain == cert_domain)
+    #
+    #     stmt = select(OrganizationEntity)
+    #     if children_conditions:
+    #         stmt = (
+    #             stmt.outerjoin(OrganizationEntity.scopes)
+    #             .outerjoin(OrganizationEntity.certificates.and_(CertificateEntity.deleted_at.is_(None)))
+    #             .outerjoin(OrganizationEntity.sources)
+    #             .options(
+    #                 contains_eager(OrganizationEntity.scopes),
+    #                 contains_eager(OrganizationEntity.certificates),
+    #                 contains_eager(OrganizationEntity.sources),
+    #             )
+    #         ).where(and_(*parent_conditions, *children_conditions))
+    #
+    #     else:
+    #         stmt = stmt.options(
+    #             selectinload(OrganizationEntity.scopes),
+    #             selectinload(OrganizationEntity.certificates.and_(CertificateEntity.deleted_at.is_(None))),
+    #             selectinload(OrganizationEntity.sources.and_(SourceEntity.deleted_at.is_(None))),
+    #         ).where(and_(*parent_conditions))
+    #
+    #     return self.db_session.execute(stmt).scalars().unique().all()
 
     def find_many(
         self,
@@ -150,47 +242,19 @@ class OrganizationRepository(RepositoryBase):
         cert_domain: str | None = None,
         include_deleted: bool = False,
     ) -> Sequence[OrganizationEntity]:
-        children_conditions: list[ColumnElement[bool]] = []
-        parent_conditions: list[ColumnElement[bool]] = []
-
-        if not include_deleted:
-            parent_conditions.append(OrganizationEntity.deleted_at.is_(None))
-
-        if external_id:
-            parent_conditions.append(OrganizationEntity.external_id == external_id)
-        if name:
-            parent_conditions.append(OrganizationEntity.name == name)
-
-        if scopes:
-            scopes_conditions = [(ScopeEntity.name == s) for s in scopes]
-            children_conditions.append(or_(*scopes_conditions))
-
-        if cert_identifier:
-            children_conditions.append(CertificateEntity.organization_identifier == cert_identifier)
-
-        if cert_domain:
-            children_conditions.append(CertificateEntity.domain == cert_domain)
-
-        stmt = select(OrganizationEntity)
-        if children_conditions:
-            stmt = (
-                stmt.outerjoin(OrganizationEntity.scopes)
-                .outerjoin(OrganizationEntity.certificates.and_(CertificateEntity.deleted_at.is_(None)))
-                .outerjoin(OrganizationEntity.sources)
-                .options(
-                    contains_eager(OrganizationEntity.scopes),
-                    contains_eager(OrganizationEntity.certificates),
-                    contains_eager(OrganizationEntity.sources),
-                )
-            ).where(and_(*parent_conditions, *children_conditions))
-
-        else:
-            stmt = stmt.options(
-                selectinload(OrganizationEntity.scopes),
-                selectinload(OrganizationEntity.certificates.and_(CertificateEntity.deleted_at.is_(None))),
-                selectinload(OrganizationEntity.sources.and_(SourceEntity.deleted_at.is_(None))),
-            ).where(and_(*parent_conditions))
-
+        children_conditions = [cert_identifier, cert_domain, scopes]
+        valid_children_conditions = any(c is not None for c in children_conditions)
+        load_strategy = LoadStrategy.OUTERJOIN_LOAD if valid_children_conditions else LoadStrategy.SELECTIN_LOAD
+        stmt = (
+            OrganizationQueryBuilder(load_strategy=load_strategy, include_deleted=include_deleted)
+            .with_external_id(external_id)
+            .with_name(name)
+            .include_scopes(scopes)
+            .include_certificate(organization_identifier=cert_identifier, domain=cert_domain)
+            .include_sources()
+            .include_clients()
+            .build()
+        )
         return self.db_session.execute(stmt).scalars().unique().all()
 
     def update(self, id: UUID, **kwargs: object) -> OrganizationEntity | None:
