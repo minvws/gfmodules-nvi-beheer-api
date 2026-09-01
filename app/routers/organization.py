@@ -62,7 +62,7 @@ def get_many(
     return orgs
 
 
-@router.put("/{id}", response_model=Organization, response_model_exclude_none=True)
+@router.put("/{id}", response_model=OrganizationUpdate, response_model_exclude_none=True)
 def update(
     id: UUID,
     body: OrganizationUpdate,
@@ -71,7 +71,7 @@ def update(
     result = service.update_one(id, dto=body)
     if result is None:
         raise HTTPException(status_code=404)
-    return Organization.from_entity(result)
+    return result
 
 
 @router.delete("/{id}")

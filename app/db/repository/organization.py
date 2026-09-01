@@ -3,20 +3,16 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select, update
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import contains_eager, selectinload
 
 from app.db.decorator import repository
-from app.db.models.certificate import CertificateEntity
-from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
-from app.db.models.source import SourceEntity
 from app.db.repository.base import RepositoryBase
 from app.db.repository.query_builder.organization_query_builder import (
+    CertificateQueryContext,
     LoadStrategy,
-    OrganizationCertificateQueryContext,
     OrganizationClientQueryContext,
     OrganizationQueryBuilder,
-    OrganizationSourceQueryContext,
+    SourceQueryContext,
 )
 from app.models.ura import UraNumber
 
@@ -29,7 +25,7 @@ class OrganizationRepository(RepositoryBase):
             self.db_session.commit()
             self.db_session.session.refresh(
                 data,
-                attribute_names=["scopes", "certificates", "sources"],
+                attribute_names=["scopes", "certificates", "sources", "clients"],
             )
             return data
         except SQLAlchemyError:
@@ -44,10 +40,10 @@ class OrganizationRepository(RepositoryBase):
         stmt = (
             OrganizationQueryBuilder(include_deleted=include_deleted)
             .with_id(id)
-            .include_clients()
+            .include_clients(OrganizationClientQueryContext.default())
             .include_scopes()
-            .include_sources()
-            .include_certificate()
+            .include_sources(SourceQueryContext.default())
+            .include_certificate(CertificateQueryContext.default())
             .build()
         )
 
@@ -74,45 +70,44 @@ class OrganizationRepository(RepositoryBase):
 
         return self.db_session.execute(stmt).unique().scalar()
 
-    def find_one_by_id(self, id: UUID) -> OrganizationEntity:
+    def find_one_without_clients(self, id: UUID, include_deleted: bool = False) -> OrganizationEntity | None:
         stmt = (
-            select(OrganizationEntity)
-            .options(
-                selectinload(OrganizationEntity.scopes),
-                selectinload(OrganizationEntity.certificates.and_(CertificateEntity.deleted_at.is_(None))),
-                selectinload(OrganizationEntity.sources.and_(SourceEntity.deleted_at.is_(None))),
-            )
-            .execution_options(populate_existing=True)
+            OrganizationQueryBuilder(include_deleted=include_deleted)
+            .with_id(id)
+            .include_scopes()
+            .include_certificate(CertificateQueryContext.default())
+            .include_sources(SourceQueryContext.default())
+            .build()
         )
+        return self.db_session.execute(stmt).unique().scalar()
 
-        return self.db_session.execute(stmt).unique().scalar_one()
+    def find_one_with_specific_client(self, id: UUID, client_id) -> OrganizationEntity | None:
+        stmt = (
+            OrganizationQueryBuilder()
+            .with_id(id)
+            .include_clients(OrganizationClientQueryContext(id=client_id))
+            .include_scopes()
+            .include_certificate(CertificateQueryContext.default())
+            .include_sources(SourceQueryContext.default())
+            .build()
+        )
+        return self.db_session.execute(stmt).scalar_one_or_none()
+
+    def find_one_with_clients(self, id: UUID, client_ctx: OrganizationClientQueryContext) -> OrganizationEntity | None:
+        src_ctx, cert_ctx = client_ctx.source_ctx, client_ctx.cert_ctx
+        children_conditions = [*[v for v in vars(cert_ctx).values()], *[v for v in vars(src_ctx).values()]]
+        load_strategy = (
+            LoadStrategy.OUTERJOIN_LOAD
+            if any(v is not None for v in children_conditions)
+            else LoadStrategy.SELECTIN_LOAD
+        )
+        stmt = OrganizationQueryBuilder(load_strategy).with_id(id).include_clients(client_ctx).build()
+
+        return self.db_session.execute(stmt).unique().scalar_one_or_none()
 
     def exists(self, id: UUID) -> bool:
         stmt = select(select(OrganizationEntity.id).where(self._and_clause(id)).exists())
         return bool(self.db_session.execute(stmt).scalar())
-
-    def find_one_by_register_id(self, register_id: UraNumber) -> OrganizationEntity | None:
-        stmt = select(OrganizationEntity).where(
-            and_(
-                OrganizationEntity.register_id == register_id,
-                OrganizationEntity.deleted_at.is_(None),
-            )
-        )
-        return self.db_session.execute(stmt).scalar()
-
-    def find_one_with_specific_client(self, id: UUID, client_id: UUID) -> OrganizationEntity | None:
-        stmt = (
-            select(OrganizationEntity)
-            .outerjoin(OrganizationEntity.clients)
-            .outerjoin(ClientEntity.scopes)
-            .where(OrganizationEntity.id == id, ClientEntity.id == client_id)
-            .options(
-                selectinload(OrganizationEntity.scopes),
-                contains_eager(OrganizationEntity.clients).contains_eager(ClientEntity.scopes),
-            )
-        )
-        result = self.db_session.execute(stmt).unique().scalar_one_or_none()
-        return result
 
     def find(
         self,
@@ -121,22 +116,38 @@ class OrganizationRepository(RepositoryBase):
         certificate_id: UUID | None = None,
         source_id: UUID | None = None,
     ) -> OrganizationEntity | None:
-        stmt = (
-            OrganizationQueryBuilder()
-            .with_id(id)
-            .include_certificate(certificate_id)
-            .include_clients(
-                id=client_id,
-                certificate_id=certificate_id,
-                source_id=source_id,
-                include_certificates=True,
-                include_sources=True,
-            )
-            .include_sources(source_id)
-            .include_certificate(certificate_id)
-            .build()
-        )
+        """
+        Will automatically load children once a parameter is present.
+        """
+        builder = OrganizationQueryBuilder().with_id(id).include_scopes()
 
+        if client_id:
+            builder = builder.include_clients(OrganizationClientQueryContext(id=client_id))
+
+        if certificate_id:
+            builder = builder.include_certificate(CertificateQueryContext(id=certificate_id))
+
+        if source_id:
+            builder = builder.include_sources(SourceQueryContext(id=source_id))
+
+        stmt = builder.build()
+
+        # stmt = (
+        #     OrganizationQueryBuilder()
+        #     .with_id(id)
+        #     .include_certificate(certificate_id)
+        #     .include_clients(
+        #         id=client_id,
+        #         certificate_id=certificate_id,
+        #         source_id=source_id,
+        #         include_certificates=True,
+        #         include_sources=True,
+        #     )
+        #     .include_sources(source_id)
+        #     .include_certificate(certificate_id)
+        #     .build()
+        # )
+        #
         # load_options = []
         # if certificate_id:
         #     load_options.append(
@@ -240,8 +251,8 @@ class OrganizationRepository(RepositoryBase):
 
     def find_many(
         self,
-        cert_ctx: OrganizationCertificateQueryContext,
-        source_ctx: OrganizationSourceQueryContext,
+        cert_ctx: CertificateQueryContext,
+        source_ctx: SourceQueryContext,
         external_id: UraNumber | None = None,
         name: str | None = None,
         scopes: list[str] | None = None,

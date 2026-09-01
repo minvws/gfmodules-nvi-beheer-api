@@ -24,6 +24,7 @@ class ClientRepository(RepositoryBase):
         try:
             self.db_session.add(data)
             self.db_session.commit()
+            self.db_session.session.refresh(data, attribute_names=["scopes", "certificates", "sources"])
             return data
         except SQLAlchemyError:
             self.db_session.rollback()
@@ -33,6 +34,7 @@ class ClientRepository(RepositoryBase):
         stmt = (
             select(ClientEntity).options(selectinload(ClientEntity.scopes)).where(self._and_clause(organization_id, id))
         )
+
         return self.db_session.execute(stmt).scalar_one_or_none()
 
     def find(
