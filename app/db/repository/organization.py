@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, or_, select, update
+from sqlalchemy import ColumnElement, and_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import contains_eager, selectinload
 
@@ -9,10 +9,15 @@ from app.db.decorator import repository
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
-from app.db.models.scope import ScopeEntity
 from app.db.models.source import SourceEntity
 from app.db.repository.base import RepositoryBase
-from app.db.repository.query_builder.organization_query_builder import LoadStrategy, OrganizationQueryBuilder
+from app.db.repository.query_builder.organization_query_builder import (
+    LoadStrategy,
+    OrganizationCertificateQueryContext,
+    OrganizationClientQueryContext,
+    OrganizationQueryBuilder,
+    OrganizationSourceQueryContext,
+)
 from app.models.ura import UraNumber
 
 
@@ -235,26 +240,32 @@ class OrganizationRepository(RepositoryBase):
 
     def find_many(
         self,
+        cert_ctx: OrganizationCertificateQueryContext,
+        source_ctx: OrganizationSourceQueryContext,
         external_id: UraNumber | None = None,
         name: str | None = None,
         scopes: list[str] | None = None,
-        cert_identifier: str | None = None,
-        cert_domain: str | None = None,
         include_deleted: bool = False,
     ) -> Sequence[OrganizationEntity]:
-        children_conditions = [cert_identifier, cert_domain, scopes]
-        valid_children_conditions = any(c is not None for c in children_conditions)
-        load_strategy = LoadStrategy.OUTERJOIN_LOAD if valid_children_conditions else LoadStrategy.SELECTIN_LOAD
+        children_conditions = [*[v for v in vars(cert_ctx).values()], *[v for v in vars(source_ctx).values()]]
+
+        load_strategy = (
+            LoadStrategy.OUTERJOIN_LOAD
+            if any(v is not None for v in children_conditions)
+            else LoadStrategy.SELECTIN_LOAD
+        )
+
         stmt = (
             OrganizationQueryBuilder(load_strategy=load_strategy, include_deleted=include_deleted)
             .with_external_id(external_id)
             .with_name(name)
             .include_scopes(scopes)
-            .include_certificate(organization_identifier=cert_identifier, domain=cert_domain)
-            .include_sources()
-            .include_clients()
+            .include_certificate(cert_ctx)
+            .include_sources(source_ctx)
+            .include_clients(OrganizationClientQueryContext.default())
             .build()
         )
+
         return self.db_session.execute(stmt).scalars().unique().all()
 
     def update(self, id: UUID, **kwargs: object) -> OrganizationEntity | None:

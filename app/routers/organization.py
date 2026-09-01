@@ -58,8 +58,8 @@ def get_many(
     params: Annotated[OrganizationQueryParams, Query()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    orgs = service.get_many(**params.model_dump())
-    return [Organization.from_entity(org) for org in orgs]
+    orgs = service.get_many(params)
+    return orgs
 
 
 @router.put("/{id}", response_model=Organization, response_model_exclude_none=True)

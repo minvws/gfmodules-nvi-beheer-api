@@ -1,8 +1,13 @@
 from typing import Self
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models.organization import OrganizationEntity
+from app.db.repository.query_builder.organization_query_builder import (
+    OrganizationCertificateQueryContext,
+    OrganizationSourceQueryContext,
+)
 from app.models.base import (
     INCLUDE_DELETED_DESCRIPTION,
     CommonModel,
@@ -83,13 +88,25 @@ class OrganizationQueryParams(BaseModel):
     name: str | None = Field(default=None, description=NAME_DESCRIPTION)
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
     external_id: UraNumber | None = Field(default=None, description=EXTERNAL_ID_DESCRIPTION)
+    cert_id: UUID | None = None
     cert_identifier: str | None = None  # TODO: Add description
     cert_domain: str | None = None  # TODO: Add description
+    source_id: UUID | None = None
+    source_name: str | None = None
+
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
     @property
     def sanitized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
+
+    def into_org_cert_query_context(self) -> OrganizationCertificateQueryContext:
+        return OrganizationCertificateQueryContext(
+            id=self.cert_id, organization_identifier=self.cert_identifier, domain=self.cert_domain
+        )
+
+    def into_org_source_query_context(self) -> OrganizationSourceQueryContext:
+        return OrganizationSourceQueryContext(id=self.source_id, name=self.source_name)
 
 
 class Organization(CommonModel, OrganizationFields):
@@ -107,7 +124,6 @@ class Organization(CommonModel, OrganizationFields):
             external_id=entity.external_id,
             name=entity.name,
             scopes=scopes,
-            # scopes=" ".join(entity.org_scopes) if entity.org_scopes else None,
             clients=[Client.from_entity(c) for c in entity.clients] if entity.clients else None,
             certificates=[Certificate.from_entity(c) for c in entity.certificates] if entity.certificates else None,
             sources=[Source.from_entity(s) for s in entity.sources] if entity.sources else None,
