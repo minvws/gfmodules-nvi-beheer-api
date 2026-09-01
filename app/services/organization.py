@@ -9,8 +9,7 @@ from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.scope import ScopeRepository
 from app.db.repository.source import SourceRepository
-from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
-from app.models.ura import UraNumber
+from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
 from app.services.certificate import OrganizationCertificateService
 from app.services.exceptions import (
     ConflictError,
@@ -83,32 +82,19 @@ class OrganizationService:
 
     def get_many(
         self,
-        external_id: UraNumber | None = None,
-        name: str | None = None,
-        scopes: list[str] | None = None,
-        cert_identifier: str | None = None,
-        cert_domain: str | None = None,
-        include_deleted: bool = False,
-    ) -> list[OrganizationEntity]:
+        params: OrganizationQueryParams,
+    ) -> list[Organization]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            # orgs = repo.find_many(
-            #     external_id=external_id,
-            #     name=name,
-            #     scopes=scopes,
-            #     cert_identifier=cert_identifier,
-            #     cert_domain=cert_domain,
-            #     include_deleted=include_deleted,
-            # )
+
             orgs = repo.find_many(
-                external_id=external_id,
-                name=name,
-                scopes=scopes,
-                cert_identifier=cert_identifier,
-                cert_domain=cert_domain,
-                include_deleted=include_deleted,
+                external_id=params.external_id,
+                name=params.name,
+                scopes=params.sanitized_scopes,
+                source_ctx=params.into_org_source_query_context(),
+                cert_ctx=params.into_org_cert_query_context(),
             )
-            return list(orgs)
+            return [Organization.from_entity(org) for org in orgs]
 
     def update_one(self, id: UUID, dto: OrganizationUpdate) -> OrganizationEntity:
         with self.db.get_db_session() as session:

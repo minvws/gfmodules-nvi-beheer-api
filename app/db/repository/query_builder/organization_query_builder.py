@@ -39,6 +39,19 @@ class OrganizationClientQueryContext:
         return cls()
 
 
+@dataclass
+class OrganizationSourceQueryContext:
+    id: UUID | None = None
+    name: str | None = None
+
+
+@dataclass
+class OrganizationCertificateQueryContext:
+    id: UUID | None = None
+    organization_identifier: str | None = None
+    domain: str | None = None
+
+
 class OrganizationQueryBuilder:
     def __init__(self, load_strategy: LoadStrategy = LoadStrategy.SELECTIN_LOAD, include_deleted: bool = False) -> None:
         self._stmt = select(OrganizationEntity)
@@ -92,46 +105,34 @@ class OrganizationQueryBuilder:
 
     def include_certificate(
         self,
-        id: UUID | None = None,
-        organization_identifier: str | None = None,
-        domain: str | None = None,
+        ctx: OrganizationCertificateQueryContext,
     ) -> Self:
         match self._load_strategy:
             case LoadStrategy.OUTERJOIN_LOAD:
-                self._joinload_cert(
-                    id=id,
-                    organization_identifier=organization_identifier,
-                    domain=domain,
-                )
+                self._joinload_cert(ctx)
 
             case LoadStrategy.SELECTIN_LOAD:
-                self._selecinload_cert(
-                    id=id,
-                    organization_identifier=organization_identifier,
-                    domain=domain,
-                )
+                self._selecinload_cert(ctx)
 
         return self
 
     def _selecinload_cert(
         self,
-        id: UUID | None = None,
-        organization_identifier: str | None = None,
-        domain: str | None = None,
+        ctx: OrganizationCertificateQueryContext,
     ) -> Self:
         attr = OrganizationEntity.certificates
         conditions = []
-        if id:
-            conditions.append(CertificateEntity.id == id)
+        if ctx.id:
+            conditions.append(CertificateEntity.id == ctx.id)
 
         if self._include_deleted is False:
             conditions.append(CertificateEntity.deleted_at.is_(None))
 
-        if organization_identifier:
-            conditions.append(CertificateEntity.organization_identifier == organization_identifier)
+        if ctx.organization_identifier:
+            conditions.append(CertificateEntity.organization_identifier == ctx.organization_identifier)
 
-        if domain:
-            conditions.append(CertificateEntity.domain == domain)
+        if ctx.domain:
+            conditions.append(CertificateEntity.domain == ctx.domain)
 
         if conditions:
             attr = attr.and_(*conditions)
@@ -142,9 +143,7 @@ class OrganizationQueryBuilder:
 
     def _joinload_cert(
         self,
-        id: UUID | None = None,
-        organization_identifier: str | None = None,
-        domain: str | None = None,
+        ctx: OrganizationCertificateQueryContext,
     ) -> Self:
         attr = OrganizationEntity.certificates
         conditions = []
@@ -152,36 +151,36 @@ class OrganizationQueryBuilder:
             conditions.append(CertificateEntity.deleted_at.is_(None))
 
         self._stmt = self._stmt.outerjoin(attr).options(contains_eager(OrganizationEntity.certificates))
-        if id:
-            conditions.append(CertificateEntity.id == id)
+        if ctx.id:
+            conditions.append(CertificateEntity.id == ctx.id)
 
-        if domain:
-            conditions.append(CertificateEntity.domain == domain)
+        if ctx.domain:
+            conditions.append(CertificateEntity.domain == ctx.domain)
 
-        if organization_identifier:
-            conditions.append(CertificateEntity.organization_identifier == organization_identifier)
+        if ctx.organization_identifier:
+            conditions.append(CertificateEntity.organization_identifier == ctx.organization_identifier)
 
         if conditions:
             self._stmt = self._stmt.where(*conditions)
 
         return self
 
-    def include_sources(self, id: UUID | None = None, name: str | None = None) -> Self:
+    def include_sources(self, ctx: OrganizationSourceQueryContext) -> Self:
         match self._load_strategy:
             case LoadStrategy.OUTERJOIN_LOAD:
-                self._joinload_sources(id, name)
+                self._joinload_sources(ctx)
             case LoadStrategy.SELECTIN_LOAD:
-                self._selectinload_sources(id, name)
+                self._selectinload_sources(ctx)
         return self
 
-    def _selectinload_sources(self, id: UUID | None = None, name: str | None = None) -> Self:
+    def _selectinload_sources(self, ctx: OrganizationSourceQueryContext) -> Self:
         attr = OrganizationEntity.sources
         conditions = []
-        if id:
-            conditions.append(SourceEntity.id == id)
+        if ctx.id:
+            conditions.append(SourceEntity.id == ctx.id)
 
-        if name:
-            conditions.append(SourceEntity.name == name)
+        if ctx.name:
+            conditions.append(SourceEntity.name == ctx.name)
 
         if self._include_deleted is False:
             conditions.append(SourceEntity.deleted_at.is_(None))
@@ -192,14 +191,14 @@ class OrganizationQueryBuilder:
         self._stmt = self._stmt.options(selectinload(attr))
         return self
 
-    def _joinload_sources(self, id: UUID | None = None, name: str | None = None) -> Self:
+    def _joinload_sources(self, ctx: OrganizationSourceQueryContext) -> Self:
         attr = OrganizationEntity.sources
         conditions = []
 
-        if id:
-            conditions.append(SourceEntity.id == id)
-        if name:
-            conditions.append(SourceEntity.name == name)
+        if ctx.id:
+            conditions.append(SourceEntity.id == ctx.id)
+        if ctx.name:
+            conditions.append(SourceEntity.name == ctx.name)
         if self._include_deleted is False:
             conditions.append(SourceEntity.deleted_at.is_(None))
 
@@ -212,7 +211,7 @@ class OrganizationQueryBuilder:
 
     def include_clients(
         self,
-        ctx: OrganizationClientQueryContext = OrganizationClientQueryContext.default(),
+        ctx: OrganizationClientQueryContext,
     ) -> Self:
 
         match self._load_strategy:
