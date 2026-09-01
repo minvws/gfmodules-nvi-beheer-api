@@ -42,7 +42,7 @@ class ScopeService:
     # TODO: unify this logic to return scopes needed
     @staticmethod
     def assert_scopes_granted(organization: OrganizationEntity, requested: list[str]) -> None:
-        available = organization.org_scopes if organization is not None else None
+        available = [c.name for c in organization.scopes]
         if not utils.is_subset(available, requested):
             ungranted = set(requested) - set(available or [])
             raise ScopesNotGrantedError(ungranted)

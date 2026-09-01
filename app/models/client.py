@@ -4,14 +4,19 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models.client import ClientEntity
+from app.db.repository.query_builder.organization_query_builder import (
+    CertificateQueryContext,
+    OrganizationClientQueryContext,
+    SourceQueryContext,
+)
 from app.models.base import (
     INCLUDE_DELETED_DESCRIPTION,
     CommonModel,
     sanatize_model_scopes,
 )
-from app.models.certificates import Certificate, CertificateCreate
+from app.models.certificates import Certificate, CertificateCreate, CertificateUpdate
 from app.models.oin import Oin
-from app.models.source import SourceCreate
+from app.models.source import Source, SourceCreate, SourceUpdate
 from app.models.ura import UraNumber
 
 ORG_URA_DESCRIPTION = "The URA (register_id) of the organization the client acts on behalf of"
@@ -52,28 +57,46 @@ class ClientCreate(ClientFields):
 
 class ClientOptionalFields(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    external_id: Oin | None = Field(default=None, description=EXTERNAL_ID_DESCRIPTION)
+    name: str | None = None
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
 
-class ClientUpdate(ClientCreate):
+class ClientUpdate(ClientFields):
+    certificates: list[CertificateUpdate] | None = None
+    sources: list[SourceUpdate] | None = None
+
     @property
     def sanatized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
 
 class ClientQueryParams(ClientOptionalFields):
+    cert_organization_identifier: str | None = None
+    cert_domain: str | None = None
+    source_id: str | None = None
+    source_name: str | None = None
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
     @property
     def sanatized_scope(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
+    def into_org_client_query_context(self) -> OrganizationClientQueryContext:
+        return OrganizationClientQueryContext(
+            name=self.name,
+            scopes=self.sanatized_scope,
+            source_ctx=SourceQueryContext(source_id=self.source_id, name=self.source_name),
+            cert_ctx=CertificateQueryContext(
+                organization_identifier=self.cert_organization_identifier, domain=self.cert_domain
+            ),
+        )
+
 
 class Client(CommonModel, ClientFields):
     model_config = ConfigDict(from_attributes=True)
     organization_id: UUID
     certificates: list[Certificate] | None = None
+    sources: list[Source] | None = None
 
     @classmethod
     def from_entity(cls, entity: ClientEntity) -> Self:
@@ -87,5 +110,6 @@ class Client(CommonModel, ClientFields):
             scopes=scopes,
             # scopes=" ".join(entity.client_scopes) if entity.client_scopes else None,
             certificates=[Certificate.from_entity(c) for c in entity.certificates] if entity.certificates else None,
+            sources=[Source.from_entity(s) for s in entity.sources] if entity.sources else None,
             created_at=entity.created_at,
         )

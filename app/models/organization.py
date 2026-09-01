@@ -5,8 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.query_builder.organization_query_builder import (
-    OrganizationCertificateQueryContext,
-    OrganizationSourceQueryContext,
+    CertificateQueryContext,
+    SourceQueryContext,
 )
 from app.models.base import (
     INCLUDE_DELETED_DESCRIPTION,
@@ -14,7 +14,7 @@ from app.models.base import (
     sanatize_model_scopes,
 )
 from app.models.certificates import Certificate, CertificateCreate, CertificateUpdate
-from app.models.client import Client
+from app.models.client import Client, ClientCreate
 from app.models.source import Source, SourceCreate, SourceUpdate
 from app.models.ura import UraNumber
 
@@ -34,6 +34,7 @@ class OrganizationCreate(OrganizationFields):
     name: str = Field(..., description=NAME_DESCRIPTION)
     certificates: list[CertificateCreate] | None = Field(default=None)
     sources: list[SourceCreate] | None = Field(default=None)
+    clients: list[ClientCreate] | None = Field(default=None)
 
     @property
     def sanitized_scopes(self) -> list[str] | None:
@@ -45,6 +46,21 @@ class OrganizationCreate(OrganizationFields):
             raise AttributeError("source_ids cannot be accessed if sources is of value None")
 
         return [s.source_id for s in self.sources]
+
+    @property
+    def client_certs(self) -> list[CertificateCreate]:
+        if self.clients is None:
+            return []
+
+        results = []
+        for client in self.clients:
+            if client.certificates is None:
+                continue
+
+            for cert in client.certificates:
+                results.append(cert)
+
+        return results
 
 
 class OrganizationUpdate(BaseModel):
@@ -61,6 +77,7 @@ class OrganizationUpdate(BaseModel):
     def from_entity(cls, entity: OrganizationEntity, include_deleted: bool = False) -> Self:
         certs: list[CertificateUpdate] | None = None
         sources: list[SourceUpdate] | None = None
+        scopes = [s.name for s in entity.scopes]
         if include_deleted:
             certs = [CertificateUpdate.from_entity(c) for c in entity.certificates] if entity.certificates else None
             sources = [SourceUpdate.from_entity(s) for s in entity.sources] if entity.sources else None
@@ -78,7 +95,7 @@ class OrganizationUpdate(BaseModel):
 
         return cls(
             name=entity.name,
-            scopes=" ".join(entity.org_scopes) if entity.org_scopes else None,
+            scopes=" ".join(scopes) if scopes else None,
             certificates=certs,
             sources=sources,
         )
@@ -100,13 +117,13 @@ class OrganizationQueryParams(BaseModel):
     def sanitized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
-    def into_org_cert_query_context(self) -> OrganizationCertificateQueryContext:
-        return OrganizationCertificateQueryContext(
+    def into_cert_query_context(self) -> CertificateQueryContext:
+        return CertificateQueryContext(
             id=self.cert_id, organization_identifier=self.cert_identifier, domain=self.cert_domain
         )
 
-    def into_org_source_query_context(self) -> OrganizationSourceQueryContext:
-        return OrganizationSourceQueryContext(id=self.source_id, name=self.source_name)
+    def into_source_query_context(self) -> SourceQueryContext:
+        return SourceQueryContext(id=self.source_id, name=self.source_name)
 
 
 class Organization(CommonModel, OrganizationFields):

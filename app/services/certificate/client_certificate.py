@@ -5,7 +5,7 @@ from app.db.db import Database
 from app.db.models.certificate import CertificateEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
-from app.models.certificates import Certificate, CertificateCreate
+from app.models.certificates import Certificate, CertificateCreate, CertificateUpdate
 from app.services.exceptions import ConflictError, ForbidenOperationError, RecordNotFoundError
 
 
@@ -62,7 +62,9 @@ class ClientCertificateService:
             return Certificate.from_entity(target_cert)
 
     @staticmethod
-    def get_client_certs_from_org(org: OrganizationEntity, certs: list[CertificateCreate]) -> list[CertificateEntity]:
+    def get_client_certs_from_org(
+        org: OrganizationEntity, certs: list[CertificateCreate] | list[CertificateUpdate]
+    ) -> list[CertificateEntity]:
         org_cert_keys = [c.unique_key for c in org.certificates] if org.certificates else []
         client_cert_keys = [c.make_unique_key(org.id) for c in certs]
         if not utils.is_subset(org_cert_keys, client_cert_keys):

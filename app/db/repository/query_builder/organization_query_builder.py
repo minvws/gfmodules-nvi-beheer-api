@@ -20,19 +20,10 @@ class LoadStrategy(Enum):
 
 
 @dataclass
-class OrganizationClientQueryContext:
+class SourceQueryContext:
     id: UUID | None = None
+    source_id: str | None = None
     name: str | None = None
-    description: str | None = None
-    scopes: list[str] | None = None
-    certificate_id: UUID | None = None
-    certificate_organization_identifier: str | None = None
-    certificate_domain: str | None = None
-    source_id: UUID | None = None
-    source_name: str | None = None
-    include_certificates: bool = True
-    include_sources: bool = True
-    include_scopes: bool = True
 
     @classmethod
     def default(cls) -> Self:
@@ -40,16 +31,31 @@ class OrganizationClientQueryContext:
 
 
 @dataclass
-class OrganizationSourceQueryContext:
-    id: UUID | None = None
-    name: str | None = None
-
-
-@dataclass
-class OrganizationCertificateQueryContext:
+class CertificateQueryContext:
     id: UUID | None = None
     organization_identifier: str | None = None
     domain: str | None = None
+
+    @classmethod
+    def default(cls) -> Self:
+        return cls()
+
+
+@dataclass
+class OrganizationClientQueryContext:
+    id: UUID | None = None
+    name: str | None = None
+    description: str | None = None
+    scopes: list[str] | None = None
+    cert_ctx: CertificateQueryContext | None = None
+    source_ctx: SourceQueryContext | None = None
+    include_certificates: bool = True
+    include_sources: bool = True
+    include_scopes: bool = True
+
+    @classmethod
+    def default(cls) -> Self:
+        return cls()
 
 
 class OrganizationQueryBuilder:
@@ -105,7 +111,7 @@ class OrganizationQueryBuilder:
 
     def include_certificate(
         self,
-        ctx: OrganizationCertificateQueryContext,
+        ctx: CertificateQueryContext,
     ) -> Self:
         match self._load_strategy:
             case LoadStrategy.OUTERJOIN_LOAD:
@@ -118,7 +124,7 @@ class OrganizationQueryBuilder:
 
     def _selecinload_cert(
         self,
-        ctx: OrganizationCertificateQueryContext,
+        ctx: CertificateQueryContext,
     ) -> Self:
         attr = OrganizationEntity.certificates
         conditions = []
@@ -143,7 +149,7 @@ class OrganizationQueryBuilder:
 
     def _joinload_cert(
         self,
-        ctx: OrganizationCertificateQueryContext,
+        ctx: CertificateQueryContext,
     ) -> Self:
         attr = OrganizationEntity.certificates
         conditions = []
@@ -165,7 +171,7 @@ class OrganizationQueryBuilder:
 
         return self
 
-    def include_sources(self, ctx: OrganizationSourceQueryContext) -> Self:
+    def include_sources(self, ctx: SourceQueryContext) -> Self:
         match self._load_strategy:
             case LoadStrategy.OUTERJOIN_LOAD:
                 self._joinload_sources(ctx)
@@ -173,11 +179,11 @@ class OrganizationQueryBuilder:
                 self._selectinload_sources(ctx)
         return self
 
-    def _selectinload_sources(self, ctx: OrganizationSourceQueryContext) -> Self:
+    def _selectinload_sources(self, ctx: SourceQueryContext) -> Self:
         attr = OrganizationEntity.sources
         conditions = []
         if ctx.id:
-            conditions.append(SourceEntity.id == ctx.id)
+            conditions.append(SourceEntity.source_id == ctx.id)
 
         if ctx.name:
             conditions.append(SourceEntity.name == ctx.name)
@@ -191,7 +197,7 @@ class OrganizationQueryBuilder:
         self._stmt = self._stmt.options(selectinload(attr))
         return self
 
-    def _joinload_sources(self, ctx: OrganizationSourceQueryContext) -> Self:
+    def _joinload_sources(self, ctx: SourceQueryContext) -> Self:
         attr = OrganizationEntity.sources
         conditions = []
 
@@ -246,16 +252,18 @@ class OrganizationQueryBuilder:
         if ctx.include_certificates:
             cert_conditions = []
             cert_attr = ClientEntity.certificates
-            if ctx.certificate_id:
-                cert_conditions.append(CertificateEntity.id == ctx.certificate_id)
+            cert_ctx = ctx.cert_ctx
+            if cert_ctx:
+                if cert_ctx.id:
+                    cert_conditions.append(CertificateEntity.id == cert_ctx.id)
 
-            if ctx.certificate_organization_identifier:
-                cert_conditions.append(
-                    CertificateEntity.organization_identifier == ctx.certificate_organization_identifier
-                )
+                if cert_ctx.organization_identifier:
+                    cert_conditions.append(
+                        CertificateEntity.organization_identifier == cert_ctx.organization_identifier
+                    )
 
-            if ctx.certificate_domain:
-                cert_conditions.append(CertificateEntity.domain == ctx.certificate_domain)
+                if cert_ctx.domain:
+                    cert_conditions.append(CertificateEntity.domain == cert_ctx.domain)
 
             if self._include_deleted is False:
                 cert_conditions.append(CertificateEntity.deleted_at.is_(None))
@@ -268,11 +276,16 @@ class OrganizationQueryBuilder:
         if ctx.include_sources:
             src_attr = ClientEntity.sources
             src_conditions = []
-            if ctx.source_id:
-                src_conditions.append(SourceEntity.id == ctx.source_id)
+            src_ctx = ctx.source_ctx
+            if src_ctx:
+                if src_ctx.id:
+                    src_conditions.append(SourceEntity.id == src_ctx.id)
 
-            if ctx.source_name:
-                src_conditions.append(SourceEntity.name == ctx.source_name)
+                if src_ctx.source_id:
+                    src_conditions.append(SourceEntity.source_id == src_ctx.source_id)
+
+                if src_ctx.name:
+                    src_conditions.append(SourceEntity.name == src_ctx.name)
 
             if self._include_deleted is False:
                 src_conditions.append(SourceEntity.deleted_at.is_(None))
@@ -335,17 +348,24 @@ class OrganizationQueryBuilder:
         if ctx.scopes:
             conditions.append(*[ClientScopeAlias.name == s for s in ctx.scopes])
 
-        if ctx.certificate_id:
-            conditions.append(ClientCertificateAlias.id == ctx.certificate_id)
+        src_ctx, cert_ctx = ctx.source_ctx, ctx.cert_ctx
 
-        if ctx.certificate_organization_identifier:
-            conditions.append(ClientCertificateAlias.organization_identifier == ctx.certificate_organization_identifier)
-        if ctx.certificate_domain:
-            conditions.append(ClientCertificateAlias.domain == ctx.certificate_domain)
-        if ctx.source_id:
-            conditions.append(ClientSourceAlias.id == ctx.source_id)
-        if ctx.source_name:
-            conditions.append(ClientSourceAlias.name == ctx.source_name)
+        if cert_ctx:
+            if cert_ctx.id:
+                conditions.append(ClientCertificateAlias.id == cert_ctx.id)
+
+            if cert_ctx.organization_identifier:
+                conditions.append(ClientCertificateAlias.organization_identifier == cert_ctx.organization_identifier)
+
+            if cert_ctx.domain:
+                conditions.append(ClientCertificateAlias.domain == cert_ctx.domain)
+        if src_ctx:
+            if src_ctx.id:
+                conditions.append(ClientSourceAlias.id == src_ctx.id)
+            if src_ctx.source_id:
+                conditions.append(ClientSourceAlias.source_id == src_ctx.source_id)
+            if src_ctx.name:
+                conditions.append(ClientSourceAlias.name == src_ctx.name)
 
         if self._include_deleted is False:
             conditions.extend(
