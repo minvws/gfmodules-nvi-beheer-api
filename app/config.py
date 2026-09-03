@@ -24,6 +24,7 @@ class LogLevel(str, Enum):
 
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
+    # TODO: remove this
     scopes: set[str] = Field(default=set(), description="The possible space separated scopes")
 
     @field_validator("scopes", mode="before")

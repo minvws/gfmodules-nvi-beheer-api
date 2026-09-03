@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated, Any, List
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -7,23 +7,39 @@ from fastapi.responses import Response
 from sqlalchemy.exc import IntegrityError
 
 from app.container import get_organization_service
-from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
+from app.models.organization import (
+    Organization,
+    OrganizationCreate,
+    OrganizationQueryParams,
+    OrganizationUpdate,
+)
 from app.services.exceptions import OrganizationHasActiveClientsError
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
+# TODO: handle soft deleted organizations on create
 
-@router.post("", response_model=Organization, response_model_exclude_none=True, status_code=201)
+
+@router.post(
+    "",
+    response_model=Organization,
+    response_model_exclude_none=True,
+    status_code=201,
+)
 def register(
     data: Annotated[OrganizationCreate, Body()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
     try:
-        return service.create_one(**data.model_dump())
+        result = service.create_one(data)
+        return result
     except IntegrityError:
-        raise HTTPException(status_code=409, detail="An organization with this ID is already registered.")
+        raise HTTPException(
+            status_code=409,
+            detail="An organization with this ID is already registered.",
+        )
 
 
 @router.get("/{id}", response_model=Organization, response_model_exclude_none=True)
@@ -37,21 +53,22 @@ def get_by_id(
     return result
 
 
-@router.get("", response_model=List[Organization], response_model_exclude_none=True)
+@router.get("", response_model=list[Organization], response_model_exclude_none=True)
 def get_many(
     params: Annotated[OrganizationQueryParams, Query()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    return service.get_many(**params.model_dump())
+    orgs = service.get_many(params)
+    return orgs
 
 
-@router.put("/{id}", response_model=Organization, response_model_exclude_none=True)
+@router.put("/{id}", response_model=OrganizationUpdate, response_model_exclude_none=True)
 def update(
     id: UUID,
     body: OrganizationUpdate,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    result = service.update_one(id, **body.model_dump(exclude_unset=True))
+    result = service.update_one(id, dto=body)
     if result is None:
         raise HTTPException(status_code=404)
     return result

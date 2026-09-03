@@ -35,6 +35,7 @@ class Database:
                     pool_size=config_database.pool_size,
                     max_overflow=config_database.max_overflow,
                 )
+            logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
         except BaseException as e:
             logger.error("Error while connecting to database: %s", e)
             raise e
