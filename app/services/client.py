@@ -6,6 +6,12 @@ from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.query_builder.data import (
+    CertificateQueryContext,
+    ClientQueryContext,
+    OrganizationQueryContext,
+    SourceQueryContext,
+)
 from app.logging.events import Log
 from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
 from app.models.oin import Oin
@@ -67,16 +73,27 @@ class ClientService:
 
     def get_one(self, id: UUID, organization_id: UUID) -> Client:
         with self.db.get_db_session() as session:
-            repo = session.get_repository(OrganizationRepository)
-            org = repo.find(id=organization_id, client_id=id)
-            if org is None:
+            org_repo = session.get_repository(OrganizationRepository)
+            if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
 
-            if not org.clients:
+            repo = session.get_repository(ClientRepository)
+            client = repo.find_one(id)
+            if client is None:
                 raise RecordNotFoundError(id)
 
-            client = org.clients[0]
             return Client.from_entity(client)
+
+        #     repo = session.get_repository(OrganizationRepository)
+        #     org = repo.find(id=organization_id, client_id=id)
+        #     if org is None:
+        #         raise RecordNotFoundError(organization_id)
+        #
+        #     if not org.clients:
+        #         raise RecordNotFoundError(id)
+        #
+        #     client = org.clients[0]
+        #     return Client.from_entity(client)
 
     def get_many(
         self,
@@ -84,15 +101,14 @@ class ClientService:
         params: ClientQueryParams,
     ) -> list[Client]:
         with self.db.get_db_session() as session:
-            repo = session.get_repository(OrganizationRepository)
-            if not repo.exists(organization_id):
+            org_repo = session.get_repository(OrganizationRepository)
+            if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
 
-            org = repo.find_one_with_clients(organization_id, params.into_org_client_query_context())
-            if org is None or not org.clients:
-                return []
+            clients_repo = session.get_repository(ClientRepository)
+            clients = clients_repo.find_many(organization_id, params.into_client_query_context())
 
-            return [Client.from_entity(c) for c in org.clients]
+            return [Client.from_entity(c) for c in clients]
 
     def update_one(
         self,
@@ -102,9 +118,17 @@ class ClientService:
     ) -> Client:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.find_one_with_specific_client(id=organization_id, client_id=id)
+            ctx = OrganizationQueryContext(
+                client_ctx=ClientQueryContext(
+                    id=id, source_ctx=SourceQueryContext.default(), cert_ctx=CertificateQueryContext.default()
+                ),
+                source_ctx=SourceQueryContext.default(),
+                certificate_ctx=CertificateQueryContext.default(),
+            )
+            org = org_repo.find(organization_id, ctx)
             if org is None:
                 raise RecordNotFoundError(organization_id)
+
             client = org.clients[0] if org.clients else None
             if client is None:
                 raise RecordNotFoundError(id)
@@ -140,25 +164,16 @@ class ClientService:
 
     def delete_one(self, id: UUID, organization_id: UUID) -> None:
         with self.db.get_db_session() as session:
-            # org_repo = session.get_repository(OrganizationRepository)
-            # client_repo = session.get_repository(ClientRepository)
-            #
-            # if not org_repo.exists(organization_id):
-            #     raise RecordNotFoundError(organization_id)
-            #
-            # client = client_repo.find_one(organization_id, id)
-            # if client is None:
-            #     raise RecordNotFoundError(id)
-
-            repo = session.get_repository(OrganizationRepository)
-            org = repo.find(id=organization_id, client_id=id)
-            if org is None:
+            org_repo = session.get_repository(OrganizationRepository)
+            if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
 
-            if not org.clients:
+            client_repo = session.get_repository(ClientRepository)
+            client = client_repo.find_one(id)
+            print(client)
+            if client is None:
                 raise RecordNotFoundError(id)
 
-            client = org.clients[0]
             if not self.valid_for_delete(client):
                 raise OrganizationHasActiveClientsError(id)
 
@@ -170,7 +185,7 @@ class ClientService:
                 event=Log.CLIENT_OFFBOARDED,
                 message="Client offboarded",
                 # oin=client.oin,
-                ura_number=org.external_id,
+                # ura_number=org.external_id,
                 deactivated_by="system",
                 reason="Deleted by system",
             )

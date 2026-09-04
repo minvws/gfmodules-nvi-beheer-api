@@ -8,6 +8,7 @@ from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.query_builder.data import CertificateQueryContext, OrganizationQueryContext, SourceQueryContext
 from app.db.repository.scope import ScopeRepository
 from app.db.repository.source import SourceRepository
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
@@ -110,20 +111,19 @@ class OrganizationService:
     ) -> list[Organization]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-
             orgs = repo.find_many(
-                external_id=params.external_id,
-                name=params.name,
-                scopes=params.sanitized_scopes,
-                source_ctx=params.into_source_query_context(),
-                cert_ctx=params.into_cert_query_context(),
+                ctx=params.into_organization_query_context(),
+                include_deleted=params.include_deleted,
             )
             return [Organization.from_entity(org) for org in orgs]
 
     def update_one(self, id: UUID, dto: OrganizationUpdate) -> OrganizationUpdate:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.find_one_without_clients(id, include_deleted=True)
+            ctx = OrganizationQueryContext(
+                source_ctx=SourceQueryContext.default(), certificate_ctx=CertificateQueryContext.default()
+            )
+            org = org_repo.find(id, ctx)
             if not org:
                 raise HTTPException(status_code=404)
 

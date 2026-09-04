@@ -6,6 +6,7 @@ from app.db.models.certificate import CertificateEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.certificate import CertificateRepository
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.query_builder.data import CertificateQueryContext, OrganizationQueryContext
 from app.models.certificates import Certificate, CertificateCreate, CertificateQueryParams, CertificateUpdate
 from app.services.exceptions import ConflictError, RecordNotFoundError
 
@@ -25,31 +26,24 @@ class OrganizationCertificateService:
 
     def get_many(self, organization_id: UUID, params: CertificateQueryParams) -> list[Certificate]:
         with self.db.get_db_session() as session:
-            repo = session.get_repository(CertificateRepository)
-            results = repo.find_many(organization_id=organization_id, **params.model_dump())
+            repo = session.get_repository(OrganizationRepository)
+            ctx = OrganizationQueryContext(
+                certificate_ctx=CertificateQueryContext(
+                    organization_identifier=params.organization_identifier, domain=params.domain
+                )
+            )
+            org = repo.find(organization_id, ctx)
+            if org is None:
+                raise RecordNotFoundError(organization_id)
 
-            return [Certificate.from_entity(e) for e in results]
+            return [Certificate.from_entity(e) for e in org.certificates]
 
     def create_one(self, organization_id: UUID, dto: CertificateCreate) -> Certificate:
         with self.db.get_db_session() as session:
-            # org_repo = session.get_repository(OrganizationRepository)
-            # org_exists = org_repo.exists(organization_id)
-            # if org_exists is False:
-            #     raise RecordNotFoundError(organization_id)
-            #
-            # cert_repo = session.get_repository(CertificateRepository)
-            # cert_exists = cert_repo.exists(dto.into_index_lookup())
-            # if cert_exists:
-            #     raise ConflictError(
-            #         f"Certificate with organization_identifier: {dto.organization_identifier}, domain: {dto.domain} already exists"
-            #     )
-            #
-            # new_cert = cert_repo.add_one(
-            #     CertificateEntity(**dto.model_dump(exclude_unset=True), organization_id=organization_id)
-            # )
-            # return Certificate.from_entity(new_cert)
             org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.find_one(organization_id)
+            ctx = OrganizationQueryContext(certificate_ctx=CertificateQueryContext.default())
+
+            org = org_repo.find(organization_id, ctx)
             if org is None:
                 raise RecordNotFoundError(organization_id)
 

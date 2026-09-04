@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.db.models.client import ClientEntity
 from app.db.repository.query_builder.organization_query_builder import (
     CertificateQueryContext,
-    OrganizationClientQueryContext,
+    ClientQueryContext,
     SourceQueryContext,
 )
 from app.models.base import (
@@ -81,8 +81,8 @@ class ClientQueryParams(ClientOptionalFields):
     def sanatized_scope(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
-    def into_org_client_query_context(self) -> OrganizationClientQueryContext:
-        return OrganizationClientQueryContext(
+    def into_client_query_context(self) -> ClientQueryContext:
+        return ClientQueryContext(
             name=self.name,
             scopes=self.sanatized_scope,
             source_ctx=SourceQueryContext(source_id=self.source_id, name=self.source_name),
