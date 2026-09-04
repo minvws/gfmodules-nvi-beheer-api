@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models.organization import OrganizationEntity
+from app.db.repository.query_builder.data import ClientQueryContext, OrganizationQueryContext
 from app.db.repository.query_builder.organization_query_builder import (
     CertificateQueryContext,
     SourceQueryContext,
@@ -108,7 +109,7 @@ class OrganizationQueryParams(BaseModel):
     cert_id: UUID | None = None
     cert_identifier: str | None = None  # TODO: Add description
     cert_domain: str | None = None  # TODO: Add description
-    source_id: UUID | None = None
+    source_id: str | None = None
     source_name: str | None = None
 
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
@@ -123,7 +124,21 @@ class OrganizationQueryParams(BaseModel):
         )
 
     def into_source_query_context(self) -> SourceQueryContext:
-        return SourceQueryContext(id=self.source_id, name=self.source_name)
+        return SourceQueryContext(source_id=self.source_id, name=self.source_name)
+
+    def into_organization_query_context(self) -> OrganizationQueryContext:
+        src_ctx = self.into_source_query_context()
+        crt_ctx = self.into_cert_query_context()
+        client_ctx = ClientQueryContext.default()
+
+        return OrganizationQueryContext(
+            external_id=self.external_id,
+            name=self.name,
+            scopes=self.sanitized_scopes,
+            client_ctx=client_ctx,
+            source_ctx=src_ctx,
+            certificate_ctx=crt_ctx,
+        )
 
 
 class Organization(CommonModel, OrganizationFields):
