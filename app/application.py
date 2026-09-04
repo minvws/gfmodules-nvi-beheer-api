@@ -1,20 +1,19 @@
 import json
 import logging
 import os
-import signal
-import sys
 from contextlib import asynccontextmanager
-from logging.config import dictConfig
 from pathlib import Path
-from types import TracebackType
 from typing import Any, AsyncIterator
 
+import gfmodules.logging as gflog
 import uvicorn
 from fastapi import FastAPI, Request, Security
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
+from gfmodules.logging.exceptions import log_unhandled_exception
+from gfmodules.logging.middleware import RequestContextMiddleware, restore_request_context
 
 from app import container
 from app.config import (
@@ -22,9 +21,7 @@ from app.config import (
     _PATH,
     get_config,
 )
-from app.logging.config_builder import LogConfigBuilder
-from app.logging.events import Log
-from app.logging.middleware import RequestContextMiddleware, restore_request_context
+from app.logging.events import ACT_CN, Log
 from app.middleware.stats import StatsdMiddleware
 from app.routers.client import router as client_router
 from app.routers.default import router as default_router
@@ -33,8 +30,6 @@ from app.routers.organization import router as organization_router
 from app.routers.resolve import router as resolve_router
 
 logger = logging.getLogger(__name__)
-
-_shutdown_reason = "graceful"
 
 
 async def request_validation_exception_handler(
@@ -89,8 +84,8 @@ def run() -> None:
 
 def application_init() -> None:
     setup_logging()
-    _install_excepthook()
-    _install_signal_handlers()
+    gflog.install_excepthook(logger)
+    gflog.install_signal_handlers()
 
 
 def create_fastapi_app() -> FastAPI:
@@ -98,12 +93,12 @@ def create_fastapi_app() -> FastAPI:
     try:
         fastapi = setup_fastapi()
     except Exception as exc:
-        Log.event(
+        gflog.emit(
             logger,
             Log.SYS_UNHANDLED_EXCEPTION,
             "Unhandled exception during application startup",
+            fields={"exception_type": type(exc).__name__},
             exc_info=exc,
-            exception_type=type(exc).__name__,
         )
         raise
 
@@ -112,15 +107,12 @@ def create_fastapi_app() -> FastAPI:
 
 def setup_logging() -> None:
     config = get_config()
-    loglevel = config.app.loglevel.upper()
-    if loglevel not in logging.getLevelNamesMapping():
-        raise ValueError(f"Invalid loglevel {loglevel}")
-
-    log_config = LogConfigBuilder(
-        loglevel=loglevel,
-        logging_config=config.logging,
-    ).build()
-    dictConfig(log_config)
+    gflog.configure(
+        config=config.logging,
+        loglevel=config.app.loglevel,
+        catalogue=Log,
+        extra_context_fields=(ACT_CN,),
+    )
 
 
 def _read_version() -> str:
@@ -133,95 +125,19 @@ def _read_version() -> str:
         return "unknown"
 
 
-def _install_excepthook() -> None:
-    """Route uncaught exceptions through our own logging so the traceback stays in the
-    debug stream only. Without this, Python prints the traceback to stderr and
-    it leaks into stdout logs."""
-
-    def _hook(
-        exc_type: type[BaseException],
-        exc_value: BaseException,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        if issubclass(exc_type, KeyboardInterrupt):
-            sys.__excepthook__(exc_type, exc_value, exc_tb)
-            return
-        global _shutdown_reason
-        _shutdown_reason = "crash"
-        Log.event(
-            logger,
-            Log.SYS_APP_CRASHED,
-            "Application crashed: uncaught exception",
-            shutdown_reason=_shutdown_reason,
-            last_exception_type=exc_type.__name__,
-            exc_info=(exc_type, exc_value, exc_tb),
-        )
-
-    sys.excepthook = _hook
-
-
-def _install_signal_handlers() -> None:
-    """Record the shutdown reason then delegate to the previously-installed
-    handler (typically uvicorn's), so we don't disrupt graceful shutdown."""
-
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        try:
-            previous = signal.getsignal(sig)
-        except (ValueError, OSError):
-            continue
-
-        def _make_handler(signum: int, prev: Any) -> Any:
-            def _handler(s: int, frame: Any) -> None:
-                global _shutdown_reason
-                _shutdown_reason = f"signal:{signal.Signals(signum).name}"
-                if callable(prev):
-                    prev(s, frame)
-
-            return _handler
-
-        try:
-            signal.signal(sig, _make_handler(sig, previous))
-        except (ValueError, OSError):
-            pass
-
-
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
-    global _shutdown_reason
-    _emit_app_started()
-    try:
-        yield
-    finally:
-        if _shutdown_reason != "crash":
-            Log.event(
-                logger,
-                Log.SYS_APP_STOPPED,
-                "Application stopped",
-                shutdown_reason=_shutdown_reason,
-            )
-
-
-def _emit_app_started() -> None:
-    Log.event(
+    async with gflog.lifespan_logging(
         logger,
-        Log.SYS_APP_STARTED,
-        "Application started",
         version=_read_version(),
         config_path=os.environ.get(_ENVIRONMENT_CONFIG_PATH_NAME, _PATH),
-    )
+    ):
+        yield
 
 
 @restore_request_context
 def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    Log.event(
-        logger,
-        Log.SYS_UNHANDLED_EXCEPTION,
-        "Unhandled exception",
-        exc_info=exc,
-        exception_type=type(exc).__name__,
-        endpoint=request.url.path,
-        method=request.method,
-    )
+    log_unhandled_exception(logger, request, exc)
     return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
@@ -248,14 +164,16 @@ def setup_fastapi() -> FastAPI:
     for router in routers:
         fastapi.include_router(router)
 
-    fastapi.add_middleware(
-        RequestContextMiddleware,
-        correlation_id_expected=config.logging.correlation_id_expected,
-    )
     fastapi.add_exception_handler(Exception, _unhandled_exception_handler)
     fastapi.exception_handler(RequestValidationError)(request_validation_exception_handler)
 
     if config.stats.enabled:
         fastapi.add_middleware(StatsdMiddleware, module_name=config.stats.module_name or "default")
 
+    fastapi.add_middleware(
+        RequestContextMiddleware,
+        correlation_id_expected=config.logging.correlation_id_expected,
+        capture_body_methods=("POST", "PUT", "DELETE"),
+        trust_forwarded_for=config.logging.trust_forwarded_for,
+    )
     return fastapi

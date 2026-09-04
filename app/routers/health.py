@@ -1,6 +1,7 @@
 import logging
 from typing import Annotated
 
+import gfmodules.logging as gflog
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
@@ -71,12 +72,14 @@ def health(
     if healthy == "ok":
         return JSONResponse(content=content)
     unhealthy = [name for name, status in components.items() if status != "ok"]
-    Log.event(
+    gflog.emit(
         logger,
         Log.HEALTH_UNHEALTHY,
         "Health check unhealthy",
-        component=",".join(unhealthy),
-        status="error",
-        error_detail=f"unhealthy components: {', '.join(unhealthy)}",
+        fields={
+            "component": ",".join(unhealthy),
+            "status": "error",
+            "error_detail": f"unhealthy components: {', '.join(unhealthy)}",
+        },
     )
     return JSONResponse(status_code=503, content=content)

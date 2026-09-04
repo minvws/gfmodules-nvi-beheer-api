@@ -26,6 +26,9 @@ opentelemetry-instrumentation-requests = "^0.60b1"
 requests = "^2.33.1"
 statsd = "^4.0.1"
 cryptography = ">=42.0.0"
+gfmodules-python-logging-library = { git = "https://github.com/minvws/gfmodules-python-logging-library", tag = "v0.2.0", extras = [
+    "fastapi",
+] }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"

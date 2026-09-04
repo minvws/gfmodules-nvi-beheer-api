@@ -1,250 +1,138 @@
-"""Integration tests for per-field stream routing.
-
-Wires up the PUBLIC_INSPECT (stroom 1), APP (stroom 2) and SIEM (stroom 3)
-handlers the same way ``LogConfigBuilder`` does and asserts each stream only
-receives the fields the app's own events assign to it. None of this app's
-events route to PUBLIC_INSPECT, so that stream is expected to stay empty.
-"""
-
-import io
-import json
 import logging
-from typing import Any, Iterator
+from collections.abc import Iterator
+from contextlib import ExitStack
+from typing import Any
 
+import gfmodules.logging as gflog
 import pytest
+from gfmodules.logging import LogEvent, LoggingStreams, bind_context
+from gfmodules.logging.testing import assert_fields_absent, capture_stream
 
-from app.logging.context import correlation_id_var, endpoint_var, ip_var, method_var, request_id_var
 from app.logging.events import Log
-from app.logging.filters import (
-    AppFilter,
-    LoggingStreams,
-    PublicInspectFilter,
-    SiemFilter,
-)
-from app.logging.formatter import JsonFormatter
+
+_LOGGER_NAME = "app.test_stream_routing"
+_OIN = "00000001000000000001"
+_URA = "12345678"
+
+Routed = dict[LoggingStreams, list[dict[str, Any]]]
 
 
 @pytest.fixture
-def streams() -> Iterator[tuple[logging.Logger, io.StringIO, io.StringIO, io.StringIO]]:
-    pub_buf, app_buf, siem_buf = io.StringIO(), io.StringIO(), io.StringIO()
+def route() -> Iterator[Any]:
+    logger = logging.getLogger(_LOGGER_NAME)
 
-    pub_handler = logging.StreamHandler(pub_buf)
-    pub_handler.addFilter(PublicInspectFilter())
-    pub_handler.setFormatter(JsonFormatter(include_traces=False, stream=LoggingStreams.PUBLIC_INSPECT))
+    def _route(event: LogEvent, message: str = "event", **fields: Any) -> Routed:
+        with ExitStack() as stack:
+            routed: Routed = {
+                stream: stack.enter_context(capture_stream(stream, _LOGGER_NAME)) for stream in LoggingStreams
+            }
+            gflog.emit(logger, event, message, fields={**fields})
+        return routed
 
-    app_handler = logging.StreamHandler(app_buf)
-    app_handler.addFilter(AppFilter())
-    app_handler.setFormatter(JsonFormatter(include_traces=False, stream=LoggingStreams.APP))
-
-    siem_handler = logging.StreamHandler(siem_buf)
-    siem_handler.addFilter(SiemFilter())
-    siem_handler.setFormatter(JsonFormatter(include_traces=False, stream=LoggingStreams.SIEM))
-
-    logger = logging.getLogger("app.test_stream_routing")
-    logger.setLevel(logging.DEBUG)
-    logger.handlers = [pub_handler, app_handler, siem_handler]
-    logger.propagate = False
-
-    tokens = [
-        request_id_var.set("req-1"),
-        ip_var.set("10.0.0.1"),
-        endpoint_var.set("/token"),
-        method_var.set("POST"),
-        correlation_id_var.set("corr-1"),
-    ]
-    try:
-        yield logger, pub_buf, app_buf, siem_buf
-    finally:
-        logger.handlers = []
-        request_id_var.reset(tokens[0])
-        ip_var.reset(tokens[1])
-        endpoint_var.reset(tokens[2])
-        method_var.reset(tokens[3])
-        correlation_id_var.reset(tokens[4])
+    with bind_context(
+        {
+            "request_id": "req-1",
+            "ip": "10.0.0.1",
+            "endpoint": "/organizations",
+            "method": "POST",
+            "correlation_id": "corr-1",
+            "gf-act-cn": "acting-client",
+        }
+    ):
+        yield _route
 
 
-def _messages(buf: io.StringIO) -> list[dict[str, Any]]:
-    return [json.loads(line)["message"] for line in buf.getvalue().splitlines()]
-
-
-def test_client_onboarded_routes_fields_per_stream(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO, io.StringIO],
-) -> None:
-    logger, pub_buf, app_buf, siem_buf = streams
-    Log.event(
-        logger,
-        Log.CLIENT_ONBOARDED,
-        "onboarded",
-        oin="00000001000000000001",
-        ura_number="12345678",
-        source_identifier="src-1",
-        approved_by="admin",
-        scopes="read write",
-    )
-
-    app_msg = _messages(app_buf)[0]
-    siem_msg = _messages(siem_buf)[0]
-
-    # APP (stroom 2) gets every onboarding field
-    assert app_msg["oin"] == "00000001000000000001"
-    assert app_msg["ura_number"] == "12345678"
-    assert app_msg["source_identifier"] == "src-1"
-    assert app_msg["approved_by"] == "admin"
-    assert app_msg["scopes"] == "read write"
-
-    # SIEM (stroom 3) gets ura_number + scopes only
-    assert siem_msg["ura_number"] == "12345678"
-    assert siem_msg["scopes"] == "read write"
-    assert "oin" not in siem_msg
-    assert "source_identifier" not in siem_msg
-    assert "approved_by" not in siem_msg
-
-    # CLIENT_ONBOARDED is not routed to PUB (stroom 1)
-    assert pub_buf.getvalue() == ""
-
-    # correlation metadata is retained in the routed streams
-    for msg in (app_msg, siem_msg):
-        assert msg["request_id"] == "req-1"
-        assert msg["ip"] == "10.0.0.1"
-        assert msg["correlation_id"] == "corr-1"
-
-
-def test_client_offboarded_routes_to_app_and_siem(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO, io.StringIO],
-) -> None:
-    logger, pub_buf, app_buf, siem_buf = streams
-    Log.event(
-        logger,
-        Log.CLIENT_OFFBOARDED,
-        "offboarded",
-        oin="00000001000000000001",
-        ura_number="12345678",
-        deactivated_by="admin",
-        reason="contract ended",
-    )
-
-    app_msg = _messages(app_buf)[0]
-    siem_msg = _messages(siem_buf)[0]
-
-    # APP keeps oin + ura_number + deactivated_by + reason
-    assert app_msg["oin"] == "00000001000000000001"
-    assert app_msg["ura_number"] == "12345678"
-    assert app_msg["deactivated_by"] == "admin"
-    assert app_msg["reason"] == "contract ended"
-
-    # SIEM keeps ura_number + deactivated_by, but NOT oin or reason
-    assert siem_msg["ura_number"] == "12345678"
-    assert siem_msg["deactivated_by"] == "admin"
-    assert "oin" not in siem_msg
-    assert "reason" not in siem_msg
-
-    # CLIENT_OFFBOARDED is not routed to PUB (stroom 1)
-    assert pub_buf.getvalue() == ""
-
-
-def test_health_unhealthy_drops_error_detail_from_siem(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO, io.StringIO],
-) -> None:
-    logger, pub_buf, app_buf, siem_buf = streams
-    Log.event(
-        logger,
-        Log.HEALTH_UNHEALTHY,
-        "unhealthy",
-        component="database",
-        status="down",
-        error_detail="connection refused",
-    )
-
-    app_msg = _messages(app_buf)[0]
-    siem_msg = _messages(siem_buf)[0]
-
-    # APP keeps component + status + error_detail
-    assert app_msg["component"] == "database"
-    assert app_msg["status"] == "down"
-    assert app_msg["error_detail"] == "connection refused"
-
-    # SIEM keeps component + status, but drops the error detail
-    assert siem_msg["component"] == "database"
-    assert siem_msg["status"] == "down"
-    assert "error_detail" not in siem_msg
-
-    # HEALTH_UNHEALTHY is not routed to PUB (stroom 1)
-    assert pub_buf.getvalue() == ""
-
-
-def test_access_request_goes_to_app_only(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO, io.StringIO],
-) -> None:
-    logger, pub_buf, app_buf, siem_buf = streams
-    Log.event(logger, Log.ACCESS_REQUEST, "access", status_code=200, duration_ms=5)
-
-    app_msg = _messages(app_buf)[0]
-    assert app_msg["endpoint"] == "/token"
-    assert app_msg["method"] == "POST"
-    # off-spec extras are not forwarded to the stream
-    assert "status_code" not in app_msg
-    assert "duration_ms" not in app_msg
-
-    # ACCESS_REQUEST is APP-only (stroom 1 and stroom 3 == "-")
-    assert pub_buf.getvalue() == ""
-    assert siem_buf.getvalue() == ""
-
-
-def test_off_spec_extras_dropped_from_all_streams(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO, io.StringIO],
-) -> None:
-    logger, pub_buf, app_buf, siem_buf = streams
-    Log.event(
-        logger,
-        Log.CLIENT_ONBOARDED,
-        "onboarded",
-        oin="00000001000000000001",
-        ura_number="12345678",
-        scopes="read",
-        bogus_field="should be dropped",
-    )
-
-    app_msg = _messages(app_buf)[0]
-    siem_msg = _messages(siem_buf)[0]
-
-    # APP keeps the spec'd fields; the off-spec `bogus_field` is dropped
-    assert app_msg["oin"] == "00000001000000000001"
-    assert app_msg["ura_number"] == "12345678"
-    assert "bogus_field" not in app_msg
-
-    # SIEM keeps its narrower subset; off-spec `bogus_field` and oin are dropped
-    assert siem_msg["ura_number"] == "12345678"
-    assert siem_msg["scopes"] == "read"
-    assert "oin" not in siem_msg
-    assert "bogus_field" not in siem_msg
-
-    # CLIENT_ONBOARDED is not routed to PUB (stroom 1)
-    assert pub_buf.getvalue() == ""
-
-
-def test_records_carry_stream_id_and_application_id() -> None:
-    # On the shared syslog channel the log server tells streams and
-    # applications apart by the stream_id/application_id stamped per record.
-    buf = io.StringIO()
-    handler = logging.StreamHandler(buf)
-    handler.setFormatter(
-        JsonFormatter(
-            include_traces=False,
-            stream=LoggingStreams.APP,
-            stream_id="app",
-            application_id="nvi-beheer-api",
+class TestClientOnboarded:
+    @pytest.fixture
+    def routed(self, route: Any) -> Routed:
+        return dict(
+            route(
+                Log.CLIENT_ONBOARDED,
+                "onboarded",
+                oin=_OIN,
+                ura_number=_URA,
+                source_identifier="src-1",
+                approved_by="admin",
+                scopes="read write",
+            )
         )
-    )
 
-    logger = logging.getLogger("app.test_stream_routing_ids")
-    logger.setLevel(logging.DEBUG)
-    logger.handlers = [handler]
-    logger.propagate = False
-    try:
-        Log.event(logger, Log.SYS_APP_STARTED, "started", version="1.0.0")
-    finally:
-        logger.handlers = []
+    def test_app_receives_every_onboarding_field(self, routed: Routed) -> None:
+        message = routed[LoggingStreams.APP][0]
+        assert message["oin"] == _OIN
+        assert message["ura_number"] == _URA
+        assert message["source_identifier"] == "src-1"
+        assert message["approved_by"] == "admin"
+        assert message["scopes"] == "read write"
 
-    record = json.loads(buf.getvalue())
-    assert record["stream_id"] == "app"
-    assert record["application_id"] == "nvi-beheer-api"
+    def test_siem_receives_the_ura_and_scopes_and_nothing_else(self, routed: Routed) -> None:
+        message = routed[LoggingStreams.SIEM][0]
+        assert message["ura_number"] == _URA
+        assert message["scopes"] == "read write"
+        assert_fields_absent(routed[LoggingStreams.SIEM], "oin", "source_identifier", "approved_by")
+
+    def test_public_inspect_receives_nothing(self, routed: Routed) -> None:
+        assert routed[LoggingStreams.PUBLIC_INSPECT] == []
+
+    def test_correlation_metadata_is_retained_in_every_routed_stream(self, routed: Routed) -> None:
+        for stream in (LoggingStreams.APP, LoggingStreams.SIEM):
+            message = routed[stream][0]
+            assert message["request_id"] == "req-1"
+            assert message["ip"] == "10.0.0.1"
+            assert message["correlation_id"] == "corr-1"
+
+
+class TestClientOffboarded:
+    @pytest.fixture
+    def routed(self, route: Any) -> Routed:
+        return dict(
+            route(
+                Log.CLIENT_OFFBOARDED,
+                "offboarded",
+                oin=_OIN,
+                ura_number=_URA,
+                deactivated_by="admin",
+                reason="contract ended",
+            )
+        )
+
+    def test_app_receives_the_oin_and_the_reason(self, routed: Routed) -> None:
+        message = routed[LoggingStreams.APP][0]
+        assert message["oin"] == _OIN
+        assert message["reason"] == "contract ended"
+
+    def test_siem_receives_neither_the_oin_nor_the_reason(self, routed: Routed) -> None:
+        message = routed[LoggingStreams.SIEM][0]
+        assert message["ura_number"] == _URA
+        assert message["deactivated_by"] == "admin"
+        assert_fields_absent(routed[LoggingStreams.SIEM], "oin", "reason")
+
+
+class TestHealthUnhealthy:
+    def test_the_error_detail_never_reaches_siem(self, route: Any) -> None:
+        routed: Routed = route(
+            Log.HEALTH_UNHEALTHY,
+            "unhealthy",
+            component="database",
+            status="error",
+            error_detail="connection refused",
+        )
+
+        assert routed[LoggingStreams.APP][0]["error_detail"] == "connection refused"
+        assert routed[LoggingStreams.SIEM][0]["component"] == "database"
+        assert_fields_absent(routed[LoggingStreams.SIEM], "error_detail")
+
+
+class TestAccessRequest:
+    def test_reaches_the_app_stream_only_and_carries_the_acting_client(self, route: Any) -> None:
+        routed: Routed = route(Log.ACCESS_REQUEST, "access", status_code=201, duration_ms=5)
+
+        message = routed[LoggingStreams.APP][0]
+        assert message["endpoint"] == "/organizations"
+        assert message["method"] == "POST"
+        assert message["status_code"] == 201
+        assert message["duration_ms"] == 5
+        assert message["gf-act-cn"] == "acting-client"
+
+        assert routed[LoggingStreams.PUBLIC_INSPECT] == []
+        assert routed[LoggingStreams.SIEM] == []

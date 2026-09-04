@@ -1,16 +1,20 @@
 import asyncio
-import importlib
 import json
-import signal
-import sys
+from typing import Any
 from unittest.mock import MagicMock
 
+import gfmodules.logging as gflog
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from gfmodules.logging import LoggingStreams
+from gfmodules.logging.middleware import RequestContextMiddleware
+from gfmodules.logging.testing import capture_records, capture_stream, recorded_shutdown_reason
 from pytest_mock import MockerFixture
 
 from app import application
 from app.config import Config, set_config
-from app.logging.events import Log
+from app.logging.events import ACT_CN, Log
 from tests.test_config import get_test_config
 
 
@@ -21,173 +25,141 @@ def use_config() -> Config:
     return cfg
 
 
-def test_unhandled_exception_handler_logs_and_returns_500(
-    mocker: MockerFixture,
-) -> None:
-    request = MagicMock()
-    request.url.path = "/boom"
-    request.method = "GET"
-    exc = RuntimeError("explode")
-    log_event = mocker.patch("app.application.Log.event")
+def _run_lifespan() -> list[Any]:
+    with capture_records(application.logger.name) as captured:
 
-    response = application._unhandled_exception_handler(request, exc)
+        async def _exercise() -> None:
+            async with application._lifespan(MagicMock()):
+                pass
 
-    assert response.status_code == 500
-    assert json.loads(response.body) == {"error": "Internal server error"}  # type: ignore
-    log_event.assert_called_once_with(
-        application.logger,
-        Log.SYS_UNHANDLED_EXCEPTION,
-        "Unhandled exception",
-        exc_info=exc,
-        exception_type="RuntimeError",
-        endpoint="/boom",
-        method="GET",
-    )
+        asyncio.run(_exercise())
+    return [entry.record for entry in captured.entries]
 
 
-def test_lifespan_logs_shutdown_reason_on_exit(use_config: Config, mocker: MockerFixture) -> None:
-    log_event = mocker.patch("app.application.Log.event")
-    mocker.patch("app.application._read_version", return_value="9.9.9")
-    application._shutdown_reason = "graceful"
-
-    async def _exercise() -> None:
-        async with application._lifespan(MagicMock()):
-            pass
-
-    asyncio.run(_exercise())
-
-    log_event.assert_any_call(
-        application.logger,
-        Log.SYS_APP_STOPPED,
-        "Application stopped",
-        shutdown_reason="graceful",
-    )
+def _records_for(event_id: str) -> list[Any]:
+    return [rec for rec in _run_lifespan() if rec.event_id == event_id]
 
 
-def test_lifespan_defaults_to_graceful_shutdown_reason(use_config: Config, mocker: MockerFixture) -> None:
-    importlib.reload(application)
-    mocker.patch("app.application._read_version", return_value="9.9.9")
-    log_event = mocker.patch("app.application.Log.event")
+class TestLifespan:
+    def test_reports_a_graceful_shutdown_on_exit(self, use_config: Config, mocker: MockerFixture) -> None:
+        mocker.patch("app.application._read_version", return_value="9.9.9")
 
-    async def _exercise() -> None:
-        async with application._lifespan(MagicMock()):
-            pass
+        stopped = _records_for(Log.SYS_APP_STOPPED.event_id)
 
-    asyncio.run(_exercise())
+        assert [rec.shutdown_reason for rec in stopped] == ["graceful"]
 
-    log_event.assert_any_call(
-        application.logger,
-        Log.SYS_APP_STOPPED,
-        "Application stopped",
-        shutdown_reason="graceful",
-    )
+    def test_reports_the_signal_that_triggered_the_shutdown(self, use_config: Config, mocker: MockerFixture) -> None:
+        mocker.patch("app.application._read_version", return_value="9.9.9")
 
+        with recorded_shutdown_reason("signal:SIGTERM"):
+            stopped = _records_for(Log.SYS_APP_STOPPED.event_id)
 
-def test_emit_app_started_logs_sys_app_started(use_config: Config, mocker: MockerFixture) -> None:
-    mocker.patch("app.application._read_version", return_value="1.2.3")
-    log_event = mocker.patch("app.application.Log.event")
+        assert [rec.shutdown_reason for rec in stopped] == ["signal:SIGTERM"]
 
-    application._emit_app_started()
+    def test_emits_no_stopped_event_after_a_crash(self, use_config: Config, mocker: MockerFixture) -> None:
+        mocker.patch("app.application._read_version", return_value="9.9.9")
 
-    log_event.assert_called_once_with(
-        application.logger,
-        Log.SYS_APP_STARTED,
-        "Application started",
-        version="1.2.3",
-        config_path=mocker.ANY,
-    )
+        with recorded_shutdown_reason("crash"):
+            assert _records_for(Log.SYS_APP_STOPPED.event_id) == []
 
+    def test_the_started_event_reports_the_version_and_config_path(
+        self, use_config: Config, mocker: MockerFixture
+    ) -> None:
+        mocker.patch("app.application._read_version", return_value="1.2.3")
 
-def test_excepthook_logs_sys_app_crashed_for_uncaught_exception(
-    mocker: MockerFixture,
-) -> None:
-    mocker.patch("app.application._read_version", return_value="9.9.9")
-    log_event = mocker.patch("app.application.Log.event")
-    previous_excepthook = sys.excepthook
-    try:
-        application._install_excepthook()
-        try:
-            raise RuntimeError("boom")
-        except RuntimeError:
-            sys.excepthook(*sys.exc_info())
-    finally:
-        sys.excepthook = previous_excepthook
+        started = _records_for(Log.SYS_APP_STARTED.event_id)
 
-    assert application._shutdown_reason == "crash"
-    assert log_event.call_count == 1
-    args, kwargs = log_event.call_args
-    assert args[0] is application.logger
-    assert args[1] is Log.SYS_APP_CRASHED
-    assert args[2] == "Application crashed: uncaught exception"
-    assert kwargs["shutdown_reason"] == "crash"
-    assert kwargs["last_exception_type"] == "RuntimeError"
-    assert kwargs["exc_info"] is not None
+        assert len(started) == 1
+        assert started[0].version == "1.2.3"
+        assert started[0].config_path is not None
 
 
-def test_create_fastapi_app_logs_sys_unhandled_exception_on_startup_failure(
-    mocker: MockerFixture,
-) -> None:
-    mocker.patch("app.application.application_init")
-    exc = RuntimeError("startup boom")
-    mocker.patch("app.application.setup_fastapi", side_effect=exc)
-    log_event = mocker.patch("app.application.Log.event")
+class TestApplicationInit:
+    def test_installs_the_logging_excepthook_and_signal_handlers(
+        self, use_config: Config, mocker: MockerFixture
+    ) -> None:
+        install_excepthook = mocker.patch("app.application.gflog.install_excepthook")
+        install_signal_handlers = mocker.patch("app.application.gflog.install_signal_handlers")
+        configure = mocker.patch("app.application.gflog.configure")
 
-    with pytest.raises(RuntimeError):
-        application.create_fastapi_app()
+        application.application_init()
 
-    log_event.assert_called_once_with(
-        application.logger,
-        Log.SYS_UNHANDLED_EXCEPTION,
-        "Unhandled exception during application startup",
-        exc_info=exc,
-        exception_type="RuntimeError",
-    )
+        configure.assert_called_once()
+        install_excepthook.assert_called_once_with(application.logger)
+        install_signal_handlers.assert_called_once_with()
 
+    def test_configures_logging_with_the_catalogue_and_the_acting_client_field(
+        self, use_config: Config, mocker: MockerFixture
+    ) -> None:
+        configure = mocker.patch("app.application.gflog.configure")
 
-def test_signal_handler_sets_shutdown_reason_and_lifespan_logs_signal(
-    use_config: Config, mocker: MockerFixture
-) -> None:
-    mocker.patch("app.application._read_version", return_value="9.9.9")
-    log_event = mocker.patch("app.application.Log.event")
-    application._shutdown_reason = "graceful"
+        application.setup_logging()
 
-    previous = signal.getsignal(signal.SIGTERM)
-    try:
-        application._install_signal_handlers()
-        installed = signal.getsignal(signal.SIGTERM)
-        assert callable(installed)
-        installed(signal.SIGTERM, None)
-    finally:
-        signal.signal(signal.SIGTERM, previous)
-
-    assert application._shutdown_reason == "signal:SIGTERM"
-
-    async def _exercise() -> None:
-        async with application._lifespan(MagicMock()):
-            pass
-
-    asyncio.run(_exercise())
-
-    log_event.assert_any_call(
-        application.logger,
-        Log.SYS_APP_STOPPED,
-        "Application stopped",
-        shutdown_reason="signal:SIGTERM",
-    )
+        configure.assert_called_once_with(
+            config=use_config.logging,
+            loglevel=use_config.app.loglevel,
+            catalogue=Log,
+            extra_context_fields=(ACT_CN,),
+        )
 
 
-def test_excepthook_skips_keyboard_interrupt(mocker: MockerFixture) -> None:
-    log_event = mocker.patch("app.application.Log.event")
-    previous_excepthook = sys.excepthook
-    default_hook = mocker.patch("sys.__excepthook__")
-    try:
-        application._install_excepthook()
-        try:
-            raise KeyboardInterrupt()
-        except KeyboardInterrupt:
-            sys.excepthook(*sys.exc_info())
-    finally:
-        sys.excepthook = previous_excepthook
+class TestStartupFailure:
+    def test_logs_an_unhandled_exception_when_the_app_fails_to_build(self, mocker: MockerFixture) -> None:
+        mocker.patch("app.application.application_init")
+        mocker.patch("app.application.setup_fastapi", side_effect=RuntimeError("startup boom"))
 
-    log_event.assert_not_called()
-    default_hook.assert_called_once()
+        with (
+            capture_records(application.logger.name) as captured,
+            pytest.raises(RuntimeError),
+        ):
+            application.create_fastapi_app()
+
+        records: list[Any] = [entry.record for entry in captured.entries]
+        assert [record.event_id for record in records] == [Log.SYS_UNHANDLED_EXCEPTION.event_id]
+        assert records[0].exception_type == "RuntimeError"
+        assert records[0].exc_info is not None
+
+
+class TestUnhandledExceptionHandler:
+    @staticmethod
+    def _app() -> FastAPI:
+        fastapi = FastAPI()
+
+        @fastapi.get("/boom")
+        def boom() -> None:
+            raise RuntimeError("explode")
+
+        fastapi.add_exception_handler(Exception, application._unhandled_exception_handler)
+        return fastapi
+
+    def test_returns_500_and_routes_the_exception_to_app_and_siem(self) -> None:
+        with (
+            capture_stream(LoggingStreams.APP, application.logger.name) as app_stream,
+            capture_stream(LoggingStreams.SIEM, application.logger.name) as siem_stream,
+        ):
+            response = TestClient(self._app(), raise_server_exceptions=False).get("/boom")
+
+        assert response.status_code == 500
+        assert json.loads(response.content) == {"error": "Internal server error"}
+        assert app_stream[0]["exception_type"] == "RuntimeError"
+        assert app_stream[0]["endpoint"] == "/boom"
+        assert siem_stream[0]["exception_type"] == "RuntimeError"
+
+
+class TestUserAgent:
+    @staticmethod
+    def _app() -> FastAPI:
+        fastapi = FastAPI()
+
+        @fastapi.get("/ping")
+        def ping() -> dict[str, str]:
+            return {"status": "ok"}
+
+        fastapi.add_middleware(RequestContextMiddleware)
+        return fastapi
+
+    def test_the_access_record_carries_the_user_agent_the_caller_sent(self) -> None:
+        with capture_stream(LoggingStreams.APP, gflog.access_logger_name()) as access_stream:
+            TestClient(self._app()).get("/ping", headers={"User-Agent": "kube-probe/1.31"})
+
+        assert access_stream[0]["user_agent"] == "kube-probe/1.31"

@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 
+import gfmodules.logging as gflog
+
 from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
@@ -44,15 +46,17 @@ class ClientService:
                 common_name=common_name,
                 scopes=scopes,
             )
-            Log.event(
-                logger=logger,
-                event=Log.CLIENT_ONBOARDED,
-                message="Client onboarded",
-                oin=oin,
-                ura_number=org.register_id,
-                source_identifier=source_id,
-                scopes=scopes,
-                approved_by="system",
+            gflog.emit(
+                logger,
+                Log.CLIENT_ONBOARDED,
+                "Client onboarded",
+                fields={
+                    "oin": oin,
+                    "ura_number": org.register_id,
+                    "source_identifier": source_id,
+                    "scopes": scopes,
+                    "approved_by": "system",
+                },
             )
             return repo.add_one(entity)
 
@@ -101,14 +105,16 @@ class ClientService:
             org = self.org_service.get_one(organization_id)
             if not org:
                 return None
-            Log.event(
-                logger=logger,
-                event=Log.CLIENT_OFFBOARDED,
-                message="Client offboarded",
-                oin=client.oin,
-                ura_number=org.register_id,
-                deactivated_by="system",
-                reason="Deleted by system",
+            gflog.emit(
+                logger,
+                Log.CLIENT_OFFBOARDED,
+                "Client offboarded",
+                fields={
+                    "oin": client.oin,
+                    "ura_number": org.register_id,
+                    "deactivated_by": "system",
+                    "reason": "Deleted by system",
+                },
             )
             return repo.update(organization_id, id, deleted_at=datetime.now())
 
