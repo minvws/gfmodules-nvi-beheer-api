@@ -7,14 +7,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db.decorator import repository
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase
+from app.db.repository.query_builder.data import OrganizationQueryContext
 from app.db.repository.query_builder.organization_query_builder import (
     CertificateQueryContext,
+    ClientQueryContext,
     LoadStrategy,
-    OrganizationClientQueryContext,
     OrganizationQueryBuilder,
     SourceQueryContext,
 )
-from app.models.ura import UraNumber
 
 
 @repository(OrganizationEntity)
@@ -40,70 +40,14 @@ class OrganizationRepository(RepositoryBase):
         stmt = (
             OrganizationQueryBuilder(include_deleted=include_deleted)
             .with_id(id)
-            .include_clients(OrganizationClientQueryContext.default())
+            .include_clients(ClientQueryContext.default())
             .include_scopes()
             .include_sources(SourceQueryContext.default())
             .include_certificate(CertificateQueryContext.default())
             .build()
         )
-
-        # stmt = select(OrganizationEntity).options(
-        #     selectinload(OrganizationEntity.scopes), selectinload(
-        #         OrganizationEntity.sources)
-        # )
-        # if include_deleted:
-        #     stmt = stmt.options(selectinload(
-        #         OrganizationEntity.certificates), selectinload(OrganizationEntity.sources))
-        # else:
-        #     stmt = stmt.options(
-        #         selectinload(OrganizationEntity.certificates.and_(
-        #             CertificateEntity.deleted_at.is_(None))),
-        #         selectinload(OrganizationEntity.sources.and_(
-        #             SourceEntity.deleted_at.is_(None))),
-        #     )
-        #
-        # if not with_clients:
-        #     stmt = stmt.where(self._and_clause(id))
-        # else:
-        #     stmt = stmt.where(OrganizationEntity.id == id).options(
-        #         joinedload(OrganizationEntity.clients))
 
         return self.db_session.execute(stmt).unique().scalar()
-
-    def find_one_without_clients(self, id: UUID, include_deleted: bool = False) -> OrganizationEntity | None:
-        stmt = (
-            OrganizationQueryBuilder(include_deleted=include_deleted)
-            .with_id(id)
-            .include_scopes()
-            .include_certificate(CertificateQueryContext.default())
-            .include_sources(SourceQueryContext.default())
-            .build()
-        )
-        return self.db_session.execute(stmt).unique().scalar()
-
-    def find_one_with_specific_client(self, id: UUID, client_id) -> OrganizationEntity | None:
-        stmt = (
-            OrganizationQueryBuilder()
-            .with_id(id)
-            .include_clients(OrganizationClientQueryContext(id=client_id))
-            .include_scopes()
-            .include_certificate(CertificateQueryContext.default())
-            .include_sources(SourceQueryContext.default())
-            .build()
-        )
-        return self.db_session.execute(stmt).scalar_one_or_none()
-
-    def find_one_with_clients(self, id: UUID, client_ctx: OrganizationClientQueryContext) -> OrganizationEntity | None:
-        src_ctx, cert_ctx = client_ctx.source_ctx, client_ctx.cert_ctx
-        children_conditions = [*[v for v in vars(cert_ctx).values()], *[v for v in vars(src_ctx).values()]]
-        load_strategy = (
-            LoadStrategy.OUTERJOIN_LOAD
-            if any(v is not None for v in children_conditions)
-            else LoadStrategy.SELECTIN_LOAD
-        )
-        stmt = OrganizationQueryBuilder(load_strategy).with_id(id).include_clients(client_ctx).build()
-
-        return self.db_session.execute(stmt).unique().scalar_one_or_none()
 
     def exists(self, id: UUID) -> bool:
         stmt = select(select(OrganizationEntity.id).where(self._and_clause(id)).exists())
@@ -112,26 +56,28 @@ class OrganizationRepository(RepositoryBase):
     def find(
         self,
         id: UUID,
-        client_id: UUID | None = None,
-        certificate_id: UUID | None = None,
-        source_id: UUID | None = None,
+        ctx: OrganizationQueryContext,
+        include_delete: bool = False,
     ) -> OrganizationEntity | None:
         """
         Will automatically load children once a parameter is present.
         """
-        builder = OrganizationQueryBuilder().with_id(id).include_scopes()
-
-        if client_id:
-            builder = builder.include_clients(OrganizationClientQueryContext(id=client_id))
-
-        if certificate_id:
-            builder = builder.include_certificate(CertificateQueryContext(id=certificate_id))
-
-        if source_id:
-            builder = builder.include_sources(SourceQueryContext(id=source_id))
-
-        stmt = builder.build()
-
+        stmt = OrganizationQueryBuilder(include_deleted=include_delete).with_id(id).apply_context(ctx).build()
+        # builder = OrganizationQueryBuilder().with_id(id).include_scopes()
+        #
+        # if client_id:
+        #     builder = builder.include_clients(ClientQueryContext(id=client_id))
+        #
+        # if certificate_id:
+        #     builder = builder.include_certificate(
+        #         CertificateQueryContext(id=certificate_id))
+        #
+        # if source_id:
+        #     builder = builder.include_sources(SourceQueryContext(id=source_id))
+        #
+        # stmt = builder.build()
+        #
+        # THIS IS VERY OLD
         # stmt = (
         #     OrganizationQueryBuilder()
         #     .with_id(id)
@@ -251,33 +197,42 @@ class OrganizationRepository(RepositoryBase):
 
     def find_many(
         self,
-        cert_ctx: CertificateQueryContext,
-        source_ctx: SourceQueryContext,
-        external_id: UraNumber | None = None,
-        name: str | None = None,
-        scopes: list[str] | None = None,
+        ctx: OrganizationQueryContext,
         include_deleted: bool = False,
     ) -> Sequence[OrganizationEntity]:
-        children_conditions = [*[v for v in vars(cert_ctx).values()], *[v for v in vars(source_ctx).values()]]
-
-        load_strategy = (
-            LoadStrategy.OUTERJOIN_LOAD
-            if any(v is not None for v in children_conditions)
-            else LoadStrategy.SELECTIN_LOAD
-        )
-
+        load_strategy = self._determine_strategy(ctx)
         stmt = (
             OrganizationQueryBuilder(load_strategy=load_strategy, include_deleted=include_deleted)
-            .with_external_id(external_id)
-            .with_name(name)
-            .include_scopes(scopes)
-            .include_certificate(cert_ctx)
-            .include_sources(source_ctx)
-            .include_clients(OrganizationClientQueryContext.default())
+            .apply_context(ctx)
             .build()
         )
 
         return self.db_session.execute(stmt).scalars().unique().all()
+
+    def _determine_strategy(self, ctx: OrganizationQueryContext) -> LoadStrategy:
+        src_ctx, crt_ctx, client_ctx = ctx.source_ctx, ctx.certificate_ctx, ctx.client_ctx
+        children_conditions = []
+        if src_ctx:
+            children_conditions.extend([v for v in src_ctx.to_dict().values()])
+
+        if crt_ctx:
+            children_conditions.extend([v for v in crt_ctx.to_dict().values()])
+
+        if client_ctx:
+            children_conditions.extend([client_ctx.name, client_ctx.description])
+            c_src_ctx, c_crt_ctx = client_ctx.source_ctx, client_ctx.cert_ctx
+
+            if c_src_ctx:
+                children_conditions.extend([v for v in c_src_ctx.to_dict().values()])
+
+            if c_crt_ctx:
+                children_conditions.extend([v for v in c_crt_ctx.to_dict().values()])
+
+        return (
+            LoadStrategy.OUTERJOIN_LOAD
+            if any(v is not None for v in children_conditions)
+            else LoadStrategy.SELECTIN_LOAD
+        )
 
     def update(self, id: UUID, **kwargs: object) -> OrganizationEntity | None:
         try:
