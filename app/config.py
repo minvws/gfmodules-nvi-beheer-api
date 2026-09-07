@@ -4,7 +4,7 @@ import os
 from enum import Enum
 from typing import Any
 
-from gfmodules.logging import ConfigLogging
+from gfmodules.logging import ConfigLogging as BaseConfigLogging
 from pydantic import BaseModel, Field, SecretStr, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,16 @@ class ConfigApp(BaseModel):
             raise ValueError("only space separated str are allowed. Check config file..")
 
         return set(value.split())
+
+
+class ConfigLogging(BaseConfigLogging):
+    @field_validator("console_streams", mode="before")
+    @classmethod
+    def validate_console_streams(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+
+        return [stream.strip() for stream in value.split(",") if stream.strip()]
 
 
 class ConfigDatabase(BaseModel):

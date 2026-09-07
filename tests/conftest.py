@@ -39,7 +39,7 @@ FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0)
 @pytest.fixture(autouse=True)
 def logging_catalogue() -> Generator[None, Any, None]:
     gflog.configure(
-        config=ConfigLogging(debug_logs_in_console=True, access_logs=True),
+        config=ConfigLogging(console_streams=["debug"], access_logs=True),
         loglevel="DEBUG",
         catalogue=Log,
         extra_context_fields=(ACT_CN,),
