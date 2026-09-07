@@ -4,7 +4,7 @@ import os
 from enum import Enum
 from typing import Any
 
-from gfmodules.logging import ConfigLogging as BaseConfigLogging
+from gfmodules.logging import ConfigLogging as GFConfigLogging
 from pydantic import BaseModel, Field, SecretStr, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
@@ -36,14 +36,13 @@ class ConfigApp(BaseModel):
         return set(value.split())
 
 
-class ConfigLogging(BaseConfigLogging):
+class ConfigLogging(GFConfigLogging):
     @field_validator("console_streams", mode="before")
     @classmethod
-    def validate_console_streams(cls, value: Any) -> Any:
-        if not isinstance(value, str):
-            return value
-
-        return [stream.strip() for stream in value.split(",") if stream.strip()]
+    def _split_console_streams(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
 
 class ConfigDatabase(BaseModel):
@@ -55,6 +54,13 @@ class ConfigDatabase(BaseModel):
     max_overflow: int = Field(default=10, ge=0, lt=100)
     pool_pre_ping: bool = Field(default=False)
     pool_recycle: int = Field(default=3600, ge=0)
+
+    @field_validator("retry_backoff", mode="before")
+    @classmethod
+    def _split_retry_backoff(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return [float(item.strip()) for item in value.split(",") if item.strip()]
+        return value
 
 
 class ConfigUvicorn(BaseModel):
@@ -139,15 +145,6 @@ def get_config(path: str | None = None) -> Config:
     ini_data = read_ini_file(path)
 
     try:
-        # Convert database.retry_backoff to a list of floats
-        if (
-            "database" in ini_data
-            and "retry_backoff" in ini_data["database"]
-            and isinstance(ini_data["database"]["retry_backoff"], str)
-        ):
-            # convert the string to a list of floats
-            ini_data["database"]["retry_backoff"] = [float(i) for i in ini_data["database"]["retry_backoff"].split(",")]
-
         _CONFIG = Config.model_validate(ini_data)
     except ValidationError as e:
         logger.error(f"Configuration validation error: {e}")
