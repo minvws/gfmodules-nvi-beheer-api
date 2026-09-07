@@ -4,10 +4,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models.organization import OrganizationEntity
-from app.db.repository.query_builder.data import ClientQueryContext, OrganizationQueryContext
-from app.db.repository.query_builder.organization_query_builder import (
-    CertificateQueryContext,
-    SourceQueryContext,
+from app.db.repository.query_builder.context.organization_context import (
+    OrganizationCertificateQueryContext,
+    OrganizationClientQueryContext,
+    OrganizationQueryContext,
+    OrganizationSourceQueryContext,
 )
 from app.models.base import (
     INCLUDE_DELETED_DESCRIPTION,
@@ -118,18 +119,18 @@ class OrganizationQueryParams(BaseModel):
     def sanitized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
-    def into_cert_query_context(self) -> CertificateQueryContext:
-        return CertificateQueryContext(
+    def into_cert_query_context(self) -> OrganizationCertificateQueryContext:
+        return OrganizationCertificateQueryContext(
             id=self.cert_id, organization_identifier=self.cert_identifier, domain=self.cert_domain
         )
 
-    def into_source_query_context(self) -> SourceQueryContext:
-        return SourceQueryContext(source_id=self.source_id, name=self.source_name)
+    def into_source_query_context(self) -> OrganizationSourceQueryContext:
+        return OrganizationSourceQueryContext(source_id=self.source_id, name=self.source_name)
 
     def into_organization_query_context(self) -> OrganizationQueryContext:
         src_ctx = self.into_source_query_context()
         crt_ctx = self.into_cert_query_context()
-        client_ctx = ClientQueryContext.default()
+        client_ctx = OrganizationClientQueryContext.default()
 
         return OrganizationQueryContext(
             external_id=self.external_id,

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.db.models.certificate import CertificateEntity
 from app.db.repository.certificate import CertificateIndexLookup
+from app.db.repository.query_builder.context.certificate_context import CertificateQueryContext
 from app.models.base import CommonModel, CommonQueryParams
 from app.models.oin import Oin
 
@@ -15,7 +16,8 @@ class CertificateOptionalFields(BaseModel):
 
 
 class CertificateQueryParams(CommonQueryParams, CertificateOptionalFields):
-    pass
+    def into_certificate_query_context(self) -> CertificateQueryContext:
+        return CertificateQueryContext(organization_identifier=self.organization_identifier, domain=self.domain)
 
 
 class CertificateField(BaseModel):

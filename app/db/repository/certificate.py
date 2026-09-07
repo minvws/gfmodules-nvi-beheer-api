@@ -1,12 +1,15 @@
 from typing import NamedTuple, Sequence
 from uuid import UUID
 
-from sqlalchemy import and_, select, tuple_
+from sqlalchemy import select, tuple_
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.decorator import repository
 from app.db.models.certificate import CertificateEntity
 from app.db.repository.base import RepositoryBase
+from app.db.repository.query_builder.certificate_query_builder import CertificateQueryBuilder
+from app.db.repository.query_builder.context.certificate_context import CertificateQueryContext
+from app.db.repository.query_builder.context.data import LoadStrategy
 
 
 class CertificateIndexLookup(NamedTuple):
@@ -35,34 +38,43 @@ class CertificateRepository(RepositoryBase):
 
         return bool(self.db_session.execute(stmt).scalar())
 
-    def find_one(self, id: UUID, organizatoin_id: UUID) -> CertificateEntity | None:
-        stmt = select(CertificateEntity).where(
-            and_(
-                CertificateEntity.id == id,
-                CertificateEntity.organization_id == organizatoin_id,
-                CertificateEntity.deleted_at.is_(None),
-            )
-        )
-
+    def find_one(self, id: UUID, organization_id: UUID) -> CertificateEntity | None:
+        stmt = CertificateQueryBuilder().with_id(id).with_organization_id(organization_id).build()
         return self.db_session.execute(stmt).scalar()
 
     def find_many(
         self,
-        organization_id: UUID,
-        organization_identifier: str | None = None,
-        domain: str | None = None,
+        ctx: CertificateQueryContext,
+        organization_id: UUID | None = None,
         include_deleted: bool = False,
     ) -> Sequence[CertificateEntity]:
-        conditions = [(CertificateEntity.organization_id == organization_id)]
-        if organization_identifier:
-            conditions.append(CertificateEntity.organization_identifier == organization_identifier)
-
-        if domain:
-            conditions.append(CertificateEntity.domain == domain)
-
-        if include_deleted:
-            conditions.append(CertificateEntity.deleted_at.is_not(None))
-
-        stmt = select(CertificateEntity).where(and_(*conditions))
+        load_strategy = self._determine_strategy(ctx)
+        stmt = (
+            CertificateQueryBuilder(load_strategy=load_strategy, include_deleted=include_deleted)
+            .with_organization_id(organization_id)
+            .apply_context(ctx)
+            .build()
+        )
 
         return self.db_session.execute(stmt).scalars().all()
+
+    def find(self, id: UUID, ctx: CertificateQueryContext, include_deleted: bool = False) -> CertificateEntity | None:
+        stmt = CertificateQueryBuilder(include_deleted=include_deleted).with_id(id).apply_context(ctx).build()
+
+        return self.db_session.execute(stmt).scalar_one_or_none()
+
+    def _determine_strategy(self, ctx: CertificateQueryContext) -> LoadStrategy:
+        org_ctx, client_ctx = ctx.organization_ctx, ctx.client_ctx
+        children_conditions = []
+
+        if org_ctx:
+            children_conditions.extend([v for v in org_ctx.to_dict()])
+
+        if client_ctx:
+            children_conditions.extend([v for v in client_ctx.to_dict()])
+
+        return (
+            LoadStrategy.OUTERJOIN_LOAD
+            if any(v is not None for v in children_conditions)
+            else LoadStrategy.SELECTIN_LOAD
+        )

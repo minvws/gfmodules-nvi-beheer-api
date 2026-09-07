@@ -12,12 +12,12 @@ from app.db.models.client_scope import clients_scopes_association
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase
 from app.db.repository.query_builder.client_query_builder import ClientQueryBuilder
-from app.db.repository.query_builder.data import (
-    CertificateQueryContext,
+from app.db.repository.query_builder.context.client_context import (
+    ClientCertificateQueryContext,
     ClientQueryContext,
-    LoadStrategy,
-    SourceQueryContext,
+    ClientSourceQueryContext,
 )
+from app.db.repository.query_builder.context.data import LoadStrategy
 from app.models.oin import Oin
 from app.models.ura import UraNumber
 
@@ -39,8 +39,8 @@ class ClientRepository(RepositoryBase):
             ClientQueryBuilder()
             .with_id(id)
             .include_scopes()
-            .include_certificate(CertificateQueryContext.default())
-            .include_sources(SourceQueryContext.default())
+            .include_certificate(ClientCertificateQueryContext.default())
+            .include_sources(ClientSourceQueryContext.default())
             .build()
         )
         return self.db_session.execute(stmt).scalar_one_or_none()
@@ -52,7 +52,7 @@ class ClientRepository(RepositoryBase):
 
     def _determine_strategy(self, ctx: ClientQueryContext) -> LoadStrategy:
         children_conditions = []
-        src_ctx, crt_ctx = ctx.source_ctx, ctx.cert_ctx
+        src_ctx, crt_ctx = ctx.source_ctx, ctx.certificate_ctx
         if src_ctx:
             children_conditions.extend([v for v in src_ctx.to_dict().values()])
 

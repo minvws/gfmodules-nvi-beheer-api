@@ -8,13 +8,13 @@ from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.scope import ScopeEntity
 from app.db.models.source import SourceEntity
-from app.db.repository.query_builder.data import (
-    CertificateQueryContext,
+from app.db.repository.query_builder.context.client_context import (
+    ClientCertificateQueryContext,
     ClientQueryContext,
     ClientRelations,
-    LoadStrategy,
-    SourceQueryContext,
+    ClientSourceQueryContext,
 )
+from app.db.repository.query_builder.context.data import LoadStrategy
 
 
 class ClientQueryBuilder:
@@ -36,11 +36,11 @@ class ClientQueryBuilder:
         for rel in ctx.include:
             match rel:
                 case ClientRelations.CERTIFICATES:
-                    cert_ctx = ctx.cert_ctx if ctx.cert_ctx else CertificateQueryContext.default()
+                    cert_ctx = ctx.certificate_ctx if ctx.certificate_ctx else ClientCertificateQueryContext.default()
                     self.include_certificate(cert_ctx)
 
                 case ClientRelations.SOURCES:
-                    src_ctx = ctx.source_ctx if ctx.source_ctx else SourceQueryContext().default()
+                    src_ctx = ctx.source_ctx if ctx.source_ctx else ClientSourceQueryContext().default()
                     self.include_sources(src_ctx)
 
                 case ClientRelations.SCOPES:
@@ -101,7 +101,7 @@ class ClientQueryBuilder:
 
         return self
 
-    def include_certificate(self, ctx: CertificateQueryContext) -> Self:
+    def include_certificate(self, ctx: ClientCertificateQueryContext) -> Self:
         match self._load_strategy:
             case LoadStrategy.OUTERJOIN_LOAD:
                 self._joinload_cert(ctx)
@@ -111,7 +111,7 @@ class ClientQueryBuilder:
 
         return self
 
-    def _selectinload_cert(self, ctx: CertificateQueryContext) -> Self:
+    def _selectinload_cert(self, ctx: ClientCertificateQueryContext) -> Self:
         attr = ClientEntity.certificates
         conditions = []
 
@@ -135,7 +135,7 @@ class ClientQueryBuilder:
 
     def _joinload_cert(
         self,
-        ctx: CertificateQueryContext,
+        ctx: ClientCertificateQueryContext,
     ) -> Self:
         attr = ClientEntity.certificates
         conditions = []
@@ -158,7 +158,7 @@ class ClientQueryBuilder:
 
         return self
 
-    def include_sources(self, ctx: SourceQueryContext) -> Self:
+    def include_sources(self, ctx: ClientSourceQueryContext) -> Self:
         match self._load_strategy:
             case LoadStrategy.OUTERJOIN_LOAD:
                 self._joinload_sources(ctx)
@@ -166,7 +166,7 @@ class ClientQueryBuilder:
                 self._selectinload_sources(ctx)
         return self
 
-    def _selectinload_sources(self, ctx: SourceQueryContext) -> Self:
+    def _selectinload_sources(self, ctx: ClientSourceQueryContext) -> Self:
         attr = ClientEntity.sources
         conditions = []
         if ctx.id:
@@ -184,7 +184,7 @@ class ClientQueryBuilder:
         self._stmt = self._stmt.options(selectinload(attr))
         return self
 
-    def _joinload_sources(self, ctx: SourceQueryContext) -> Self:
+    def _joinload_sources(self, ctx: ClientSourceQueryContext) -> Self:
         attr = ClientEntity.sources
         conditions = []
 

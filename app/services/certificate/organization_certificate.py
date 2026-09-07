@@ -6,9 +6,16 @@ from app.db.models.certificate import CertificateEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.certificate import CertificateRepository
 from app.db.repository.organization import OrganizationRepository
-from app.db.repository.query_builder.data import CertificateQueryContext, OrganizationQueryContext
+from app.db.repository.query_builder.context.certificate_context import (
+    CertificateClientQueryContext,
+    CertificateQueryContext,
+)
+from app.db.repository.query_builder.context.organization_context import (
+    OrganizationCertificateQueryContext,
+    OrganizationQueryContext,
+)
 from app.models.certificates import Certificate, CertificateCreate, CertificateQueryParams, CertificateUpdate
-from app.services.exceptions import ConflictError, RecordNotFoundError
+from app.services.exceptions import ConflictError, ForbidenOperationError, RecordNotFoundError
 
 
 class OrganizationCertificateService:
@@ -17,31 +24,33 @@ class OrganizationCertificateService:
 
     def get_one(self, id: UUID, organization_id: UUID) -> Certificate:
         with self.db.get_db_session() as session:
-            repo = session.get_repository(CertificateRepository)
-            result = repo.find_one(id, organization_id)
-            if result is None:
+            org_repo = session.get_repository(OrganizationRepository)
+            if not org_repo.exists(organization_id):
+                raise RecordNotFoundError(organization_id)
+
+            cert_repo = session.get_repository(CertificateRepository)
+            cert = cert_repo.find_one(id, organization_id)
+            if cert is None:
                 raise RecordNotFoundError(id)
 
-            return Certificate.from_entity(result)
+            return Certificate.from_entity(cert)
 
     def get_many(self, organization_id: UUID, params: CertificateQueryParams) -> list[Certificate]:
         with self.db.get_db_session() as session:
-            repo = session.get_repository(OrganizationRepository)
-            ctx = OrganizationQueryContext(
-                certificate_ctx=CertificateQueryContext(
-                    organization_identifier=params.organization_identifier, domain=params.domain
-                )
-            )
-            org = repo.find(organization_id, ctx)
-            if org is None:
+            org_repo = session.get_repository(OrganizationRepository)
+            if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
 
-            return [Certificate.from_entity(e) for e in org.certificates]
+            ctx = params.into_certificate_query_context()
+            cert_repo = session.get_repository(CertificateRepository)
+            certs = cert_repo.find_many(organization_id, ctx, params.include_deleted)
+
+            return [Certificate.from_entity(c) for c in certs]
 
     def create_one(self, organization_id: UUID, dto: CertificateCreate) -> Certificate:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
-            ctx = OrganizationQueryContext(certificate_ctx=CertificateQueryContext.default())
+            ctx = OrganizationQueryContext(certificate_ctx=OrganizationCertificateQueryContext.default())
 
             org = org_repo.find(organization_id, ctx)
             if org is None:
@@ -68,7 +77,7 @@ class OrganizationCertificateService:
 
     def update_one(self, id: UUID, organization_id: UUID, dto: CertificateUpdate) -> Certificate:
         with self.db.get_db_session() as session:
-            ctx = OrganizationQueryContext(certificate_ctx=CertificateQueryContext(id=id))
+            ctx = OrganizationQueryContext(certificate_ctx=OrganizationCertificateQueryContext(id=id))
             repo = session.get_repository(OrganizationRepository)
             org = repo.find(organization_id, ctx)
 
@@ -91,6 +100,37 @@ class OrganizationCertificateService:
 
             session.commit()
             return Certificate.from_entity(target)
+
+    def delete_one(self, organization_id: UUID, id: UUID) -> Certificate:
+        with self.db.get_db_session() as session:
+            org_repo = session.get_repository(OrganizationRepository)
+            if not org_repo.exists(organization_id):
+                raise RecordNotFoundError(organization_id)
+
+            ctx = CertificateQueryContext(client_ctx=CertificateClientQueryContext.default())
+            cert_repo = session.get_repository(CertificateRepository)
+            target = cert_repo.find(id, ctx)
+            if target is None:
+                raise RecordNotFoundError(id)
+
+            valid_for_delete = self.validated_for_delete(target)
+            if valid_for_delete is None:
+                raise ForbidenOperationError()
+
+            target.deleted_at = datetime.now()
+            session.commit()
+
+            return Certificate.from_entity(target)
+
+    @staticmethod
+    def validated_for_delete(cert: CertificateEntity) -> bool:
+        valid = True
+        if cert.clients:
+            for c in cert.clients:
+                if c.deleted_at is not None:
+                    valid = False
+                    break
+        return valid
 
     @staticmethod
     def compute_certs_to_update_from_org(
