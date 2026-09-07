@@ -6,11 +6,11 @@ from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
-from app.db.repository.query_builder.data import (
-    CertificateQueryContext,
-    ClientQueryContext,
+from app.db.repository.query_builder.context.organization_context import (
+    OrganizationCertificateQueryContext,
+    OrganizationClientQueryContext,
     OrganizationQueryContext,
-    SourceQueryContext,
+    OrganizationSourceQueryContext,
 )
 from app.logging.events import Log
 from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
@@ -84,17 +84,6 @@ class ClientService:
 
             return Client.from_entity(client)
 
-        #     repo = session.get_repository(OrganizationRepository)
-        #     org = repo.find(id=organization_id, client_id=id)
-        #     if org is None:
-        #         raise RecordNotFoundError(organization_id)
-        #
-        #     if not org.clients:
-        #         raise RecordNotFoundError(id)
-        #
-        #     client = org.clients[0]
-        #     return Client.from_entity(client)
-
     def get_many(
         self,
         organization_id: UUID,
@@ -119,11 +108,13 @@ class ClientService:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(
-                client_ctx=ClientQueryContext(
-                    id=id, source_ctx=SourceQueryContext.default(), cert_ctx=CertificateQueryContext.default()
+                client_ctx=OrganizationClientQueryContext(
+                    id=id,
+                    source_ctx=OrganizationSourceQueryContext.default(),
+                    certificate_ctx=OrganizationCertificateQueryContext.default(),
                 ),
-                source_ctx=SourceQueryContext.default(),
-                certificate_ctx=CertificateQueryContext.default(),
+                source_ctx=OrganizationSourceQueryContext.default(),
+                certificate_ctx=OrganizationCertificateQueryContext.default(),
             )
             org = org_repo.find(organization_id, ctx)
             if org is None:

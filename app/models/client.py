@@ -4,10 +4,10 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models.client import ClientEntity
-from app.db.repository.query_builder.organization_query_builder import (
-    CertificateQueryContext,
+from app.db.repository.query_builder.context.client_context import (
+    ClientCertificateQueryContext,
     ClientQueryContext,
-    SourceQueryContext,
+    ClientSourceQueryContext,
 )
 from app.models.base import (
     INCLUDE_DELETED_DESCRIPTION,
@@ -85,8 +85,8 @@ class ClientQueryParams(ClientOptionalFields):
         return ClientQueryContext(
             name=self.name,
             scopes=self.sanatized_scope,
-            source_ctx=SourceQueryContext(source_id=self.source_id, name=self.source_name),
-            cert_ctx=CertificateQueryContext(
+            source_ctx=ClientSourceQueryContext(source_id=self.source_id, name=self.source_name),
+            certificate_ctx=ClientCertificateQueryContext(
                 organization_identifier=self.cert_organization_identifier, domain=self.cert_domain
             ),
         )
@@ -108,7 +108,6 @@ class Client(CommonModel, ClientFields):
             description=entity.description,
             organization_id=entity.organization_id,
             scopes=scopes,
-            # scopes=" ".join(entity.client_scopes) if entity.client_scopes else None,
             certificates=[Certificate.from_entity(c) for c in entity.certificates] if entity.certificates else None,
             sources=[Source.from_entity(s) for s in entity.sources] if entity.sources else None,
             created_at=entity.created_at,

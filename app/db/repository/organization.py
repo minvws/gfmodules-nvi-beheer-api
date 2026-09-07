@@ -7,13 +7,15 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db.decorator import repository
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase
-from app.db.repository.query_builder.data import OrganizationQueryContext
+from app.db.repository.query_builder.context.data import LoadStrategy
+from app.db.repository.query_builder.context.organization_context import (
+    OrganizationCertificateQueryContext,
+    OrganizationClientQueryContext,
+    OrganizationQueryContext,
+    OrganizationSourceQueryContext,
+)
 from app.db.repository.query_builder.organization_query_builder import (
-    CertificateQueryContext,
-    ClientQueryContext,
-    LoadStrategy,
     OrganizationQueryBuilder,
-    SourceQueryContext,
 )
 
 
@@ -40,10 +42,10 @@ class OrganizationRepository(RepositoryBase):
         stmt = (
             OrganizationQueryBuilder(include_deleted=include_deleted)
             .with_id(id)
-            .include_clients(ClientQueryContext.default())
+            .include_clients(OrganizationClientQueryContext.default())
             .include_scopes()
-            .include_sources(SourceQueryContext.default())
-            .include_certificate(CertificateQueryContext.default())
+            .include_sources(OrganizationSourceQueryContext.default())
+            .include_certificate(OrganizationCertificateQueryContext.default())
             .build()
         )
 
@@ -220,7 +222,8 @@ class OrganizationRepository(RepositoryBase):
 
         if client_ctx:
             children_conditions.extend([client_ctx.name, client_ctx.description])
-            c_src_ctx, c_crt_ctx = client_ctx.source_ctx, client_ctx.cert_ctx
+
+            c_src_ctx, c_crt_ctx = client_ctx.source_ctx, client_ctx.certificate_ctx
 
             if c_src_ctx:
                 children_conditions.extend([v for v in c_src_ctx.to_dict().values()])

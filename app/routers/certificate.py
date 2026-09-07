@@ -51,7 +51,12 @@ def update(
 
 
 @router.delete("/{organization_id}/certificate/{id}")
-def delete(): ...
+def delete(
+    organization_id: UUID,
+    id: UUID,
+    service: Annotated[OrganizationCertificateService, Depends(get_org_certificate_service)],
+):
+    return service.delete_one(organization_id, id)
 
 
 @router.post("/{organization_id}/clients/{client_id}/certificate/{id}", response_model=Certificate)
