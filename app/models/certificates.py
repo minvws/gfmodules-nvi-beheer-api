@@ -4,16 +4,8 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.db.models.certificate import CertificateEntity
-from app.db.repository.certificate import CertificateIndexLookup
-from app.db.repository.query_builder.context.certificate_context import (
-    CertificateOrganizationQueryContext,
-    CertificateQueryContext,
-)
 from app.models.base import CommonModel, CommonQueryParams
 from app.models.oin import Oin
-from app.models.ura import UraNumber
-
-# TODO:  split certificates between client and organization to eliminate include deleted and add search params
 
 
 class CertificateOptionalFields(BaseModel):
@@ -22,23 +14,11 @@ class CertificateOptionalFields(BaseModel):
 
 
 class CertificateQueryParams(CommonQueryParams, CertificateOptionalFields):
-    def into_certificate_query_context(self) -> CertificateQueryContext:
-        return CertificateQueryContext(organization_identifier=self.organization_identifier, domain=self.domain)
+    pass
 
 
-class CertificateOrgSearchQueryParams(CommonQueryParams, CertificateOptionalFields):
-    organization_id: UUID | None = None
-    organization_external_id: UraNumber | None = None
-    name: str | None = None
-
-    def into_certificate_query_context(self) -> CertificateQueryContext:
-        return CertificateQueryContext(
-            organization_identifier=self.organization_identifier,
-            domain=self.domain,
-            organization_ctx=CertificateOrganizationQueryContext(
-                id=self.organization_id, external_id=self.organization_external_id, name=self.name
-            ),
-        )
+class ClientCertificateQueryParams(CertificateOptionalFields):
+    pass
 
 
 class CertificateField(BaseModel):
@@ -50,14 +30,15 @@ class CertificateField(BaseModel):
 
 
 class CertificateCreate(CertificateField):
-    def into_index_lookup(self) -> CertificateIndexLookup:
-        return CertificateIndexLookup(organization_identifier=str(self.organization_identifier), domain=self.domain)
+    pass
 
 
 class CertificateUpdate(CertificateField):
+    id: UUID
+
     @classmethod
     def from_entity(cls, entity: CertificateEntity) -> Self:
-        return cls(organization_identifier=entity.organization_identifier, domain=entity.domain)
+        return cls(id=entity.id, organization_identifier=entity.organization_identifier, domain=entity.domain)
 
 
 class Certificate(CommonModel, CertificateField):

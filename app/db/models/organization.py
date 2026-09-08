@@ -32,7 +32,7 @@ class OrganizationEntity(CommonColumns):
             postgresql_where=text("deleted_at IS NULL"),
         ),
     )
-    external_id: Mapped[UraNumber] = mapped_column("external_id", UraType)  # TODO check if this is unique
+    external_id: Mapped[UraNumber] = mapped_column("external_id", UraType)
     name: Mapped[str] = mapped_column("name", String)
 
     clients: Mapped[list["ClientEntity"]] = relationship(

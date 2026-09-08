@@ -12,13 +12,17 @@ from app.container import get_client_service, get_organization_service
 from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
+from app.db.repository.certificate import CertificateRepository
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.source import SourceRepository
 from app.models.oin import Oin
 from app.models.ura import UraNumber
 from app.routers.client import router as client_router
 from app.routers.organization import router as organization_router
 from app.routers.resolve import router as resolve_router
+from app.services.certificate.client_certificate import ClientCertificateService
+from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
 
@@ -51,13 +55,35 @@ def client_repository(database: Database) -> ClientRepository:
 
 
 @pytest.fixture()
+def certificate_repository(database: Database) -> CertificateRepository:
+    return CertificateRepository(db_session=database.get_db_session())
+
+
+@pytest.fixture()
+def source_repository(database: Database) -> SourceRepository:
+    return SourceRepository(db_session=database.get_db_session())
+
+
+@pytest.fixture()
 def organization_service(database: Database) -> OrganizationService:
     return OrganizationService(database)
 
 
 @pytest.fixture()
-def client_service(database: Database, organization_service: OrganizationService) -> ClientService:
-    return ClientService(database, organization_service)
+def client_service(
+    database: Database,
+) -> ClientService:
+    return ClientService(database)
+
+
+@pytest.fixture()
+def organization_certificate_service(database: Database) -> OrganizationCertificateService:
+    return OrganizationCertificateService(database)
+
+
+@pytest.fixture()
+def client_certificate_service(database: Database) -> ClientCertificateService:
+    return ClientCertificateService(database)
 
 
 @pytest.fixture()

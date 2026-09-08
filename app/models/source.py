@@ -24,9 +24,16 @@ class SourceCreate(SourceFields):
 
 
 class SourceUpdate(SourceFields):
+    id: UUID
+
     @classmethod
     def from_entity(cls, entity: SourceEntity) -> Self:
-        return cls(source_id=entity.source_id, name=entity.name)
+        return cls(id=entity.id, source_id=entity.source_id, name=entity.name)
+
+
+class SourceQueryParams(BaseModel):
+    source_id: str | None = None
+    name: str | None = None
 
 
 class Source(SourceFields, CommonModel):

@@ -1,8 +1,8 @@
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
 from sqlalchemy import Select, select
-from sqlalchemy.orm import contains_eager, selectinload
+from sqlalchemy.orm import QueryableAttribute, contains_eager, selectinload
 
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
@@ -11,7 +11,6 @@ from app.db.repository.query_builder.context.certificate_context import (
     CertificateClientQueryContext,
     CertificateOrganizationQueryContext,
     CertificateQueryContext,
-    CertificateRelations,
 )
 from app.db.repository.query_builder.data import LoadStrategy
 from app.models.oin import Oin
@@ -27,23 +26,20 @@ class CertificateQueryBuilder:
         if ctx.id:
             self.with_id(ctx.id)
 
+        if ctx.organization_id:
+            self.with_organization_id(ctx.organization_id)
+
         if ctx.organization_identifier:
             self.with_organization_identifier(ctx.organization_identifier)
 
         if ctx.domain:
             self.with_domain(ctx.domain)
 
-        for rel in ctx.include:
-            match rel:
-                case CertificateRelations.CLIENTS:
-                    client_ctx = ctx.client_ctx if ctx.client_ctx else CertificateClientQueryContext.default()
-                    self.include_clients(client_ctx)
+        if ctx.client_ctx:
+            self.include_clients(ctx.client_ctx)
 
-                case CertificateRelations.ORGANIZATION:
-                    org_ctx = (
-                        ctx.organization_ctx if ctx.organization_ctx else CertificateOrganizationQueryContext.default()
-                    )
-                    self.include_organization(org_ctx)
+        if ctx.organization_ctx:
+            self.include_organization(ctx.organization_ctx)
 
         return self
 
@@ -85,7 +81,7 @@ class CertificateQueryBuilder:
         return self
 
     def _selectinload_organization(self, ctx: CertificateOrganizationQueryContext) -> Self:
-        attr = CertificateEntity.organization
+        attr: QueryableAttribute[Any] = CertificateEntity.organization
         conditions = []
         if ctx.id:
             conditions.append(OrganizationEntity.id == ctx.id)
@@ -103,7 +99,10 @@ class CertificateQueryBuilder:
 
     def _joinload_organization(self, ctx: CertificateOrganizationQueryContext) -> Self:
         attr = CertificateEntity.organization
-        self._stmt = self._stmt.outerjoin(attr).options(contains_eager(attr))
+        if self._include_deleted is False:
+            attr = attr.and_(OrganizationEntity.deleted_at.is_(None))
+
+        self._stmt = self._stmt.outerjoin(attr).options(contains_eager(CertificateEntity.organization))
 
         conditions = []
         if ctx.id:
@@ -114,9 +113,6 @@ class CertificateQueryBuilder:
 
         if ctx.external_id:
             conditions.append(OrganizationEntity.external_id == ctx.external_id)
-
-        if self._include_deleted is False:
-            conditions.append(OrganizationEntity.deleted_at.is_(None))
 
         if conditions:
             self._stmt = self._stmt.where(*conditions)
@@ -134,7 +130,7 @@ class CertificateQueryBuilder:
         return self
 
     def _selectinload_clients(self, ctx: CertificateClientQueryContext) -> Self:
-        attr = CertificateEntity.clients
+        attr: QueryableAttribute[Any] = CertificateEntity.clients
         conditions = []
 
         if ctx.id:
@@ -157,6 +153,9 @@ class CertificateQueryBuilder:
 
     def _joinload_clients(self, ctx: CertificateClientQueryContext) -> Self:
         attr = CertificateEntity.clients
+        if self._include_deleted is False:
+            attr = attr.and_(ClientEntity.deleted_at.is_(None))
+
         conditions = []
         if ctx.id:
             conditions.append(ClientEntity.id == ctx.id)
@@ -167,10 +166,7 @@ class CertificateQueryBuilder:
         if ctx.description:
             conditions.append(ClientEntity.description == ctx.description)
 
-        if self._include_deleted is False:
-            conditions.append(ClientEntity.deleted_at.is_(None))
-
-        self._stmt = self._stmt.outerjoin(attr).options(contains_eager(attr))
+        self._stmt = self._stmt.outerjoin(attr).options(contains_eager(CertificateEntity.clients))
         if conditions:
             self._stmt = self._stmt.where(*conditions)
 

@@ -6,6 +6,11 @@ from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.query_builder.context.client_context import (
+    ClientCertificateQueryContext,
+    ClientQueryContext,
+    ClientSourceQueryContext,
+)
 from app.db.repository.query_builder.context.organization_context import (
     OrganizationCertificateQueryContext,
     OrganizationClientQueryContext,
@@ -19,9 +24,8 @@ from app.models.ura import UraNumber
 from app.services import scopes
 from app.services.certificate import ClientCertificateService
 from app.services.exceptions import OrganizationHasActiveClientsError, RecordNotFoundError
-from app.services.organization import OrganizationService
 from app.services.scopes import ScopeService
-from app.services.source import SourceService
+from app.services.source.client_source import ClientSourceService
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +34,8 @@ class ClientService:
     def __init__(
         self,
         db: Database,
-        org_service: OrganizationService,
     ) -> None:
         self.db = db
-        self.org_service = org_service
 
     def create_one(self, organization_id: UUID, dto: ClientCreate) -> Client:
         with self.db.get_db_session() as session:
@@ -53,7 +55,7 @@ class ClientService:
                 target.certificates = client_certs
 
             if dto.sources:
-                client_sources = SourceService.get_client_sources_from_org(org, dto.sources)
+                client_sources = ClientSourceService.get_client_sources_from_org(org, dto.sources)
                 target.sources = client_sources
 
             client_repo = session.get_repository(ClientRepository)
@@ -78,7 +80,7 @@ class ClientService:
                 raise RecordNotFoundError(organization_id)
 
             repo = session.get_repository(ClientRepository)
-            client = repo.find_one(id)
+            client = repo.find_one(id, organization_id)
             if client is None:
                 raise RecordNotFoundError(id)
 
@@ -94,10 +96,34 @@ class ClientService:
             if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
 
+            ctx = ClientQueryContext(
+                organization_id=organization_id,
+                name=params.name,
+                scopes=params.sanatized_scope,
+                source_ctx=ClientSourceQueryContext(source_id=params.source_id, name=params.source_name),
+                certificate_ctx=ClientCertificateQueryContext(
+                    organization_identifier=params.cert_organization_identifier, domain=params.cert_domain
+                ),
+            )
             clients_repo = session.get_repository(ClientRepository)
-            clients = clients_repo.find_many(organization_id, params.into_client_query_context())
+            clients = clients_repo.find_many(ctx, params.include_deleted)
 
             return [Client.from_entity(c) for c in clients]
+
+    def search(self, params: ClientQueryParams) -> list[Client]:
+        with self.db.get_db_session() as session:
+            repo = session.get_repository(ClientRepository)
+            ctx = ClientQueryContext(
+                name=params.name,
+                scopes=params.sanatized_scope,
+                source_ctx=ClientSourceQueryContext(source_id=params.source_id, name=params.source_name),
+                certificate_ctx=ClientCertificateQueryContext(
+                    organization_identifier=params.cert_organization_identifier, domain=params.cert_domain
+                ),
+            )
+
+            results = repo.find_many(ctx, params.include_deleted)
+            return [Client.from_entity(r) for r in results]
 
     def update_one(
         self,
@@ -108,6 +134,7 @@ class ClientService:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(
+                id=organization_id,
                 client_ctx=OrganizationClientQueryContext(
                     id=id,
                     source_ctx=OrganizationSourceQueryContext.default(),
@@ -116,7 +143,7 @@ class ClientService:
                 source_ctx=OrganizationSourceQueryContext.default(),
                 certificate_ctx=OrganizationCertificateQueryContext.default(),
             )
-            org = org_repo.find(organization_id, ctx)
+            org = org_repo.find(ctx)
             if org is None:
                 raise RecordNotFoundError(organization_id)
 
@@ -137,7 +164,7 @@ class ClientService:
                 client.scopes = []
 
             if dto.sources:
-                updated_sources = SourceService.get_client_sources_from_org(org, dto.sources)
+                updated_sources = ClientSourceService.get_client_sources_from_org(org, dto.sources)
                 client.sources = updated_sources
             else:
                 client.sources = []
@@ -160,8 +187,7 @@ class ClientService:
                 raise RecordNotFoundError(organization_id)
 
             client_repo = session.get_repository(ClientRepository)
-            client = client_repo.find_one(id)
-            print(client)
+            client = client_repo.find_one(id, organization_id)
             if client is None:
                 raise RecordNotFoundError(id)
 

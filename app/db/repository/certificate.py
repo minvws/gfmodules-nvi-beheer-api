@@ -2,9 +2,6 @@ from collections.abc import Sequence
 from typing import NamedTuple
 from uuid import UUID
 
-from sqlalchemy import select, tuple_
-from sqlalchemy.exc import SQLAlchemyError
-
 from app.db.decorator import repository
 from app.db.models.certificate import CertificateEntity
 from app.db.repository.base import RepositoryBase
@@ -20,31 +17,13 @@ class CertificateIndexLookup(NamedTuple):
 
 @repository(CertificateEntity)
 class CertificateRepository(RepositoryBase):
-    def add_one(self, data: CertificateEntity) -> CertificateEntity:
-        try:
-            self.db_session.add(data)
-            self.db_session.commit()
-            self.db_session.session.refresh(data)
-            return data
-        except SQLAlchemyError:
-            self.db_session.rollback()
-            raise
-
-    def exists(self, data: CertificateIndexLookup | list[CertificateIndexLookup]) -> bool:
-        stmt = select(
-            select(CertificateEntity)
-            .where(tuple_(CertificateEntity.organization_identifier, CertificateEntity.domain).in_(data))
-            .exists()
-        )
-
-        return bool(self.db_session.execute(stmt).scalar())
-
     def find_one(self, id: UUID, organization_id: UUID) -> CertificateEntity | None:
         stmt = CertificateQueryBuilder().with_id(id).with_organization_id(organization_id).build()
         return self.db_session.execute(stmt).scalar()
 
     def find_many(self, ctx: CertificateQueryContext, include_deleted: bool = False) -> Sequence[CertificateEntity]:
         load_strategy = self._determine_strategy(ctx)
+
         stmt = (
             CertificateQueryBuilder(load_strategy=load_strategy, include_deleted=include_deleted)
             .apply_context(ctx)
@@ -53,24 +32,8 @@ class CertificateRepository(RepositoryBase):
 
         return self.db_session.execute(stmt).scalars().unique().all()
 
-    def find_many_per_organization(
-        self,
-        organization_id: UUID,
-        ctx: CertificateQueryContext,
-        include_deleted: bool = False,
-    ) -> Sequence[CertificateEntity]:
-        load_strategy = self._determine_strategy(ctx)
-        stmt = (
-            CertificateQueryBuilder(load_strategy=load_strategy, include_deleted=include_deleted)
-            .with_organization_id(organization_id)
-            .apply_context(ctx)
-            .build()
-        )
-
-        return self.db_session.execute(stmt).scalars().unique().all()
-
-    def find(self, id: UUID, ctx: CertificateQueryContext, include_deleted: bool = False) -> CertificateEntity | None:
-        stmt = CertificateQueryBuilder(include_deleted=include_deleted).with_id(id).apply_context(ctx).build()
+    def find(self, ctx: CertificateQueryContext, include_deleted: bool = False) -> CertificateEntity | None:
+        stmt = CertificateQueryBuilder(include_deleted=include_deleted).apply_context(ctx).build()
 
         return self.db_session.execute(stmt).scalar_one_or_none()
 
@@ -79,10 +42,10 @@ class CertificateRepository(RepositoryBase):
         children_conditions = []
 
         if org_ctx:
-            children_conditions.extend([v for v in org_ctx.to_dict()])
+            children_conditions.extend([v for v in org_ctx.to_dict().values()])
 
         if client_ctx:
-            children_conditions.extend([v for v in client_ctx.to_dict()])
+            children_conditions.extend([v for v in client_ctx.to_dict().values()])
 
         return (
             LoadStrategy.OUTERJOIN_LOAD
