@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from enum import Enum, auto
 from typing import Any, Self
 from uuid import UUID
 
@@ -8,11 +7,6 @@ from app.db.repository.query_builder.context.data import (
     OrganizationQueryContextBase,
     SourceQueryContextBase,
 )
-
-
-class SourceRelations(Enum):
-    ORGANIZATION = auto()
-    CLIENTS = auto()
 
 
 @dataclass()
@@ -39,16 +33,6 @@ class SourceClientQueryContext(ClientQueryContextBase):
 
 @dataclass()
 class SourceQueryContext(SourceQueryContextBase):
+    organization_id: UUID | None = None
     organization_ctx: SourceOrganizationQueryContext | None = None
     client_ctx: SourceClientQueryContext | None = None
-
-    @property
-    def include(self) -> set[SourceRelations]:
-        relantions = set()
-        if self.organization_ctx:
-            relantions.add(SourceRelations.ORGANIZATION)
-
-        if self.client_ctx:
-            relantions.add(SourceRelations.ORGANIZATION)
-
-        return relantions

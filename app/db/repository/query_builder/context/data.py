@@ -31,6 +31,7 @@ class CertificateQueryContextBase:
 @dataclass
 class ClientQueryContextBase:
     id: UUID | None = None
+    organization_id: UUID | None = None
     name: str | None = None
     description: str | None = None
 

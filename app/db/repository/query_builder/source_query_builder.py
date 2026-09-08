@@ -1,8 +1,8 @@
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import Select, select
-from sqlalchemy.orm import contains_eager, selectinload
+from sqlalchemy import BinaryExpression, ColumnElement, Select, select
+from sqlalchemy.orm import QueryableAttribute, contains_eager, selectinload
 
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
@@ -12,7 +12,6 @@ from app.db.repository.query_builder.context.source_context import (
     SourceClientQueryContext,
     SourceOrganizationQueryContext,
     SourceQueryContext,
-    SourceRelations,
 )
 from app.db.repository.query_builder.data import LoadStrategy
 
@@ -30,18 +29,17 @@ class SourceQueryBuilder:
         if ctx.source_id:
             self.with_source_id(ctx.source_id)
 
+        if ctx.organization_id:
+            self.with_organization_id(ctx.organization_id)
+
         if ctx.name:
             self.with_name(ctx.name)
 
-        for rel in ctx.include:
-            match rel:
-                case SourceRelations.ORGANIZATION:
-                    org_ctx = ctx.organization_ctx if ctx.organization_ctx else SourceOrganizationQueryContext.default()
-                    self.include_organization(org_ctx)
+        if ctx.organization_ctx:
+            self.include_organization(ctx.organization_ctx)
 
-                case SourceRelations.CLIENTS:
-                    client_ctx = ctx.client_ctx if ctx.client_ctx else SourceClientQueryContext.default()
-                    self.include_clients(client_ctx)
+        if ctx.client_ctx:
+            self.include_clients(ctx.client_ctx)
 
         return self
 
@@ -66,6 +64,13 @@ class SourceQueryBuilder:
         self._stmt = self._stmt.where(SourceEntity.name == name)
         return self
 
+    def with_organization_id(self, id: UUID | None) -> Self:
+        if id is None:
+            return self
+
+        self._stmt = self._stmt.where(SourceEntity.organization_id == id)
+        return self
+
     def include_organization(self, ctx: SourceOrganizationQueryContext) -> Self:
         match self._load_strategy:
             case LoadStrategy.SELECTIN_LOAD:
@@ -76,7 +81,7 @@ class SourceQueryBuilder:
         return self
 
     def _selecintload_organizations(self, ctx: SourceOrganizationQueryContext) -> Self:
-        attr = SourceEntity.organization
+        attr: QueryableAttribute[Any] = SourceEntity.organization
         conditions = []
 
         if ctx.id:
@@ -101,7 +106,7 @@ class SourceQueryBuilder:
         attr = SourceEntity.organization
         self._stmt = self._stmt.outerjoin(attr).options(contains_eager(attr))
 
-        conditions = []
+        conditions: list[ColumnElement[bool] | BinaryExpression[bool]] = []
 
         if self._include_deleted is False:
             conditions.append(OrganizationEntity.deleted_at.is_(None))
@@ -132,8 +137,8 @@ class SourceQueryBuilder:
         return self
 
     def _selectinload_clients(self, ctx: SourceClientQueryContext) -> Self:
-        attr = CertificateEntity.clients
-        conditions = []
+        attr: QueryableAttribute[Any] = CertificateEntity.clients
+        conditions: list[Any] = []
 
         if self._include_deleted:
             conditions.append(ClientEntity.deleted_at.is_(None))
@@ -157,7 +162,7 @@ class SourceQueryBuilder:
         attr = CertificateEntity.clients
         self._stmt = self._stmt.outerjoin(attr).options(contains_eager(attr))
 
-        conditions = []
+        conditions: list[ColumnElement[bool] | BinaryExpression[bool]] = []
         if self._include_deleted is False:
             conditions.append(ClientEntity.deleted_at.is_(None))
 

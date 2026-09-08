@@ -12,7 +12,12 @@ from app.db.repository.query_builder.context.organization_context import (
     OrganizationClientQueryContext,
     OrganizationQueryContext,
 )
-from app.models.certificates import Certificate, CertificateCreate, CertificateQueryParams, CertificateUpdate
+from app.models.certificates import (
+    Certificate,
+    CertificateCreate,
+    CertificateUpdate,
+    ClientCertificateQueryParams,
+)
 from app.services.exceptions import ConflictError, ForbidenOperationError, RecordNotFoundError
 
 
@@ -27,9 +32,11 @@ class ClientCertificateService:
                 raise RecordNotFoundError(organization_id)
 
             client_repo = session.get_repository(ClientRepository)
-            ctx = ClientQueryContext(certificate_ctx=ClientCertificateQueryContext(id=id))
+            ctx = ClientQueryContext(
+                id=client_id, organization_id=organization_id, certificate_ctx=ClientCertificateQueryContext(id=id)
+            )
 
-            client = client_repo.find(client_id, organization_id, ctx)
+            client = client_repo.find(ctx)
             if client is None:
                 raise RecordNotFoundError(client_id)
 
@@ -40,7 +47,9 @@ class ClientCertificateService:
 
             return Certificate.from_entity(cert)
 
-    def get_many(self, organization_id: UUID, client_id: UUID, params: CertificateQueryParams) -> list[Certificate]:
+    def get_many(
+        self, organization_id: UUID, client_id: UUID, params: ClientCertificateQueryParams
+    ) -> list[Certificate]:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
             if not org_repo.exists(organization_id):
@@ -49,10 +58,10 @@ class ClientCertificateService:
             cert_ctx = ClientCertificateQueryContext(
                 domain=params.domain, organization_identifier=params.organization_identifier
             )
-            ctx = ClientQueryContext(certificate_ctx=cert_ctx)
+            ctx = ClientQueryContext(id=client_id, organization_id=organization_id, certificate_ctx=cert_ctx)
 
             client_repo = session.get_repository(ClientRepository)
-            client = client_repo.find(client_id, organization_id, ctx)
+            client = client_repo.find(ctx)
             if client is None:
                 raise RecordNotFoundError(client_id)
 
@@ -63,10 +72,11 @@ class ClientCertificateService:
             repo = session.get_repository(OrganizationRepository)
             cert_ctx = OrganizationCertificateQueryContext(id=id)
             ctx = OrganizationQueryContext(
+                id=organization_id,
                 client_ctx=OrganizationClientQueryContext(id=client_id, certificate_ctx=cert_ctx),
                 certificate_ctx=cert_ctx,
             )
-            org = repo.find(id=organization_id, ctx=ctx)
+            org = repo.find(ctx=ctx)
 
             if org is None:
                 raise RecordNotFoundError(organization_id)
@@ -93,10 +103,11 @@ class ClientCertificateService:
 
             cert_ctx = OrganizationCertificateQueryContext(id=id)
             ctx = OrganizationQueryContext(
+                id=organization_id,
                 certificate_ctx=cert_ctx,
                 client_ctx=OrganizationClientQueryContext(id=client_id, certificate_ctx=cert_ctx),
             )
-            org = org_repo.find(id=organization_id, ctx=ctx)
+            org = org_repo.find(ctx=ctx)
             if org is None:
                 raise RecordNotFoundError(organization_id)
 

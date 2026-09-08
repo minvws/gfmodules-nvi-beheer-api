@@ -17,6 +17,7 @@ from app.models.base import (
 )
 from app.models.certificates import Certificate, CertificateCreate, CertificateUpdate
 from app.models.client import Client, ClientCreate
+from app.models.oin import Oin
 from app.models.source import Source, SourceCreate, SourceUpdate
 from app.models.ura import UraNumber
 
@@ -66,20 +67,23 @@ class OrganizationCreate(OrganizationFields):
 
 
 class OrganizationUpdate(BaseModel):
+    external_id: UraNumber = Field(..., description=EXTERNAL_ID_DESCRIPTION)
     name: str = Field(..., description=NAME_DESCRIPTION)
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
-    certificates: list[CertificateUpdate] | None = None
-    sources: list[SourceUpdate] | None = None
+    certificates: list[CertificateCreate | CertificateUpdate] | None = None
+    sources: list[SourceCreate | SourceUpdate] | None = None
 
+    # TODO: check if client can be included here
     @property
     def sanitized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
 
     @classmethod
     def from_entity(cls, entity: OrganizationEntity, include_deleted: bool = False) -> Self:
-        certs: list[CertificateUpdate] | None = None
-        sources: list[SourceUpdate] | None = None
+        certs: list[CertificateUpdate | CertificateCreate] | None = None
+        sources: list[SourceUpdate | SourceCreate] | None = None
         scopes = [s.name for s in entity.scopes]
+
         if include_deleted:
             certs = [CertificateUpdate.from_entity(c) for c in entity.certificates] if entity.certificates else None
             sources = [SourceUpdate.from_entity(s) for s in entity.sources] if entity.sources else None
@@ -97,6 +101,7 @@ class OrganizationUpdate(BaseModel):
 
         return cls(
             name=entity.name,
+            external_id=entity.external_id,
             scopes=" ".join(scopes) if scopes else None,
             certificates=certs,
             sources=sources,
@@ -108,16 +113,36 @@ class OrganizationQueryParams(BaseModel):
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
     external_id: UraNumber | None = Field(default=None, description=EXTERNAL_ID_DESCRIPTION)
     cert_id: UUID | None = None
-    cert_identifier: str | None = None  # TODO: Add description
+    cert_identifier: Oin | None = None  # TODO: Add description
     cert_domain: str | None = None  # TODO: Add description
     source_id: str | None = None
     source_name: str | None = None
+    client_name: str | None = None
+    client_scopes: str | None = None
+    client_cert_identifier: Oin | None = None
+    client_cert_domain: str | None = None
+    client_source_id: str | None = None
+    client_source_name: str | None = None
 
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
     @property
     def sanitized_scopes(self) -> list[str] | None:
         return sanatize_model_scopes(self.scopes)
+
+    @property
+    def sanatized_client_scopes(self) -> list[str] | None:
+        return sanatize_model_scopes(self.client_scopes)
+
+    def into_org_client_query_context(self) -> OrganizationClientQueryContext:
+        return OrganizationClientQueryContext(
+            name=self.client_name,
+            scopes=self.sanatized_client_scopes,
+            certificate_ctx=OrganizationCertificateQueryContext(
+                organization_identifier=self.client_cert_identifier, domain=self.client_cert_domain
+            ),
+            source_ctx=OrganizationSourceQueryContext(source_id=self.client_source_id, name=self.client_source_name),
+        )
 
     def into_cert_query_context(self) -> OrganizationCertificateQueryContext:
         return OrganizationCertificateQueryContext(
@@ -130,8 +155,7 @@ class OrganizationQueryParams(BaseModel):
     def into_organization_query_context(self) -> OrganizationQueryContext:
         src_ctx = self.into_source_query_context()
         crt_ctx = self.into_cert_query_context()
-        client_ctx = OrganizationClientQueryContext.default()
-
+        client_ctx = self.into_org_client_query_context()
         return OrganizationQueryContext(
             external_id=self.external_id,
             name=self.name,

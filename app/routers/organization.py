@@ -19,8 +19,6 @@ from app.services.organization import OrganizationService
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
-# TODO: handle soft deleted organizations on create
-
 
 @router.post(
     "",
