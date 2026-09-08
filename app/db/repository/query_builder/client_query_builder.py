@@ -14,7 +14,7 @@ from app.db.repository.query_builder.context.client_context import (
     ClientRelations,
     ClientSourceQueryContext,
 )
-from app.db.repository.query_builder.context.data import LoadStrategy
+from app.db.repository.query_builder.data import LoadStrategy
 
 
 class ClientQueryBuilder:

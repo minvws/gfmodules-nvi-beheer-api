@@ -8,7 +8,11 @@ from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
-from app.db.repository.query_builder.data import CertificateQueryContext, OrganizationQueryContext, SourceQueryContext
+from app.db.repository.query_builder.context.organization_context import (
+    OrganizationCertificateQueryContext,
+    OrganizationQueryContext,
+    OrganizationSourceQueryContext,
+)
 from app.db.repository.scope import ScopeRepository
 from app.db.repository.source import SourceRepository
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
@@ -121,13 +125,14 @@ class OrganizationService:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(
-                source_ctx=SourceQueryContext.default(), certificate_ctx=CertificateQueryContext.default()
+                source_ctx=OrganizationSourceQueryContext.default(),
+                certificate_ctx=OrganizationCertificateQueryContext.default(),
             )
             org = org_repo.find(id, ctx)
             if not org:
                 raise HTTPException(status_code=404)
 
-            change_happened = not (OrganizationUpdate.from_entity(org) == dto)
+            change_happened = OrganizationUpdate.from_entity(org) != dto
             if change_happened is False:
                 return OrganizationUpdate.from_entity(org)
 

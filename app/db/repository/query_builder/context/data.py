@@ -1,15 +1,9 @@
 from dataclasses import dataclass
-from enum import Enum, auto
 from typing import Self
 from uuid import UUID
 
 from app.models.oin import Oin
 from app.models.ura import UraNumber
-
-
-class LoadStrategy(Enum):
-    SELECTIN_LOAD = auto()
-    OUTERJOIN_LOAD = auto()
 
 
 @dataclass()

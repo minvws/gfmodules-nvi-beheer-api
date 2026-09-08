@@ -7,13 +7,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db.decorator import repository
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase
-from app.db.repository.query_builder.context.data import LoadStrategy
 from app.db.repository.query_builder.context.organization_context import (
     OrganizationCertificateQueryContext,
     OrganizationClientQueryContext,
     OrganizationQueryContext,
     OrganizationSourceQueryContext,
 )
+from app.db.repository.query_builder.data import LoadStrategy
 from app.db.repository.query_builder.organization_query_builder import (
     OrganizationQueryBuilder,
 )

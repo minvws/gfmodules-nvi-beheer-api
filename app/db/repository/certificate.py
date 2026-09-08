@@ -1,4 +1,5 @@
-from typing import NamedTuple, Sequence
+from collections.abc import Sequence
+from typing import NamedTuple
 from uuid import UUID
 
 from sqlalchemy import select, tuple_
@@ -9,7 +10,7 @@ from app.db.models.certificate import CertificateEntity
 from app.db.repository.base import RepositoryBase
 from app.db.repository.query_builder.certificate_query_builder import CertificateQueryBuilder
 from app.db.repository.query_builder.context.certificate_context import CertificateQueryContext
-from app.db.repository.query_builder.context.data import LoadStrategy
+from app.db.repository.query_builder.data import LoadStrategy
 
 
 class CertificateIndexLookup(NamedTuple):
@@ -42,10 +43,20 @@ class CertificateRepository(RepositoryBase):
         stmt = CertificateQueryBuilder().with_id(id).with_organization_id(organization_id).build()
         return self.db_session.execute(stmt).scalar()
 
-    def find_many(
+    def find_many(self, ctx: CertificateQueryContext, include_deleted: bool = False) -> Sequence[CertificateEntity]:
+        load_strategy = self._determine_strategy(ctx)
+        stmt = (
+            CertificateQueryBuilder(load_strategy=load_strategy, include_deleted=include_deleted)
+            .apply_context(ctx)
+            .build()
+        )
+
+        return self.db_session.execute(stmt).scalars().unique().all()
+
+    def find_many_per_organization(
         self,
+        organization_id: UUID,
         ctx: CertificateQueryContext,
-        organization_id: UUID | None = None,
         include_deleted: bool = False,
     ) -> Sequence[CertificateEntity]:
         load_strategy = self._determine_strategy(ctx)
@@ -56,7 +67,7 @@ class CertificateRepository(RepositoryBase):
             .build()
         )
 
-        return self.db_session.execute(stmt).scalars().all()
+        return self.db_session.execute(stmt).scalars().unique().all()
 
     def find(self, id: UUID, ctx: CertificateQueryContext, include_deleted: bool = False) -> CertificateEntity | None:
         stmt = CertificateQueryBuilder(include_deleted=include_deleted).with_id(id).apply_context(ctx).build()

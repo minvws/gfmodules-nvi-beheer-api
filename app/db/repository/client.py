@@ -17,7 +17,7 @@ from app.db.repository.query_builder.context.client_context import (
     ClientQueryContext,
     ClientSourceQueryContext,
 )
-from app.db.repository.query_builder.context.data import LoadStrategy
+from app.db.repository.query_builder.data import LoadStrategy
 from app.models.oin import Oin
 from app.models.ura import UraNumber
 
