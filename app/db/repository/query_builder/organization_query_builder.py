@@ -1,8 +1,8 @@
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
 from sqlalchemy import Select, or_, select
-from sqlalchemy.orm import aliased, contains_eager, selectinload
+from sqlalchemy.orm import QueryableAttribute, aliased, contains_eager, selectinload
 
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
@@ -13,7 +13,6 @@ from app.db.repository.query_builder.context.organization_context import (
     OrganizationCertificateQueryContext,
     OrganizationClientQueryContext,
     OrganizationQueryContext,
-    OrganizationRelations,
     OrganizationSourceQueryContext,
 )
 from app.db.repository.query_builder.data import LoadStrategy
@@ -27,30 +26,21 @@ class OrganizationQueryBuilder:
         self._include_deleted: bool = include_deleted
 
     def apply_context(self, ctx: OrganizationQueryContext) -> Self:
+        self.include_scopes(ctx.scopes)
         if ctx.external_id:
             self.with_external_id(ctx.external_id)
 
         if ctx.name:
             self.with_name(ctx.name)
 
-        for rel in ctx.includes:
-            match rel:
-                case OrganizationRelations.SCOPES:
-                    self.include_scopes(ctx.scopes)
+        if ctx.certificate_ctx:
+            self.include_certificate(ctx.certificate_ctx)
 
-                case OrganizationRelations.CERTIFICATES:
-                    cert_ctx = (
-                        ctx.certificate_ctx if ctx.certificate_ctx else OrganizationCertificateQueryContext.default()
-                    )
-                    self.include_certificate(cert_ctx)
+        if ctx.source_ctx:
+            self.include_sources(ctx.source_ctx)
 
-                case OrganizationRelations.SOURCES:
-                    src_ctx = ctx.source_ctx if ctx.source_ctx else OrganizationSourceQueryContext.default()
-                    self.include_sources(src_ctx)
-
-                case OrganizationRelations.CLIENTS:
-                    clients_ctx = ctx.client_ctx if ctx.client_ctx else OrganizationClientQueryContext.default()
-                    self.include_clients(clients_ctx)
+        if ctx.client_ctx:
+            self.include_clients(ctx.client_ctx)
 
         return self
 
@@ -85,7 +75,7 @@ class OrganizationQueryBuilder:
         return self
 
     def _selectinload_scopes(self, scopes: list[str] | None = None) -> Self:
-        attr = OrganizationEntity.scopes
+        attr: QueryableAttribute[Any] = OrganizationEntity.scopes
         if scopes:
             attr = attr.and_(or_(*[ScopeEntity.name == s for s in scopes]))
 
@@ -116,7 +106,7 @@ class OrganizationQueryBuilder:
         self,
         ctx: OrganizationCertificateQueryContext,
     ) -> Self:
-        attr = OrganizationEntity.certificates
+        attr: QueryableAttribute[Any] = OrganizationEntity.certificates
         conditions = []
         if ctx.id:
             conditions.append(CertificateEntity.id == ctx.id)
@@ -141,12 +131,13 @@ class OrganizationQueryBuilder:
         self,
         ctx: OrganizationCertificateQueryContext,
     ) -> Self:
-        attr = OrganizationEntity.certificates
+        attr: QueryableAttribute[Any] = OrganizationEntity.certificates
+        if self._include_deleted is False:
+            attr = attr.and_(CertificateEntity.deleted_at.is_(None))
+
         self._stmt = self._stmt.outerjoin(attr).options(contains_eager(OrganizationEntity.certificates))
 
-        conditions = []
-        if self._include_deleted is False:
-            conditions.append(CertificateEntity.deleted_at.is_(None))
+        conditions: list[Any] = []
 
         if ctx.id:
             conditions.append(CertificateEntity.id == ctx.id)
@@ -171,13 +162,16 @@ class OrganizationQueryBuilder:
         return self
 
     def _selectinload_sources(self, ctx: OrganizationSourceQueryContext) -> Self:
-        attr = OrganizationEntity.sources
+        attr: QueryableAttribute[Any] = OrganizationEntity.sources
         conditions = []
         if ctx.id:
-            conditions.append(SourceEntity.source_id == ctx.id)
+            conditions.append(SourceEntity.id == ctx.id)
 
         if ctx.name:
             conditions.append(SourceEntity.name == ctx.name)
+
+        if ctx.source_id:
+            conditions.append(SourceEntity.source_id == ctx.source_id)
 
         if self._include_deleted is False:
             conditions.append(SourceEntity.deleted_at.is_(None))
@@ -190,14 +184,17 @@ class OrganizationQueryBuilder:
 
     def _joinload_sources(self, ctx: OrganizationSourceQueryContext) -> Self:
         attr = OrganizationEntity.sources
+        if self._include_deleted is False:
+            attr = attr.and_(SourceEntity.deleted_at.is_(None))
+
         conditions = []
 
         if ctx.id:
             conditions.append(SourceEntity.id == ctx.id)
         if ctx.name:
             conditions.append(SourceEntity.name == ctx.name)
-        if self._include_deleted is False:
-            conditions.append(SourceEntity.deleted_at.is_(None))
+        if ctx.source_id:
+            conditions.append(SourceEntity.source_id == ctx.source_id)
 
         self._stmt = self._stmt.outerjoin(attr).options(contains_eager(OrganizationEntity.sources))
 
@@ -223,8 +220,8 @@ class OrganizationQueryBuilder:
         self,
         ctx: OrganizationClientQueryContext,
     ) -> Self:
-        main_attr = OrganizationEntity.clients
-        scope_attr = ClientEntity.scopes
+        main_attr: QueryableAttribute[Any] = OrganizationEntity.clients
+        scope_attr: QueryableAttribute[Any] = ClientEntity.scopes
         if ctx.id:
             main_attr = main_attr.and_(ClientEntity.id == ctx.id)
 
@@ -242,7 +239,7 @@ class OrganizationQueryBuilder:
 
         if ctx.certificate_ctx:
             cert_conditions = []
-            cert_attr = ClientEntity.certificates
+            cert_attr: QueryableAttribute[Any] = ClientEntity.certificates
             cert_ctx = ctx.certificate_ctx
             if cert_ctx.id:
                 cert_conditions.append(CertificateEntity.id == cert_ctx.id)
@@ -262,7 +259,7 @@ class OrganizationQueryBuilder:
             load_options.append(selectinload(main_attr).selectinload(cert_attr))
 
         if ctx.source_ctx:
-            src_attr = ClientEntity.sources
+            src_attr: QueryableAttribute[Any] = ClientEntity.sources
             src_conditions = []
             src_ctx = ctx.source_ctx
             if src_ctx.id:
@@ -288,7 +285,7 @@ class OrganizationQueryBuilder:
     def _joinload_client(
         self,
         ctx: OrganizationClientQueryContext,
-    ):
+    ) -> Self:
 
         ClientCertificateAlias = aliased(CertificateEntity, name="client_certificate")
         ClientSourceAlias = aliased(SourceEntity, name="client_source")
@@ -296,6 +293,8 @@ class OrganizationQueryBuilder:
         options = [contains_eager(OrganizationEntity.clients)]
 
         attr = OrganizationEntity.clients
+        if self._include_deleted is False:
+            attr = attr.and_(ClientEntity.deleted_at.is_(None))
 
         self._stmt = self._stmt.outerjoin(attr)
 
@@ -346,6 +345,7 @@ class OrganizationQueryBuilder:
 
             if cert_ctx.domain:
                 conditions.append(ClientCertificateAlias.domain == cert_ctx.domain)
+
         if src_ctx:
             if src_ctx.id:
                 conditions.append(ClientSourceAlias.id == src_ctx.id)
@@ -353,15 +353,6 @@ class OrganizationQueryBuilder:
                 conditions.append(ClientSourceAlias.source_id == src_ctx.source_id)
             if src_ctx.name:
                 conditions.append(ClientSourceAlias.name == src_ctx.name)
-
-        if self._include_deleted is False:
-            conditions.extend(
-                [
-                    ClientEntity.deleted_at.is_(None),
-                    ClientCertificateAlias.deleted_at.is_(None),
-                    ClientSourceAlias.deleted_at.is_(None),
-                ]
-            )
 
         if conditions:
             self._stmt = self._stmt.where(*conditions)

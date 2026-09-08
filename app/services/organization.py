@@ -25,7 +25,8 @@ from app.services.exceptions import (
     ScopeNotAllowedError,
 )
 from app.services.scopes import ScopeService
-from app.services.source import SourceService
+from app.services.source.client_source import ClientSourceService
+from app.services.source.organization_source import OrganizationSourceService
 
 
 class OrganizationService:
@@ -59,8 +60,8 @@ class OrganizationService:
                 ]
 
             if dto.sources:
-                repo = session.get_repository(SourceRepository)
-                existing_sources = repo.find_many_by_external_ids(dto.source_ids)
+                src_repo = session.get_repository(SourceRepository)
+                existing_sources = src_repo.find_many_by_external_ids(dto.source_ids)
                 if len(existing_sources) > 0:
                     raise ConflictError(
                         f"Sources with source_id {[s.source_id for s in existing_sources]} already exists"
@@ -86,7 +87,9 @@ class OrganizationService:
                         client_entitiy.certificates = client_certs
 
                     if client.sources:
-                        client_sources = SourceService.get_client_sources_from_org(org_entity, client.sources or [])
+                        client_sources = ClientSourceService.get_client_sources_from_org(
+                            org_entity, client.sources or []
+                        )
                         client_entitiy.sources = client_sources
 
                     org_entity.clients.append(client_entitiy)
@@ -125,10 +128,11 @@ class OrganizationService:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(
+                id=id,
                 source_ctx=OrganizationSourceQueryContext.default(),
                 certificate_ctx=OrganizationCertificateQueryContext.default(),
             )
-            org = org_repo.find(id, ctx)
+            org = org_repo.find(ctx)
             if not org:
                 raise HTTPException(status_code=404)
 
@@ -159,7 +163,7 @@ class OrganizationService:
                             cert.deleted_at = datetime.now()
 
             if dto.sources:
-                updated_sources = SourceService.compute_org_sources_for_update(org, dto.sources)
+                updated_sources = OrganizationSourceService.compute_org_sources_for_update(org, dto.sources)
                 org.sources = updated_sources
             else:
                 if org.sources:

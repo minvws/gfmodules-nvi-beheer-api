@@ -124,7 +124,7 @@ BEGIN;
 	CREATE TABLE sources (
 	  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	  organization_id UUID NOT NULL, 
-	  source_id VARCHAR(100) NOT NULL UNIQUE, 
+	  source_id VARCHAR(100) NOT NULL, 
 	  name VARCHAR(150) NOT NULL,
 	  created_at TIMESTAMP DEFAULT now() NOT NULL, 
 	  modified_at TIMESTAMP, 
@@ -132,6 +132,10 @@ BEGIN;
 	
 	  CONSTRAINT fk_sources_organizations FOREIGN KEY (organization_id) REFERENCES organizations (id)
 	);
+
+  CREATE UNIQUE INDEX uq_sources_source_id_active 
+    ON sources (source_id)
+    WHERE deleted_at IS NULL;
 	
 	CREATE TABLE clients_sources (
 	  client_id UUID NOT NULL,

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from enum import Enum, auto
 from typing import Any, Self
+from uuid import UUID
 
 from app.db.repository.query_builder.context.data import (
     CertificateQueryContextBase,
@@ -8,13 +8,6 @@ from app.db.repository.query_builder.context.data import (
     OrganizationQueryContextBase,
     SourceQueryContextBase,
 )
-
-
-class OrganizationRelations(Enum):
-    CLIENTS = auto()
-    CERTIFICATES = auto()
-    SOURCES = auto()
-    SCOPES = auto()
 
 
 @dataclass()
@@ -48,21 +41,8 @@ class OrganizationClientQueryContext(ClientQueryContextBase):
 
 @dataclass()
 class OrganizationQueryContext(OrganizationQueryContextBase):
+    id: UUID | None = None
     scopes: list[str] | None = None
     client_ctx: OrganizationClientQueryContext | None = None
     certificate_ctx: OrganizationCertificateQueryContext | None = None
     source_ctx: OrganizationSourceQueryContext | None = None
-
-    @property
-    def includes(self) -> set[OrganizationRelations]:
-        relations = {OrganizationRelations.SCOPES}
-        if self.source_ctx:
-            relations.add(OrganizationRelations.SOURCES)
-
-        if self.certificate_ctx:
-            relations.add(OrganizationRelations.CERTIFICATES)
-
-        if self.client_ctx:
-            relations.add(OrganizationRelations.CLIENTS)
-
-        return relations

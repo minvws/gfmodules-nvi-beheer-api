@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from enum import Enum, auto
 from typing import Any, Self
 
 from app.db.repository.query_builder.context.data import (
@@ -7,12 +6,6 @@ from app.db.repository.query_builder.context.data import (
     ClientQueryContextBase,
     SourceQueryContextBase,
 )
-
-
-class ClientRelations(Enum):
-    SCOPES = auto()
-    CERTIFICATES = auto()
-    SOURCES = auto()
 
 
 @dataclass()
@@ -45,20 +38,10 @@ class ClientQueryContext(ClientQueryContextBase):
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
+            "organization_id": self.organization_id,
             "name": self.name,
             "description": self.description,
             "scopes": self.scopes,
             "cert_ctx": self.certificate_ctx.to_dict() if self.certificate_ctx else None,
             "source_ctx": self.source_ctx.to_dict() if self.source_ctx else None,
         }
-
-    @property
-    def include(self) -> set[ClientRelations]:
-        relations = {ClientRelations.SCOPES}
-        if self.source_ctx:
-            relations.add(ClientRelations.SOURCES)
-
-        if self.certificate_ctx:
-            relations.add(ClientRelations.CERTIFICATES)
-
-        return relations

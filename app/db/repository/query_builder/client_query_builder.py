@@ -11,7 +11,6 @@ from app.db.models.source import SourceEntity
 from app.db.repository.query_builder.context.client_context import (
     ClientCertificateQueryContext,
     ClientQueryContext,
-    ClientRelations,
     ClientSourceQueryContext,
 )
 from app.db.repository.query_builder.data import LoadStrategy
@@ -24,8 +23,13 @@ class ClientQueryBuilder:
         self._include_deleted: bool = include_deleted
 
     def apply_context(self, ctx: ClientQueryContext) -> Self:
+        self.include_scopes(ctx.scopes)
+
         if ctx.id:
             self.with_id(ctx.id)
+
+        if ctx.organization_id:
+            self.with_organization_id(ctx.organization_id)
 
         if ctx.name:
             self.with_name(ctx.name)
@@ -33,18 +37,11 @@ class ClientQueryBuilder:
         if ctx.description:
             self.with_description(ctx.description)
 
-        for rel in ctx.include:
-            match rel:
-                case ClientRelations.CERTIFICATES:
-                    cert_ctx = ctx.certificate_ctx if ctx.certificate_ctx else ClientCertificateQueryContext.default()
-                    self.include_certificate(cert_ctx)
+        if ctx.certificate_ctx:
+            self.include_certificate(ctx.certificate_ctx)
 
-                case ClientRelations.SOURCES:
-                    src_ctx = ctx.source_ctx if ctx.source_ctx else ClientSourceQueryContext().default()
-                    self.include_sources(src_ctx)
-
-                case ClientRelations.SCOPES:
-                    self.include_scopes(ctx.scopes)
+        if ctx.source_ctx:
+            self.include_sources(ctx.source_ctx)
 
         return self
 
@@ -115,9 +112,6 @@ class ClientQueryBuilder:
         attr = ClientEntity.certificates
         conditions = []
 
-        if self._include_deleted is False:
-            conditions.append(CertificateEntity.deleted_at.is_(None))
-
         if ctx.id:
             conditions.append(CertificateEntity.id == ctx.id)
 
@@ -139,8 +133,6 @@ class ClientQueryBuilder:
     ) -> Self:
         attr = ClientEntity.certificates
         conditions = []
-        if self._include_deleted is False:
-            conditions.append(CertificateEntity.deleted_at.is_(None))
 
         self._stmt = self._stmt.outerjoin(attr).options(contains_eager(ClientEntity.certificates))
 
@@ -170,13 +162,13 @@ class ClientQueryBuilder:
         attr = ClientEntity.sources
         conditions = []
         if ctx.id:
-            conditions.append(SourceEntity.source_id == ctx.id)
+            conditions.append(SourceEntity.id == ctx.id)
+
+        if ctx.source_id:
+            conditions.append(SourceEntity.source_id == ctx.source_id)
 
         if ctx.name:
             conditions.append(SourceEntity.name == ctx.name)
-
-        if self._include_deleted is False:
-            conditions.append(SourceEntity.deleted_at.is_(None))
 
         if conditions:
             attr = attr.and_(*conditions)
@@ -190,10 +182,11 @@ class ClientQueryBuilder:
 
         if ctx.id:
             conditions.append(SourceEntity.id == ctx.id)
+        if ctx.source_id:
+            conditions.append(SourceEntity.source_id == ctx.source_id)
+
         if ctx.name:
             conditions.append(SourceEntity.name == ctx.name)
-        if self._include_deleted is False:
-            conditions.append(SourceEntity.deleted_at.is_(None))
 
         self._stmt = self._stmt.outerjoin(attr).options(contains_eager(ClientEntity.sources))
 

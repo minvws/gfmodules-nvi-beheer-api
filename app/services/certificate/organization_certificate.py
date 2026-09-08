@@ -46,19 +46,22 @@ class OrganizationCertificateService:
             if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
 
-            ctx = params.into_certificate_query_context()
+            ctx = CertificateQueryContext(
+                organization_id=organization_id, **params.model_dump(exclude={"include_deleted"})
+            )
             cert_repo = session.get_repository(CertificateRepository)
-            # TODO: check this if it can be generalized
-            certs = cert_repo.find_many_per_organization(organization_id, ctx, params.include_deleted)
+            certs = cert_repo.find_many(ctx, params.include_deleted)
 
             return [Certificate.from_entity(c) for c in certs]
 
     def create_one(self, organization_id: UUID, dto: CertificateCreate) -> Certificate:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
-            ctx = OrganizationQueryContext(certificate_ctx=OrganizationCertificateQueryContext.default())
+            ctx = OrganizationQueryContext(
+                id=organization_id, certificate_ctx=OrganizationCertificateQueryContext.default()
+            )
 
-            org = org_repo.find(organization_id, ctx)
+            org = org_repo.find(ctx)
             if org is None:
                 raise RecordNotFoundError(organization_id)
 
@@ -83,9 +86,11 @@ class OrganizationCertificateService:
 
     def update_one(self, id: UUID, organization_id: UUID, dto: CertificateUpdate) -> Certificate:
         with self.db.get_db_session() as session:
-            ctx = OrganizationQueryContext(certificate_ctx=OrganizationCertificateQueryContext(id=id))
+            ctx = OrganizationQueryContext(
+                id=organization_id, certificate_ctx=OrganizationCertificateQueryContext(id=id)
+            )
             repo = session.get_repository(OrganizationRepository)
-            org = repo.find(organization_id, ctx)
+            org = repo.find(ctx)
 
             if org is None:
                 raise RecordNotFoundError(organization_id)
@@ -113,9 +118,9 @@ class OrganizationCertificateService:
             if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
 
-            ctx = CertificateQueryContext(client_ctx=CertificateClientQueryContext.default())
+            ctx = CertificateQueryContext(id=id, client_ctx=CertificateClientQueryContext.default())
             cert_repo = session.get_repository(CertificateRepository)
-            target = cert_repo.find(id, ctx)
+            target = cert_repo.find(ctx)
             if target is None:
                 raise RecordNotFoundError(id)
 
@@ -140,40 +145,33 @@ class OrganizationCertificateService:
 
     @staticmethod
     def compute_certs_to_update_from_org(
-        org: OrganizationEntity, target: list[CertificateUpdate]
+        org: OrganizationEntity, target: list[CertificateCreate | CertificateUpdate]
     ) -> list[CertificateEntity]:
-        current_certs_map = {c.unique_key: c for c in org.certificates} if org.certificates else {}
-        update_certs: list[CertificateEntity] = []
-        if not current_certs_map:
-            update_certs = [
-                CertificateEntity(
-                    organization_identifier=c.organization_identifier, domain=c.domain, organization_id=org.id
-                )
-                for c in target
-            ]
-        else:
-            for incoming_cert in target:
-                # TODO: this should be a function in dto
-                unique_key = f"{org.id}-{incoming_cert.organization_identifier}-{incoming_cert.domain}"
-                if unique_key in current_certs_map:
-                    cert = current_certs_map[unique_key]
-                    update_certs.append(cert)
-                else:
-                    new_cert = CertificateEntity(**incoming_cert.model_dump(exclude_unset=True), organization_id=org.id)
-                    update_certs.append(new_cert)
+        # handle new certs
+        results = [CertificateEntity(**c.model_dump()) for c in target if isinstance(c, CertificateCreate)]
+        updated_ids: list[UUID] = []
+
+        current_cert_map = {c.id: c for c in org.certificates}
+
+        for cert in target:
+            if not isinstance(cert, CertificateUpdate):
+                continue
+
+            current_cert = current_cert_map.get(cert.id)
+            if current_cert is None:
+                raise ForbidenOperationError(
+                    f"id {cert.id} is not allowed to be added."
+                )  # TODO: more descriptive error
+            current_cert.organization_identifier = cert.organization_identifier
+            current_cert.domain = cert.domain
+
+            results.append(current_cert)
+            updated_ids.append(current_cert.id)
 
         # handle soft delete
-        update_list = [c.unique_key for c in update_certs]
-        for key, value in current_certs_map.items():
-            if key not in update_list:
+        for key, value in current_cert_map.items():
+            if key not in updated_ids:
                 value.deleted_at = datetime.now()
-                update_certs.append(value)
+                results.append(value)
 
-        return update_certs
-        update_list = [c.unique_key for c in update_certs]
-        for key, value in current_certs_map.items():
-            if key not in update_list:
-                value.deleted_at = datetime.now()
-                update_certs.append(value)
-
-        return update_certs
+        return results
