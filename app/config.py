@@ -4,7 +4,8 @@ import os
 from enum import Enum
 from typing import Any
 
-from gfmodules.logging import ConfigLogging
+from gfmodules.logging import ConfigLogging as GFConfigLogging
+from gfmodules.logging.ini import split_comma_separated
 from pydantic import BaseModel, Field, SecretStr, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,10 @@ class ConfigApp(BaseModel):
         return set(value.split())
 
 
+class ConfigLogging(GFConfigLogging):
+    _split_console_streams = field_validator("console_streams", mode="before")(split_comma_separated())
+
+
 class ConfigDatabase(BaseModel):
     # SecretStr so the DSN password never appears in reprs or logs
     dsn: SecretStr
@@ -45,6 +50,8 @@ class ConfigDatabase(BaseModel):
     max_overflow: int = Field(default=10, ge=0, lt=100)
     pool_pre_ping: bool = Field(default=False)
     pool_recycle: int = Field(default=3600, ge=0)
+
+    _split_retry_backoff = field_validator("retry_backoff", mode="before")(split_comma_separated(float))
 
 
 class ConfigUvicorn(BaseModel):
@@ -129,15 +136,6 @@ def get_config(path: str | None = None) -> Config:
     ini_data = read_ini_file(path)
 
     try:
-        # Convert database.retry_backoff to a list of floats
-        if (
-            "database" in ini_data
-            and "retry_backoff" in ini_data["database"]
-            and isinstance(ini_data["database"]["retry_backoff"], str)
-        ):
-            # convert the string to a list of floats
-            ini_data["database"]["retry_backoff"] = [float(i) for i in ini_data["database"]["retry_backoff"].split(",")]
-
         _CONFIG = Config.model_validate(ini_data)
     except ValidationError as e:
         logger.error(f"Configuration validation error: {e}")

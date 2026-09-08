@@ -17,8 +17,9 @@ application_id = nvi-beheer-api
 access_logs = True
 # Include exception/stack traces in JSON logs
 include_traces = True
-# Whether to display debug logs in the console
-debug_logs_in_console = True
+# Which streams reach stdout as readable text, comma separated: app, siem, debug.
+# Leave empty to silence stdout.
+console_streams = debug
 # Log an error when a request arrives without an X-GF-Correlation-ID header
 correlation_id_expected = False
 # Read the client ip from X-Forwarded-For instead of the connection. The header

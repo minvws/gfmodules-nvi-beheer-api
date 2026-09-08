@@ -1,10 +1,10 @@
-from gfmodules.logging import ConfigLogging
 from pydantic import SecretStr
 
 from app.config import (
     Config,
     ConfigApp,
     ConfigDatabase,
+    ConfigLogging,
     ConfigStats,
     ConfigTelemetry,
     ConfigUvicorn,
@@ -21,7 +21,7 @@ def get_test_config() -> Config:
             syslog_path=None,
             application_id="nvi-beheer-api",
             include_traces=True,
-            debug_logs_in_console=True,
+            console_streams=["debug"],
         ),
         database=ConfigDatabase(
             dsn=SecretStr("sqlite:///:memory:"),
