@@ -13,7 +13,7 @@ from app.db.repository.query_builder.context.certificate_context import (
     CertificateQueryContext,
     CertificateRelations,
 )
-from app.db.repository.query_builder.context.data import LoadStrategy
+from app.db.repository.query_builder.data import LoadStrategy
 from app.models.oin import Oin
 
 

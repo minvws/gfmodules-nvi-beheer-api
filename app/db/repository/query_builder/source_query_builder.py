@@ -8,13 +8,13 @@ from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.models.source import SourceEntity
-from app.db.repository.query_builder.context.data import LoadStrategy
 from app.db.repository.query_builder.context.source_context import (
     SourceClientQueryContext,
     SourceOrganizationQueryContext,
     SourceQueryContext,
     SourceRelations,
 )
+from app.db.repository.query_builder.data import LoadStrategy
 
 
 class SourceQueryBuilder:

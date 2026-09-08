@@ -23,11 +23,12 @@ from app.config import (
 )
 from app.logging.events import Log
 from app.middleware.stats import StatsdMiddleware
-from app.routers.certificate import router as certificate_router
 from app.routers.client import router as client_router
+from app.routers.client_certificate import router as client_certificate_router
 from app.routers.default import router as default_router
 from app.routers.health import router as health_router
 from app.routers.organization import router as organization_router
+from app.routers.organization_certificate import router as organization_certificate_router
 from app.routers.resolve import router as resolve_router
 
 logger = logging.getLogger(__name__)
@@ -159,7 +160,15 @@ def setup_fastapi() -> FastAPI:
 
     container.configure()
 
-    routers = [default_router, health_router, organization_router, client_router, resolve_router, certificate_router]
+    routers = [
+        default_router,
+        health_router,
+        organization_router,
+        client_router,
+        resolve_router,
+        organization_certificate_router,
+        client_certificate_router,
+    ]
 
     for router in routers:
         fastapi.include_router(router)

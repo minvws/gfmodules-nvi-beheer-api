@@ -9,7 +9,6 @@ from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.models.scope import ScopeEntity
 from app.db.models.source import SourceEntity
-from app.db.repository.query_builder.context.data import LoadStrategy
 from app.db.repository.query_builder.context.organization_context import (
     OrganizationCertificateQueryContext,
     OrganizationClientQueryContext,
@@ -17,6 +16,7 @@ from app.db.repository.query_builder.context.organization_context import (
     OrganizationRelations,
     OrganizationSourceQueryContext,
 )
+from app.db.repository.query_builder.data import LoadStrategy
 from app.models.ura import UraNumber
 
 

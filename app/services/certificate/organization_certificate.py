@@ -14,7 +14,12 @@ from app.db.repository.query_builder.context.organization_context import (
     OrganizationCertificateQueryContext,
     OrganizationQueryContext,
 )
-from app.models.certificates import Certificate, CertificateCreate, CertificateQueryParams, CertificateUpdate
+from app.models.certificates import (
+    Certificate,
+    CertificateCreate,
+    CertificateQueryParams,
+    CertificateUpdate,
+)
 from app.services.exceptions import ConflictError, ForbidenOperationError, RecordNotFoundError
 
 
@@ -43,7 +48,8 @@ class OrganizationCertificateService:
 
             ctx = params.into_certificate_query_context()
             cert_repo = session.get_repository(CertificateRepository)
-            certs = cert_repo.find_many(organization_id, ctx, params.include_deleted)
+            # TODO: check this if it can be generalized
+            certs = cert_repo.find_many_per_organization(organization_id, ctx, params.include_deleted)
 
             return [Certificate.from_entity(c) for c in certs]
 
@@ -157,6 +163,13 @@ class OrganizationCertificateService:
                     update_certs.append(new_cert)
 
         # handle soft delete
+        update_list = [c.unique_key for c in update_certs]
+        for key, value in current_certs_map.items():
+            if key not in update_list:
+                value.deleted_at = datetime.now()
+                update_certs.append(value)
+
+        return update_certs
         update_list = [c.unique_key for c in update_certs]
         for key, value in current_certs_map.items():
             if key not in update_list:
