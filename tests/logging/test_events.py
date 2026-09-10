@@ -47,7 +47,7 @@ class TestTheOverriddenSlots:
             for name, event in vars(Log).items()
             if not name.startswith("_")
             and name in vars(DefaultEventCatalogue)
-            and event.replace(event_id="") != getattr(DefaultEventCatalogue, name)
+            and event.replace(event_id="") != getattr(DefaultEventCatalogue, name).replace(event_id="")
         }
         assert rerouted == set()
 
