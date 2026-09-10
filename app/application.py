@@ -21,7 +21,7 @@ from app.config import (
     _PATH,
     get_config,
 )
-from app.logging.events import ACT_CN, Log
+from app.logging.events import Log
 from app.middleware.stats import StatsdMiddleware
 from app.routers.client import router as client_router
 from app.routers.default import router as default_router
@@ -111,7 +111,6 @@ def setup_logging() -> None:
         config=config.logging,
         loglevel=config.app.loglevel,
         catalogue=Log,
-        extra_context_fields=(ACT_CN,),
     )
 
 

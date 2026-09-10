@@ -36,7 +36,6 @@ def route() -> Iterator[Any]:
             "endpoint": "/organizations",
             "method": "POST",
             "correlation_id": "corr-1",
-            "gf-act-cn": "acting-client",
         }
     ):
         yield _route
@@ -124,7 +123,7 @@ class TestHealthUnhealthy:
 
 
 class TestAccessRequest:
-    def test_reaches_the_app_stream_only_and_carries_the_acting_client(self, route: Any) -> None:
+    def test_reaches_the_app_stream_only(self, route: Any) -> None:
         routed: Routed = route(Log.ACCESS_REQUEST, "access", status_code=201, duration_ms=5)
 
         message = routed[LoggingStreams.APP][0]
@@ -132,7 +131,6 @@ class TestAccessRequest:
         assert message["method"] == "POST"
         assert message["status_code"] == 201
         assert message["duration_ms"] == 5
-        assert message["gf-act-cn"] == "acting-client"
 
         assert routed[LoggingStreams.PUBLIC_INSPECT] == []
         assert routed[LoggingStreams.SIEM] == []

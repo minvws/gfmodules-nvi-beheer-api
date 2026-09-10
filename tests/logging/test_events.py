@@ -4,7 +4,7 @@ import pytest
 from gfmodules.logging import DefaultEventCatalogue, LoggingStreams, declared_events
 from gfmodules.logging.testing import assert_catalogue_complete
 
-from app.logging.events import ACT_CN, Log
+from app.logging.events import Log
 
 _APP = LoggingStreams.APP
 _SIEM = LoggingStreams.SIEM
@@ -26,7 +26,6 @@ def test_the_catalogue_fills_every_required_slot() -> None:
         ("SYS_UNHANDLED_EXCEPTION", "100604"),
         ("DB_SCHEMA_ERROR", "100605"),
         ("SYS_MISSING_CORRELATION_ID", "100606"),
-        ("ACCESS_REQUEST", "094500"),
         ("CLIENT_ONBOARDED", "100607"),
         ("CLIENT_OFFBOARDED", "100608"),
         ("CREDENTIAL_COUPLED", "100609"),
@@ -42,10 +41,6 @@ def test_the_per_route_access_ids_cover_every_mutating_beheer_route() -> None:
 
 
 class TestTheOverriddenSlots:
-    def test_the_access_record_adds_the_acting_client(self) -> None:
-        added = set(Log.ACCESS_REQUEST.fields[_APP]) - set(DefaultEventCatalogue.ACCESS_REQUEST.fields[_APP])
-        assert added == {ACT_CN.name}
-
     def test_every_other_system_slot_keeps_the_shared_routing(self) -> None:
         rerouted = {
             name
@@ -54,7 +49,7 @@ class TestTheOverriddenSlots:
             and name in vars(DefaultEventCatalogue)
             and event.replace(event_id="") != getattr(DefaultEventCatalogue, name)
         }
-        assert rerouted == {"ACCESS_REQUEST"}
+        assert rerouted == set()
 
 
 class TestStreamRoutingIsDeclared:

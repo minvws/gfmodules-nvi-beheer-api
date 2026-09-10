@@ -1,14 +1,11 @@
 import logging
 
-from gfmodules.logging import ContextField, DefaultEventCatalogue, LogEvent, LoggingStreams
+from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
 
 _APP = LoggingStreams.APP
 _SIEM = LoggingStreams.SIEM
 
 _Base = DefaultEventCatalogue
-
-#: The acting client's common name
-ACT_CN = ContextField(name="gf-act-cn", header="x-gf-act-cn")
 
 
 class Log(_Base):
@@ -17,11 +14,6 @@ class Log(_Base):
     SYS_APP_CRASHED = _Base.SYS_APP_CRASHED.with_id("100602")  # NVI-SYS-002
     SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("100604")  # NVI-SYS-004
     SYS_MISSING_CORRELATION_ID = _Base.SYS_MISSING_CORRELATION_ID.with_id("100606")  # NVI-SYS-006
-    # Overridden: the shared default's allow-list plus the acting client.
-    ACCESS_REQUEST = _Base.ACCESS_REQUEST.replace(  # NVI-AUTH-101
-        event_id="094500",
-        fields={_APP: (*_Base.ACCESS_REQUEST.fields[_APP], ACT_CN.name)},
-    )
 
     HEALTH_UNHEALTHY = LogEvent(  # NVI-HEALTH-001
         "100600",
