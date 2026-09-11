@@ -18,7 +18,7 @@ from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
-from app.logging.events import ACT_CN, Log
+from app.logging.events import Log
 from app.models.oin import Oin
 from app.models.ura import UraNumber
 from app.routers.client import router as client_router
@@ -42,7 +42,6 @@ def logging_catalogue() -> Generator[None, Any, None]:
         config=ConfigLogging(console_streams=["debug"], access_logs=True),
         loglevel="DEBUG",
         catalogue=Log,
-        extra_context_fields=(ACT_CN,),
         strict_fields=True,
     )
     try:

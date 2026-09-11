@@ -14,7 +14,7 @@ from pytest_mock import MockerFixture
 
 from app import application
 from app.config import Config, set_config
-from app.logging.events import ACT_CN, Log
+from app.logging.events import Log
 from tests.test_config import get_test_config
 
 
@@ -88,9 +88,7 @@ class TestApplicationInit:
         install_excepthook.assert_called_once_with(application.logger)
         install_signal_handlers.assert_called_once_with()
 
-    def test_configures_logging_with_the_catalogue_and_the_acting_client_field(
-        self, use_config: Config, mocker: MockerFixture
-    ) -> None:
+    def test_configures_logging_with_the_catalogue(self, use_config: Config, mocker: MockerFixture) -> None:
         configure = mocker.patch("app.application.gflog.configure")
 
         application.setup_logging()
@@ -99,7 +97,6 @@ class TestApplicationInit:
             config=use_config.logging,
             loglevel=use_config.app.loglevel,
             catalogue=Log,
-            extra_context_fields=(ACT_CN,),
         )
 
 
