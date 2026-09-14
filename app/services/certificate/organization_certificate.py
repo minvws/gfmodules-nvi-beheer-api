@@ -5,22 +5,27 @@ from app.db.db import Database
 from app.db.models.certificate import CertificateEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.certificate import CertificateRepository
-from app.db.repository.organization import OrganizationRepository
-from app.db.repository.query_builder.context.certificate_context import (
+from app.db.repository.contexts.certificate_context import (
     CertificateClientQueryContext,
     CertificateQueryContext,
 )
-from app.db.repository.query_builder.context.organization_context import (
+from app.db.repository.contexts.organization_context import (
     OrganizationCertificateQueryContext,
     OrganizationQueryContext,
 )
+from app.db.repository.organization import OrganizationRepository
 from app.models.certificates import (
     Certificate,
     CertificateCreate,
     CertificateQueryParams,
     CertificateUpdate,
 )
-from app.services.exceptions import ConflictError, ForbidenOperationError, RecordNotFoundError
+from app.services.exceptions import (
+    ConflictError,
+    EntityHasActiveMemebersError,
+    ForbidenOperationError,
+    RecordNotFoundError,
+)
 
 
 class OrganizationCertificateService:
@@ -118,15 +123,17 @@ class OrganizationCertificateService:
             if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
 
-            ctx = CertificateQueryContext(id=id, client_ctx=CertificateClientQueryContext.default())
+            ctx = CertificateQueryContext(
+                id=id, organization_id=organization_id, client_ctx=CertificateClientQueryContext.default()
+            )
             cert_repo = session.get_repository(CertificateRepository)
             target = cert_repo.find(ctx)
             if target is None:
                 raise RecordNotFoundError(id)
 
-            valid_for_delete = self.validated_for_delete(target)
-            if valid_for_delete is None:
-                raise ForbidenOperationError()
+            active_memebers = self.validated_for_delete(target)
+            if active_memebers is not None:
+                raise EntityHasActiveMemebersError("Certificate", active_memebers, id)
 
             target.deleted_at = datetime.now()
             session.commit()
@@ -134,14 +141,14 @@ class OrganizationCertificateService:
             return Certificate.from_entity(target)
 
     @staticmethod
-    def validated_for_delete(cert: CertificateEntity) -> bool:
-        valid = True
+    def validated_for_delete(cert: CertificateEntity) -> str | None:
+        valid_for_delete = True
         if cert.clients:
-            for c in cert.clients:
-                if c.deleted_at is not None:
-                    valid = False
-                    break
-        return valid
+            valid_for_delete = any(c.deleted_at is not None for c in cert.clients)
+            if valid_for_delete is False:
+                return "Clients"
+
+        return None
 
     @staticmethod
     def compute_certs_to_update_from_org(

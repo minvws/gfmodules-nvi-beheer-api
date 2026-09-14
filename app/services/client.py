@@ -2,30 +2,24 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
-import gfmodules.logging as gflog
-
 from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
-from app.db.repository.organization import OrganizationRepository
-from app.db.repository.query_builder.context.client_context import (
+from app.db.repository.contexts.client_context import (
     ClientCertificateQueryContext,
     ClientQueryContext,
     ClientSourceQueryContext,
 )
-from app.db.repository.query_builder.context.organization_context import (
+from app.db.repository.contexts.organization_context import (
     OrganizationCertificateQueryContext,
     OrganizationClientQueryContext,
     OrganizationQueryContext,
     OrganizationSourceQueryContext,
 )
-from app.logging.events import Log
+from app.db.repository.organization import OrganizationRepository
 from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
-from app.models.oin import Oin
-from app.models.ura import UraNumber
-from app.services import scopes
 from app.services.certificate import ClientCertificateService
-from app.services.exceptions import OrganizationHasActiveClientsError, RecordNotFoundError
+from app.services.exceptions import EntityHasActiveMemebersError, RecordNotFoundError
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
 
@@ -62,16 +56,6 @@ class ClientService:
 
             client_repo = session.get_repository(ClientRepository)
             new_client = client_repo.add_one(target)
-            Log.event(
-                logger=logger,
-                event=Log.CLIENT_ONBOARDED,
-                message="Client onboarded",
-                # oin=oin,
-                ura_number=org.external_id,
-                # source_identifier=source_id,
-                scopes=scopes,
-                approved_by="system",
-            )
 
             return Client.from_entity(new_client)
 
@@ -111,21 +95,6 @@ class ClientService:
             clients = clients_repo.find_many(ctx, params.include_deleted)
 
             return [Client.from_entity(c) for c in clients]
-
-    def search(self, params: ClientQueryParams) -> list[Client]:
-        with self.db.get_db_session() as session:
-            repo = session.get_repository(ClientRepository)
-            ctx = ClientQueryContext(
-                name=params.name,
-                scopes=params.sanatized_scope,
-                source_ctx=ClientSourceQueryContext(source_id=params.source_id, name=params.source_name),
-                certificate_ctx=ClientCertificateQueryContext(
-                    organization_identifier=params.cert_organization_identifier, domain=params.cert_domain
-                ),
-            )
-
-            results = repo.find_many(ctx, params.include_deleted)
-            return [Client.from_entity(r) for r in results]
 
     def update_one(
         self,
@@ -193,39 +162,24 @@ class ClientService:
             if client is None:
                 raise RecordNotFoundError(id)
 
-            if not self.valid_for_delete(client):
-                raise OrganizationHasActiveClientsError(id)
+            active_member = self.validate_for_delete(client)
+            if active_member:
+                raise EntityHasActiveMemebersError("Client", active_member, id)
 
             client.deleted_at = datetime.now()
             session.commit()
 
-            Log.event(
-                logger=logger,
-                event=Log.CLIENT_OFFBOARDED,
-                message="Client offboarded",
-                # oin=client.oin,
-                # ura_number=org.external_id,
-                deactivated_by="system",
-                reason="Deleted by system",
-            )
-
-    def resolve(
-        self,
-        oin: Oin,
-        common_name: str,
-        org_ura: UraNumber,
-    ) -> ClientEntity | None:
-        with self.db.get_db_session() as session:
-            repo = session.get_repository(ClientRepository)
-            return repo.get_by_credentials(common_name=common_name, oin=oin, org_ura=org_ura)
-
     @staticmethod
-    def valid_for_delete(client: ClientEntity) -> bool:
+    def validate_for_delete(client: ClientEntity) -> str | None:
         valid_for_delete = True
         if client.certificates:
             valid_for_delete = any(c.deleted_at is not None for c in client.certificates)
+            if valid_for_delete is False:
+                return "Certificates"
 
         if client.sources:
             valid_for_delete = any(s.deleted_at is not None for s in client.sources)
+            if valid_for_delete is False:
+                return "Sources"
 
-        return valid_for_delete
+        return None

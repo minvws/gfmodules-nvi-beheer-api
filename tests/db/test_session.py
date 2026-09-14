@@ -1,4 +1,5 @@
-from typing import Any, Callable, list
+from collections.abc import Callable
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -9,7 +10,7 @@ from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
 from app.config import ConfigDatabase
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
-from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
+from tests.conftest import TEST_EXTERNAL_ID, TEST_ORG_NAME
 
 
 def _failing(*errors: Exception) -> Callable[..., Any]:
@@ -38,7 +39,7 @@ def test_commit_failure_is_not_masked_by_retry(retrying_database: Database) -> N
     report success while nothing was written -- it must raise instead.
     """
     with retrying_database.get_db_session() as session:
-        session.add(OrganizationEntity(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME))
+        session.add(OrganizationEntity(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME))
 
         flaky = _failing(
             OperationalError("stmt", {}, Exception("connection refused")),
@@ -54,7 +55,7 @@ def test_commit_failure_is_not_masked_by_retry(retrying_database: Database) -> N
 def test_commit_failure_leaves_nothing_persisted(retrying_database: Database) -> None:
     """The insert must be absent afterwards -- and the caller must have been told."""
     with retrying_database.get_db_session() as session:
-        session.add(OrganizationEntity(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME))
+        session.add(OrganizationEntity(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME))
 
         flaky = _failing(OperationalError("stmt", {}, Exception("connection refused")))
         with patch.object(session.session, "commit", side_effect=flaky):

@@ -1,274 +1,558 @@
-from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
-from app.db.models.client import ClientEntity
-from app.db.models.organization import OrganizationEntity
-from app.models.oin import Oin
-from app.models.ura import UraNumber
+from app import utils
+from app.models.certificates import CertificateCreate, CertificateQueryParams, CertificateUpdate
+from app.models.client import ClientCreate, ClientQueryParams, ClientUpdate
+from app.models.organization import OrganizationCreate
+from app.models.source import SourceCreate, SourceQueryParams, SourceUpdate
+from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
-from app.services.exceptions import ScopesNotGrantedError
+from app.services.exceptions import (
+    EntityHasActiveMemebersError,
+    ForbidenOperationError,
+    RecordNotFoundError,
+    ScopesNotGrantedError,
+)
 from app.services.organization import OrganizationService
-from tests.conftest import TEST_OIN
-
-ALT_OIN = Oin("00000099000000002000")
-SCOPED_ORG_REGISTER_ID = UraNumber("12349000")
-
-
-def _create_client(
-    service: ClientService,
-    organization_id: UUID,
-    *,
-    oin: Oin = TEST_OIN,
-    common_name: str = "CN-1",
-    source_id: str | None = None,
-    scopes: str | None = None,
-) -> ClientEntity:
-    return service.create_one(
-        organization_id=organization_id,
-        oin=oin,
-        common_name=common_name,
-        source_id=source_id,
-        scopes=scopes,
-    )
+from app.services.source.organization_source import OrganizationSourceService
+from tests.conftest import (
+    TEST_CLIENT_NAME,
+    TEST_DOMAIN,
+    TEST_EXTERNAL_ID,
+    TEST_OIN,
+    TEST_ORG_NAME,
+    TEST_SCOPES,
+    TEST_SOURCE_ID,
+    TEST_SOURCE_NAME,
+)
 
 
-def _scoped_org(organization_service: OrganizationService, scopes: str) -> OrganizationEntity:
-    return organization_service.create_one(register_id=SCOPED_ORG_REGISTER_ID, name="Scoped Org", scopes=scopes)
-
-
+@pytest.mark.parametrize(
+    "org_dto, client_dto",
+    [
+        (
+            OrganizationCreate(
+                external_id=TEST_EXTERNAL_ID,
+                name=TEST_ORG_NAME,
+            ),
+            ClientCreate(name=TEST_CLIENT_NAME),
+        ),
+        (
+            OrganizationCreate(
+                external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, scopes="nvi:create nvi:read nvi:delete"
+            ),
+            ClientCreate(name=TEST_CLIENT_NAME, scopes="nvi:create nvi:read"),
+        ),
+        (
+            OrganizationCreate(
+                external_id=TEST_EXTERNAL_ID,
+                name=TEST_ORG_NAME,
+                certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+            ),
+            ClientCreate(name=TEST_CLIENT_NAME),
+        ),
+        (
+            OrganizationCreate(
+                external_id=TEST_EXTERNAL_ID,
+                name=TEST_ORG_NAME,
+                certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+            ),
+            ClientCreate(
+                name=TEST_CLIENT_NAME,
+                certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+            ),
+        ),
+        (
+            OrganizationCreate(
+                external_id=TEST_EXTERNAL_ID,
+                name=TEST_ORG_NAME,
+                sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
+            ),
+            ClientCreate(
+                name=TEST_CLIENT_NAME,
+            ),
+        ),
+        (
+            OrganizationCreate(
+                external_id=TEST_EXTERNAL_ID,
+                name=TEST_ORG_NAME,
+                sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
+            ),
+            ClientCreate(
+                name=TEST_CLIENT_NAME, sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)]
+            ),
+        ),
+        (
+            OrganizationCreate(
+                external_id=TEST_EXTERNAL_ID,
+                name=TEST_ORG_NAME,
+                sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
+                certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+            ),
+            ClientCreate(
+                name=TEST_CLIENT_NAME,
+                sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
+                certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+            ),
+        ),
+    ],
+)
 def test_create_one_should_succeed(
     client_service: ClientService,
-    persisted_organization: OrganizationEntity,
+    organization_service: OrganizationService,
+    org_dto: OrganizationCreate,
+    client_dto: ClientCreate,
 ) -> None:
-    result = _create_client(client_service, persisted_organization.id, source_id="source-1")
-    assert isinstance(result.id, UUID)
-    assert result.organization_id == persisted_organization.id
-    assert str(result.oin) == str(TEST_OIN)
-    assert result.common_name == "CN-1"
-    assert result.source_id == "source-1"
+
+    org = organization_service.create_one(org_dto)
+    client = client_service.create_one(org.id, client_dto)
+
+    assert client.organization_id == org.id
+    assert utils.is_subset(
+        [s.id for s in org.sources] if org.sources else [],
+        [s.id for s in client.sources] if client.sources else [],
+    )
+    assert utils.is_subset(
+        [c.id for c in org.certificates] if org.certificates else [],
+        [c.id for c in client.certificates] if client.certificates else [],
+    )
+    if org.scopes and client.scopes:
+        assert utils.is_subset(org.scopes.split(" "), client.scopes.split(" "))
 
 
-@pytest.mark.parametrize(
-    "real_client, real_org, expected_found",
-    [
-        (True, True, True),
-        (False, True, False),
-        (True, False, False),
-    ],
-)
-def test_get_one_lookup(
-    client_service: ClientService,
-    persisted_organization: OrganizationEntity,
-    real_client: bool,
-    real_org: bool,
-    expected_found: bool,
-) -> None:
-    created = _create_client(client_service, persisted_organization.id)
-    client_id = created.id if real_client else uuid4()
-    organization_id = persisted_organization.id if real_org else uuid4()
-    assert (client_service.get_one(client_id, organization_id) is not None) == expected_found
-
-
-@pytest.mark.parametrize("exists", [True, False])
-def test_delete_one(
-    client_service: ClientService,
-    persisted_organization: OrganizationEntity,
-    exists: bool,
-) -> None:
-    created = _create_client(client_service, persisted_organization.id)
-    target = created.id if exists else uuid4()
-    result = client_service.delete_one(target, persisted_organization.id)
-    assert (result is not None) == exists
-    assert (client_service.get_one(created.id, persisted_organization.id) is None) == exists
-
-
-@pytest.mark.parametrize("exists", [True, False])
-def test_update_one(
-    client_service: ClientService,
-    persisted_organization: OrganizationEntity,
-    exists: bool,
-) -> None:
-    created = _create_client(client_service, persisted_organization.id)
-    target = created.id if exists else uuid4()
-    result = client_service.update_one(target, persisted_organization.id, common_name="Updated Client")
-    if exists:
-        assert result is not None
-        assert result.id == created.id
-        assert result.common_name == "Updated Client"
-    else:
-        assert result is None
-
-
-def test_update_one_can_change_oin_and_source_id(
-    client_service: ClientService,
-    persisted_organization: OrganizationEntity,
-) -> None:
-    created = _create_client(client_service, persisted_organization.id, source_id="source-old")
-    result = client_service.update_one(created.id, persisted_organization.id, oin=ALT_OIN, source_id="source-new")
-    assert result is not None
-    assert str(result.oin) == str(ALT_OIN)
-    assert isinstance(result.oin, Oin)
-    assert result.source_id == "source-new"
-    assert client_service.get_one(created.id, persisted_organization.id) is not None
-
-
-@pytest.mark.parametrize("count", [0, 1, 2])
-def test_get_many_returns_active_clients(
-    client_service: ClientService,
-    persisted_organization: OrganizationEntity,
-    count: int,
-) -> None:
-    for i in range(count):
-        _create_client(client_service, persisted_organization.id, common_name=f"CN-{i}")
-    assert len(client_service.get_many(organization_id=persisted_organization.id)) == count
-
-
-def test_get_many_scoped_to_organization(
-    client_service: ClientService,
-    persisted_organization: OrganizationEntity,
-) -> None:
-    _create_client(client_service, persisted_organization.id)
-    assert client_service.get_many(organization_id=uuid4()) == []
-
-
-@pytest.mark.parametrize("include_deleted, expected_count", [(False, 0), (True, 1)])
-def test_get_many_deleted_visibility(
-    client_service: ClientService,
-    persisted_organization: OrganizationEntity,
-    include_deleted: bool,
-    expected_count: int,
-) -> None:
-    created = _create_client(client_service, persisted_organization.id)
-    client_service.delete_one(created.id, persisted_organization.id)
-    results = client_service.get_many(organization_id=persisted_organization.id, include_deleted=include_deleted)
-    assert len(results) == expected_count
-
-
-@pytest.mark.parametrize(
-    "filter_kwargs, attr, expected",
-    [
-        ({"oin": TEST_OIN}, "oin", TEST_OIN),
-        ({"common_name": "CN-1"}, "common_name", "CN-1"),
-        ({"source_id": "source-a"}, "source_id", "source-a"),
-    ],
-)
-def test_get_many_single_filter(
-    client_service: ClientService,
-    persisted_organization: OrganizationEntity,
-    filter_kwargs: dict[str, Any],
-    attr: str,
-    expected: str,
-) -> None:
-    _create_client(client_service, persisted_organization.id, oin=TEST_OIN, common_name="CN-1", source_id="source-a")
-    _create_client(client_service, persisted_organization.id, oin=ALT_OIN, common_name="CN-2", source_id="source-b")
-    results = client_service.get_many(organization_id=persisted_organization.id, **filter_kwargs)
-    assert len(results) == 1
-    actual = getattr(results[0], attr)
-    if attr == "oin":
-        assert str(actual) == str(expected)
-    else:
-        assert actual == expected
-
-
-@pytest.mark.parametrize(
-    "query, expected_common_names",
-    [
-        ("read", {"CN-1", "CN-2"}),
-        ("write", {"CN-2"}),
-        ("read write", {"CN-2"}),
-        ("rea", set()),
-    ],
-)
-def test_get_many_filters_by_scopes(
+def test_create_should_raise_when_mismatch_scopes(
     client_service: ClientService,
     organization_service: OrganizationService,
-    query: str,
-    expected_common_names: set[str],
+    org_create_dto_1: OrganizationCreate,
+    client_create_dto_1: ClientCreate,
 ) -> None:
-    org = _scoped_org(organization_service, "read write")
-    _create_client(client_service, org.id, oin=TEST_OIN, common_name="CN-1", scopes="read")
-    _create_client(client_service, org.id, oin=ALT_OIN, common_name="CN-2", scopes="read write")
-    results = client_service.get_many(organization_id=org.id, scopes=query)
-    assert {client.common_name for client in results} == expected_common_names
+    org_create_dto_1.clients = None
+    org_create_dto_1.scopes = "nvi:create nvi:delete nvi:localize"
+    client_create_dto_1.scopes = "nvi:read"
+
+    org = organization_service.create_one(org_create_dto_1)
+
+    with pytest.raises(ScopesNotGrantedError):
+        _ = client_service.create_one(org.id, client_create_dto_1)
 
 
 @pytest.mark.parametrize(
-    "org_scopes, requested, expected_scopes, raises",
+    "org_dto, client_dto",
     [
-        ("read write delete", "read write", "read write", False),
-        ("read", None, None, False),
-        ("read", "read write", None, True),
+        (
+            OrganizationCreate(
+                external_id=TEST_EXTERNAL_ID,
+                name=TEST_ORG_NAME,
+                sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
+            ),
+            ClientCreate(
+                name=TEST_CLIENT_NAME,
+                certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+            ),
+        ),
+        (
+            OrganizationCreate(
+                external_id=TEST_EXTERNAL_ID,
+                name=TEST_ORG_NAME,
+                certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+            ),
+            ClientCreate(
+                name=TEST_CLIENT_NAME,
+                sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
+            ),
+        ),
+        (
+            OrganizationCreate(
+                external_id=TEST_EXTERNAL_ID,
+                name=TEST_ORG_NAME,
+            ),
+            ClientCreate(
+                name=TEST_CLIENT_NAME,
+                sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
+                certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+            ),
+        ),
     ],
 )
-def test_create_one_scope_enforcement(
+def test_create_should_raise_on_cert_and_source_mismatch(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+    org_dto: OrganizationCreate,
+    client_dto: ClientCreate,
+) -> None:
+    org = organization_service.create_one(org_dto)
+
+    with pytest.raises(ForbidenOperationError):
+        _ = client_service.create_one(org.id, client_dto)
+
+
+def test_get_one_should_succeed(
+    client_service: ClientService, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.clients is not None
+    client = org.clients[0]
+
+    actual = client_service.get_one(client.id, org.id)
+
+    assert actual == client
+
+
+def test_get_one_should_raise_on_wrong_client_id(
+    client_service: ClientService, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+
+    with pytest.raises(RecordNotFoundError):
+        _ = client_service.get_one(uuid4(), org.id)
+
+
+def test_get_one_should_raise_on_org_client_id(
+    client_service: ClientService, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.clients is not None
+    client = org.clients[0]
+
+    with pytest.raises(RecordNotFoundError):
+        _ = client_service.get_one(client.id, uuid4())
+
+
+def test_get_many_should_succeed(
     client_service: ClientService,
     organization_service: OrganizationService,
-    org_scopes: str,
-    requested: str | None,
-    expected_scopes: str | None,
-    raises: bool,
+    org_create_dto_1: OrganizationCreate,
+    org_create_dto_2: OrganizationCreate,
 ) -> None:
-    org = _scoped_org(organization_service, org_scopes)
-    if raises:
-        with pytest.raises(ScopesNotGrantedError):
-            _create_client(client_service, org.id, scopes=requested)
-    else:
-        result = _create_client(client_service, org.id, scopes=requested)
-        assert result.scopes == expected_scopes
+
+    org = organization_service.create_one(org_create_dto_1)
+    org_2 = organization_service.create_one(org_create_dto_2)
+
+    result_1 = client_service.get_many(org.id, ClientQueryParams())
+    result_2 = client_service.get_many(org_2.id, ClientQueryParams())
+
+    assert org.clients is not None
+    assert result_1 == org.clients
+    assert org_2.clients is not None
+    assert result_2 == org_2.clients
+
+
+def test_get_many_should_return_empty_list_on_no_match(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+
+    actual = client_service.get_many(org.id, ClientQueryParams(name="some-name"))
+
+    assert actual == []
 
 
 @pytest.mark.parametrize(
-    "org_scopes, requested, raises",
+    "params",
     [
-        ("read write", "read", False),
-        ("read", "read write", True),
+        ClientQueryParams(name=TEST_CLIENT_NAME),
+        ClientQueryParams(scopes=TEST_SCOPES),
+        ClientQueryParams(cert_organization_identifier=TEST_OIN),
+        ClientQueryParams(cert_domain=TEST_DOMAIN),
+        ClientQueryParams(cert_organization_identifier=TEST_OIN, cert_domain=TEST_DOMAIN),
+        ClientQueryParams(source_id=TEST_SOURCE_ID),
+        ClientQueryParams(source_name=TEST_SOURCE_NAME),
+        ClientQueryParams(source_id=TEST_SOURCE_ID, source_name=TEST_SOURCE_NAME),
     ],
 )
-def test_update_one_scope_enforcement(
+def test_get_many_should_return_according_based_on_params(
     client_service: ClientService,
     organization_service: OrganizationService,
-    org_scopes: str,
-    requested: str,
-    raises: bool,
+    org_create_dto_1: OrganizationCreate,
+    org_create_dto_2: OrganizationCreate,
+    params: ClientQueryParams,
 ) -> None:
-    org = _scoped_org(organization_service, org_scopes)
-    created = _create_client(client_service, org.id)
-    if raises:
-        with pytest.raises(ScopesNotGrantedError):
-            client_service.update_one(created.id, org.id, scopes=requested)
-    else:
-        result = client_service.update_one(created.id, org.id, scopes=requested)
-        assert result is not None
-        assert result.scopes == requested
+    org = organization_service.create_one(org_create_dto_1)
+    org_2 = organization_service.create_one(org_create_dto_2)
+
+    result = client_service.get_many(org.id, params)
+
+    assert org.clients is not None
+    assert result == org.clients
+    assert org_2.clients is not None
+    assert [c.id for c in org_2.clients] not in [c.id for c in org.clients]
+
+
+def test_get_many_should_return_on_deleted_flag(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+) -> None:
+    assert org_create_dto_1.clients is not None
+    org_create_dto_1.clients[0].certificates = None
+    org_create_dto_1.clients[0].sources = None
+    org_1 = organization_service.create_one(org_create_dto_1)
+
+    assert org_1.clients is not None
+    client_1 = org_1.clients[0]
+    client_service.delete_one(client_1.id, org_1.id)
+
+    actual_with_deleted_flag = client_service.get_many(org_1.id, ClientQueryParams(include_deleted=True))
+    actual_not_deleted_flag = client_service.get_many(org_1.id, ClientQueryParams())
+
+    assert len(actual_with_deleted_flag) == 1
+    assert client_1.id in [c.id for c in actual_with_deleted_flag]
+    assert actual_not_deleted_flag == []
+
+
+def test_update_one_should_succeed(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+    cert_create_dto_1: CertificateCreate,
+    source_create_dto_1: SourceCreate,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    create_dto = ClientCreate(
+        name="old_name", certificates=[cert_create_dto_1], sources=[source_create_dto_1], scopes="nvi:create"
+    )
+    new_client = client_service.create_one(org.id, create_dto)
+    update_dto = ClientUpdate(id=new_client.id, name="new_name")
+    actual = client_service.update_one(new_client.id, org.id, update_dto)
+
+    assert actual.id == update_dto.id
+    assert actual.name == update_dto.name
+    assert actual.certificates is None
+    assert actual.sources is None
+
+
+def test_update_one_should_add_sources_to_client(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    organization_source_service: OrganizationSourceService,
+    org_create_dto_1: OrganizationCreate,
+    cert_create_dto_1: CertificateCreate,
+    source_create_dto_1: SourceCreate,
+    source_create_dto_2: SourceCreate,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    sources = organization_source_service.get_many(org.id, SourceQueryParams())
+    sources_dto = [SourceUpdate(id=s.id, source_id=s.source_id, name=s.name) for s in sources]
+    create_dto = ClientCreate(
+        name="old_name", certificates=[cert_create_dto_1], sources=[source_create_dto_1], scopes="nvi:create"
+    )
+    new_client = client_service.create_one(org.id, create_dto)
+    update_dto = ClientUpdate(id=new_client.id, name="new_name", sources=sources_dto)
+
+    actual = client_service.update_one(new_client.id, org.id, update_dto)
+
+    assert actual.id == update_dto.id
+    assert actual.name == update_dto.name
+    assert actual.certificates is None
+    assert actual.sources is not None
+    assert len(actual.sources) == 2
+
+
+def test_update_one_should_swap_sources_to_client(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    organization_source_service: OrganizationSourceService,
+    org_create_dto_1: OrganizationCreate,
+    cert_create_dto_1: CertificateCreate,
+    source_create_dto_1: SourceCreate,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.sources is not None
+    src_to_swap = org.sources[1]
+    src_update_dto = SourceUpdate(**src_to_swap.model_dump())
+    create_dto = ClientCreate(
+        name="old_name", certificates=[cert_create_dto_1], sources=[source_create_dto_1], scopes="nvi:create"
+    )
+    new_client = client_service.create_one(org.id, create_dto)
+    update_dto = ClientUpdate(id=new_client.id, name="new name", sources=[src_update_dto])
+
+    actual = client_service.update_one(new_client.id, org.id, update_dto)
+
+    assert actual.id == update_dto.id
+    assert actual.certificates is None
+    assert actual.sources is not None
+    assert len(actual.sources) == 1
+    assert actual.sources[0].id == src_to_swap.id
+
+
+def test_update_one_should_add_certificates_to_client(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    organization_certificate_service: OrganizationCertificateService,
+    org_create_dto_1: OrganizationCreate,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    certs_to_add = organization_certificate_service.get_many(org.id, CertificateQueryParams())
+    certs_dto = [
+        CertificateUpdate(id=c.id, organization_identifier=c.organization_identifier, domain=c.domain)
+        for c in certs_to_add
+    ]
+    create_dto = ClientCreate(name="old_name", scopes="nvi:create")
+    new_client = client_service.create_one(org.id, create_dto)
+    update_dto = ClientUpdate(id=new_client.id, name="new name", certificates=certs_dto)
+
+    actual = client_service.update_one(new_client.id, org.id, update_dto)
+
+    assert actual.sources is None
+    assert actual.certificates is not None
+    assert len(actual.certificates) == 2
+    assert actual.certificates == certs_to_add
+
+
+def test_update_one_should_raise_when_source_not_in_org(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    organization_certificate_service: OrganizationCertificateService,
+    org_create_dto_1: OrganizationCreate,
+    source_create_dto_1: SourceCreate,
+    source_create_dto_2: SourceCreate,
+) -> None:
+    org_create_dto_1.sources = [source_create_dto_1]
+    org_create_dto_1.clients = None
+    org = organization_service.create_one(org_create_dto_1)
+    create_dto = ClientCreate(name="old_name", scopes="nvi:create")
+    new_client = client_service.create_one(org.id, create_dto)
+    update_dto = ClientUpdate(
+        id=new_client.id, name="new name", sources=[SourceUpdate(**source_create_dto_2.model_dump(), id=uuid4())]
+    )
+
+    with pytest.raises(ForbidenOperationError):
+        _ = client_service.update_one(new_client.id, org.id, update_dto)
+
+
+def test_upate_one_should_swap_certificates(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    organization_certificate_service: OrganizationCertificateService,
+    org_create_dto_1: OrganizationCreate,
+    cert_create_dto_1: CertificateCreate,
+    cert_create_dto_2: CertificateCreate,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.certificates is not None
+    cert_to_swap = org.certificates[1]
+    cert_dto = CertificateUpdate(**cert_to_swap.model_dump())
+    create_dto = ClientCreate(name="old_name", scopes="nvi:create", certificates=[cert_create_dto_1])
+    new_client = client_service.create_one(org.id, create_dto)
+    update_dto = ClientUpdate(id=new_client.id, name="new name", certificates=[cert_dto])
+
+    actual = client_service.update_one(new_client.id, org.id, update_dto)
+
+    assert actual.sources is None
+    assert actual.certificates is not None
+    assert len(actual.certificates) == 1
+    assert org.certificates[0].id not in [c.id for c in actual.certificates]
+    assert actual.certificates[0].id == cert_dto.id
+
+
+def test_update_one_should_raise_when_adding_cert_not_in_org(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    organization_certificate_service: OrganizationCertificateService,
+    org_create_dto_1: OrganizationCreate,
+    cert_create_dto_1: CertificateCreate,
+    cert_create_dto_2: CertificateCreate,
+) -> None:
+    org_create_dto_1.certificates = [cert_create_dto_1]
+    org = organization_service.create_one(org_create_dto_1)
+    client_dto = ClientCreate(name="old name", certificates=[cert_create_dto_1])
+    new_client = client_service.create_one(org.id, client_dto)
+    cert_dto = CertificateUpdate(id=uuid4(), **cert_create_dto_2.model_dump())
+    update_dto = ClientUpdate(id=new_client.id, name="new name", certificates=[cert_dto])
+
+    with pytest.raises(ForbidenOperationError):
+        _ = client_service.update_one(new_client.id, org.id, update_dto)
+
+
+def test_update_one_should_successfully_change_scope(
+    client_service: ClientService, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    create_dto = ClientCreate(name="old_name", scopes="nvi:create")
+    new_client = client_service.create_one(org.id, create_dto)
+    update_dto = ClientUpdate(id=new_client.id, name="new name", scopes="nvi:read nvi:delete")
+
+    actual = client_service.update_one(new_client.id, org.id, update_dto)
+
+    assert actual.id == update_dto.id
+    assert " ".split(actual.scopes) == " ".split(update_dto.scopes)
+
+
+def test_update_one_should_raise_with_scope_not_in_org(
+    client_service: ClientService, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org_create_dto_1.scopes = "nvi:create nvi:read"
+    org = organization_service.create_one(org_create_dto_1)
+    create_dto = ClientCreate(name="old_name", scopes="nvi:create")
+    new_client = client_service.create_one(org.id, create_dto)
+    update_dto = ClientUpdate(id=new_client.id, name="new name", scopes="nvi:delete")
+
+    with pytest.raises(ScopesNotGrantedError):
+        _ = client_service.update_one(new_client.id, org.id, update_dto)
+
+
+def test_delete_one_should_succeed(
+    client_service: ClientService, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    dto = ClientCreate(name="some name")
+    new_client = client_service.create_one(org.id, dto)
+
+    client_service.delete_one(new_client.id, org.id)
+
+    with pytest.raises(RecordNotFoundError):
+        _ = client_service.get_one(new_client.id, org.id)
+
+
+def test_delete_one_should_raise_with_unkown_org(
+    client_service: ClientService, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    dto = ClientCreate(name="some name")
+    new_client = client_service.create_one(org.id, dto)
+
+    with pytest.raises(RecordNotFoundError):
+        client_service.delete_one(new_client.id, uuid4())
+
+
+def test_delete_one_should_raise_with_unkown_client(
+    client_service: ClientService, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    dto = ClientCreate(name="some name")
+    _ = client_service.create_one(org.id, dto)
+
+    with pytest.raises(RecordNotFoundError):
+        client_service.delete_one(uuid4(), org.id)
 
 
 @pytest.mark.parametrize(
-    "common_name, org_ura, expected_scopes, expected_source_id",
+    "dto",
     [
-        # matched via the organization's register_id
-        ("Scoped Client", SCOPED_ORG_REGISTER_ID, "read write", "source-xyz"),
-        # wrong common_name -> no client
-        ("Nobody", SCOPED_ORG_REGISTER_ID, None, None),
-        # org_ura matches no organization -> no client
-        ("Scoped Client", UraNumber("99999999"), None, None),
+        ClientCreate(name="some-name", sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_CLIENT_NAME)]),
+        ClientCreate(
+            name="some-name", certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)]
+        ),
+        ClientCreate(
+            name="some-name",
+            sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_CLIENT_NAME)],
+            certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+        ),
     ],
 )
-def test_resolve(
+def test_delete_one_should_raise_when_client_has_active_memebers(
     client_service: ClientService,
     organization_service: OrganizationService,
-    common_name: str,
-    org_ura: UraNumber,
-    expected_scopes: str | None,
-    expected_source_id: str | None,
+    org_create_dto_1: OrganizationCreate,
+    dto: ClientCreate,
 ) -> None:
-    org = _scoped_org(organization_service, "read write delete")
-    _create_client(client_service, org.id, common_name="Scoped Client", source_id="source-xyz", scopes="read write")
-    resolved = client_service.resolve(oin=TEST_OIN, common_name=common_name, org_ura=org_ura)
-    if expected_scopes is None:
-        assert resolved is None
-    else:
-        assert resolved is not None
-        assert resolved.scopes == expected_scopes
-        assert resolved.source_id == expected_source_id
+
+    org = organization_service.create_one(org_create_dto_1)
+    new_client = client_service.create_one(org.id, dto)
+
+    with pytest.raises(EntityHasActiveMemebersError):
+        client_service.delete_one(new_client.id, org.id)

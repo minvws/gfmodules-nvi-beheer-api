@@ -5,13 +5,13 @@ from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
 from app.db.models.source import SourceEntity
 from app.db.repository.client import ClientRepository
-from app.db.repository.organization import OrganizationRepository
-from app.db.repository.query_builder.context.client_context import ClientQueryContext, ClientSourceQueryContext
-from app.db.repository.query_builder.context.organization_context import (
+from app.db.repository.contexts.client_context import ClientQueryContext, ClientSourceQueryContext
+from app.db.repository.contexts.organization_context import (
     OrganizationClientQueryContext,
     OrganizationQueryContext,
     OrganizationSourceQueryContext,
 )
+from app.db.repository.organization import OrganizationRepository
 from app.models.source import Source, SourceCreate, SourceQueryParams, SourceUpdate
 from app.services.exceptions import ConflictError, ForbidenOperationError, RecordNotFoundError
 

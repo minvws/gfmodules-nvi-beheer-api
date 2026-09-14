@@ -4,18 +4,18 @@ from uuid import UUID
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
 from app.db.models.source import SourceEntity
-from app.db.repository.organization import OrganizationRepository
-from app.db.repository.query_builder.context.organization_context import (
+from app.db.repository.contexts.organization_context import (
     OrganizationQueryContext,
     OrganizationSourceQueryContext,
 )
-from app.db.repository.query_builder.context.source_context import SourceClientQueryContext, SourceQueryContext
+from app.db.repository.contexts.source_context import SourceClientQueryContext, SourceQueryContext
+from app.db.repository.organization import OrganizationRepository
 from app.db.repository.source import SourceRepository
 from app.models.source import Source, SourceCreate, SourceQueryParams, SourceUpdate
 from app.services.exceptions import (
     ConflictError,
+    EntityHasActiveMemebersError,
     ForbidenOperationError,
-    OrganizationHasActiveClientsError,
     RecordNotFoundError,
 )
 
@@ -72,9 +72,7 @@ class OrganizationSourceService:
     def update_one(self, organization_id: UUID, id: UUID, dto: SourceUpdate) -> Source:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            ctx = OrganizationQueryContext(
-                id=organization_id, source_ctx=OrganizationSourceQueryContext(source_id=dto.source_id)
-            )
+            ctx = OrganizationQueryContext(id=organization_id, source_ctx=OrganizationSourceQueryContext(id=id))
 
             org = repo.find(ctx)
             if org is None:
@@ -103,14 +101,16 @@ class OrganizationSourceService:
                 raise RecordNotFoundError(organization_id)
 
             source_repo = session.get_repository(SourceRepository)
-            ctx = SourceQueryContext(id=id, client_ctx=SourceClientQueryContext.default())
+            ctx = SourceQueryContext(
+                id=id, organization_id=organization_id, client_ctx=SourceClientQueryContext.default()
+            )
             target = source_repo.find(ctx)
             if target is None:
                 raise RecordNotFoundError(id)
 
-            valid_for_delete = self.validate_for_delete(target)
-            if not valid_for_delete:
-                raise OrganizationHasActiveClientsError(target.id)
+            active_memebers = self.validate_for_delete(target)
+            if active_memebers is not None:
+                raise EntityHasActiveMemebersError("Source", active_memebers, target.id)
 
             target.deleted_at = datetime.datetime.now()
             session.commit()
@@ -118,15 +118,14 @@ class OrganizationSourceService:
             return Source.from_entity(target)
 
     @staticmethod
-    def validate_for_delete(source: SourceEntity) -> bool:
-        valid = True
+    def validate_for_delete(source: SourceEntity) -> str | None:
+        valid_for_delete = True
         if source.clients:
-            for c in source.clients:
-                if c.deleted_at is not None:
-                    valid = False
-                    break
+            valid_for_delete = any(c.deleted_at is not None for c in source.clients)
+            if valid_for_delete is False:
+                return "Clients"
 
-        return valid
+        return None
 
     @staticmethod
     def compute_org_sources_for_update(

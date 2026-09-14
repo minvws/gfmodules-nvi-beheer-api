@@ -2,9 +2,8 @@ import logging
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import Response
-from sqlalchemy.exc import IntegrityError
 
 from app.container import get_organization_service
 from app.models.organization import (
@@ -13,7 +12,6 @@ from app.models.organization import (
     OrganizationQueryParams,
     OrganizationUpdate,
 )
-from app.services.exceptions import OrganizationHasActiveClientsError
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -30,14 +28,8 @@ def register(
     data: Annotated[OrganizationCreate, Body()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    try:
-        result = service.create_one(data)
-        return result
-    except IntegrityError:
-        raise HTTPException(
-            status_code=409,
-            detail="An organization with this ID is already registered.",
-        )
+    result = service.create_one(data)
+    return result
 
 
 @router.get("/{id}", response_model=Organization, response_model_exclude_none=True)
@@ -46,8 +38,6 @@ def get_by_id(
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
     result = service.get_one(id)
-    if result is None:
-        raise HTTPException(status_code=404)
     return result
 
 
@@ -67,8 +57,6 @@ def update(
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
     result = service.update_one(id, dto=body)
-    if result is None:
-        raise HTTPException(status_code=404)
     return result
 
 
@@ -76,11 +64,6 @@ def update(
 def delete(
     id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
-) -> Response:
-    try:
-        result = service.delete_one(id)
-    except OrganizationHasActiveClientsError as error:
-        raise HTTPException(status_code=409, detail=str(error))
-    if result is None:
-        raise HTTPException(status_code=404)
+) -> Any:
+    service.delete_one(id)
     return Response(status_code=204)
