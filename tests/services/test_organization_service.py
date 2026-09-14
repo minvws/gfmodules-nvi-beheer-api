@@ -7,7 +7,7 @@ from app.models.ura import UraNumber
 from app.services.client import ClientService
 from app.services.exceptions import OrganizationHasActiveClientsError
 from app.services.organization import OrganizationService
-from tests.conftest import TEST_COMMON_NAME, TEST_OIN, TEST_ORG_NAME, TEST_REGISTER_ID
+from tests.conftest import TEST_COMMON_NAME, TEST_EXTERNAL_ID, TEST_OIN, TEST_ORG_NAME
 
 SECOND_ORG_REG_ID = UraNumber("87654321")
 SECOND_ORG_NAME = "Second Test Organization"
@@ -30,7 +30,7 @@ def test_create_one_with_scopes(
     organization_service: OrganizationService,
 ) -> None:
     result = organization_service.create_one(
-        register_id=TEST_REGISTER_ID,
+        register_id=TEST_EXTERNAL_ID,
         name=TEST_ORG_NAME,
         scopes="read write",
     )
@@ -212,7 +212,7 @@ def test_get_many_filters_by_register_id(
 def test_get_many_filters_by_name(
     organization_service: OrganizationService,
 ) -> None:
-    organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
+    organization_service.create_one(register_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME)
     organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME)
     results = organization_service.get_many(name=TEST_ORG_NAME)
     assert len(results) == 1
@@ -222,7 +222,7 @@ def test_get_many_filters_by_name(
 def test_get_many_filters_by_scopes_contains(
     organization_service: OrganizationService,
 ) -> None:
-    organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="read")
+    organization_service.create_one(register_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, scopes="read")
     organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME, scopes="read write")
     # "read" is contained in both organizations' scope sets.
     assert len(organization_service.get_many(scopes="read")) == 2

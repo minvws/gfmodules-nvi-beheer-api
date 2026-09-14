@@ -29,7 +29,7 @@ class SourceEntity(CommonColumns):
     name: Mapped[str] = mapped_column("name", String)
     organization_id: Mapped[UUID] = mapped_column("organization_id", Uuid, ForeignKey("organizations.id"))
 
-    organization: Mapped["OrganizationEntity"] = relationship(back_populates="sources")
+    organization: Mapped["OrganizationEntity"] = relationship(back_populates="sources", lazy="raise")
     clients: Mapped[list["ClientEntity"]] = relationship(
-        back_populates="sources", secondary=clients_sources_association
+        back_populates="sources", secondary=clients_sources_association, lazy="raise"
     )

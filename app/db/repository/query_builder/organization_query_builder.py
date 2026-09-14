@@ -222,11 +222,23 @@ class OrganizationQueryBuilder:
     ) -> Self:
         main_attr: QueryableAttribute[Any] = OrganizationEntity.clients
         scope_attr: QueryableAttribute[Any] = ClientEntity.scopes
-        if ctx.id:
-            main_attr = main_attr.and_(ClientEntity.id == ctx.id)
 
+        main_options = []
         if self._include_deleted is False:
-            main_attr = main_attr.and_(ClientEntity.deleted_at.is_(None))
+            # main_attr = main_attr.and_(ClientEntity.deleted_at.is_(None))
+            main_options.append(ClientEntity.deleted_at.is_(None))
+
+        if ctx.id:
+            main_options.append(ClientEntity.id == ctx.id)
+        if ctx.organization_id:
+            main_options.append(ClientEntity.organization_id == ctx.organization_id)
+        if ctx.name:
+            main_options.append(ClientEntity.name == ctx.name)
+        if ctx.description:
+            main_options.append(ClientEntity.description == ctx.description)
+
+        if main_options:
+            main_attr = main_attr.and_(*main_options)
 
         load_options = []
 

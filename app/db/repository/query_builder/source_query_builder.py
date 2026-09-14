@@ -4,7 +4,6 @@ from uuid import UUID
 from sqlalchemy import BinaryExpression, ColumnElement, Select, select
 from sqlalchemy.orm import QueryableAttribute, contains_eager, selectinload
 
-from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.models.source import SourceEntity
@@ -137,7 +136,7 @@ class SourceQueryBuilder:
         return self
 
     def _selectinload_clients(self, ctx: SourceClientQueryContext) -> Self:
-        attr: QueryableAttribute[Any] = CertificateEntity.clients
+        attr: QueryableAttribute[Any] = SourceEntity.clients
         conditions: list[Any] = []
 
         if self._include_deleted:
@@ -159,7 +158,7 @@ class SourceQueryBuilder:
         return self
 
     def _joinload_clients(self, ctx: SourceClientQueryContext) -> Self:
-        attr = CertificateEntity.clients
+        attr = SourceEntity.clients
         self._stmt = self._stmt.outerjoin(attr).options(contains_eager(attr))
 
         conditions: list[ColumnElement[bool] | BinaryExpression[bool]] = []
