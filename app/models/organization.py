@@ -1,10 +1,10 @@
 from typing import Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from app.db.models.organization import OrganizationEntity
-from app.db.repository.query_builder.context.organization_context import (
+from app.db.repository.contexts.organization_context import (
     OrganizationCertificateQueryContext,
     OrganizationClientQueryContext,
     OrganizationQueryContext,
@@ -31,8 +31,14 @@ class OrganizationFields(BaseModel):
     name: str = Field(..., description=NAME_DESCRIPTION)
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
+    @field_serializer("external_id")
+    def serialize_external_id(self, external_id: UraNumber) -> str:
+        return self.external_id.value
+
 
 class OrganizationCreate(OrganizationFields):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     external_id: UraNumber = Field(..., description=EXTERNAL_ID_DESCRIPTION)
     name: str = Field(..., description=NAME_DESCRIPTION)
     certificates: list[CertificateCreate] | None = Field(default=None)
@@ -80,35 +86,29 @@ class OrganizationUpdate(BaseModel):
 
     @classmethod
     def from_entity(cls, entity: OrganizationEntity, include_deleted: bool = False) -> Self:
-        certs: list[CertificateUpdate | CertificateCreate] | None = None
-        sources: list[SourceUpdate | SourceCreate] | None = None
+        certs: list[CertificateUpdate | CertificateCreate] = []
+        sources: list[SourceUpdate | SourceCreate] = []
         scopes = [s.name for s in entity.scopes]
 
         if include_deleted:
-            certs = [CertificateUpdate.from_entity(c) for c in entity.certificates] if entity.certificates else None
-            sources = [SourceUpdate.from_entity(s) for s in entity.sources] if entity.sources else None
+            certs = [CertificateUpdate.from_entity(c) for c in entity.certificates]
+            sources = [SourceUpdate.from_entity(s) for s in entity.sources]
         else:
-            certs = (
-                [CertificateUpdate.from_entity(c) for c in entity.certificates if c.deleted_at is None]
-                if entity.certificates
-                else None
-            )
-            sources = (
-                [SourceUpdate.from_entity(s) for s in entity.sources if s.deleted_at is None]
-                if entity.sources
-                else None
-            )
+            certs = [CertificateUpdate.from_entity(c) for c in entity.certificates if c.deleted_at is None]
+            sources = [SourceUpdate.from_entity(s) for s in entity.sources if s.deleted_at is None]
 
         return cls(
             name=entity.name,
             external_id=entity.external_id,
             scopes=" ".join(scopes) if scopes else None,
-            certificates=certs,
-            sources=sources,
+            certificates=certs if certs else None,
+            sources=sources if sources else None,
         )
 
 
 class OrganizationQueryParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = Field(default=None, description=NAME_DESCRIPTION)
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
     external_id: UraNumber | None = Field(default=None, description=EXTERNAL_ID_DESCRIPTION)
@@ -173,9 +173,13 @@ class Organization(CommonModel, OrganizationFields):
     sources: list[Source] | None = Field(default=None)
     clients: list[Client] | None = Field(default=None)
 
+    @property
+    def sanitized_scopes(self) -> list[str] | None:
+        return sanatize_model_scopes(self.scopes)
+
     @classmethod
     def from_entity(cls, entity: OrganizationEntity) -> Self:
-        scopes = " ".join([s.name for s in entity.scopes]) if entity.scopes else None
+        scopes = " ".join(sorted([s.name for s in entity.scopes]))
         return cls(
             id=entity.id,
             external_id=entity.external_id,
@@ -185,4 +189,6 @@ class Organization(CommonModel, OrganizationFields):
             certificates=[Certificate.from_entity(c) for c in entity.certificates] if entity.certificates else None,
             sources=[Source.from_entity(s) for s in entity.sources] if entity.sources else None,
             created_at=entity.created_at,
+            modified_at=entity.modified_at,
+            deleted_at=entity.deleted_at,
         )

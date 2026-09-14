@@ -7,12 +7,12 @@ from app.db.db import Database
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
-from app.db.repository.organization import OrganizationRepository
-from app.db.repository.query_builder.context.organization_context import (
+from app.db.repository.contexts.organization_context import (
     OrganizationCertificateQueryContext,
     OrganizationQueryContext,
     OrganizationSourceQueryContext,
 )
+from app.db.repository.organization import OrganizationRepository
 from app.db.repository.scope import ScopeRepository
 from app.db.repository.source import SourceRepository
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
@@ -20,7 +20,7 @@ from app.services.certificate import OrganizationCertificateService
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.exceptions import (
     ConflictError,
-    OrganizationHasActiveClientsError,
+    EntityHasActiveMemebersError,
     RecordNotFoundError,
     ScopeNotAllowedError,
 )
@@ -39,6 +39,9 @@ class OrganizationService:
     ) -> Organization:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
+            if org_repo.exsits_by_external_id(dto.external_id):
+                raise ConflictError(f"Organization external_id {dto.external_id.value} already exists")
+
             org_entity = OrganizationEntity(
                 external_id=dto.external_id,
                 name=dto.name,
@@ -48,7 +51,7 @@ class OrganizationService:
                 app_scopes = scopes_repo.find_many()
                 valid_scopes = ScopeService.validate_requested_scopes(app_scopes, dto.sanitized_scopes)
                 if not valid_scopes:
-                    raise ScopeNotAllowedError(dto.sanitized_scopes)
+                    raise ScopeNotAllowedError(dto.sanitized_scopes, [s.name for s in app_scopes])
 
                 org_scopes = [s for s in app_scopes if s.name in dto.sanitized_scopes]
                 org_entity.scopes = org_scopes
@@ -64,7 +67,7 @@ class OrganizationService:
                 existing_sources = src_repo.find_many_by_external_ids(dto.source_ids)
                 if len(existing_sources) > 0:
                     raise ConflictError(
-                        f"Sources with source_id {[s.source_id for s in existing_sources]} already exists"
+                        f"Sources with source_id {' '.join([s.source_id for s in existing_sources])} already exists"
                     )
 
                 org_entity.sources = [s.into_entity() for s in dto.sources]
@@ -73,7 +76,6 @@ class OrganizationService:
                 for client in dto.clients:
                     client_entitiy = ClientEntity(name=client.name, description=client.description)
                     if client.scopes:
-                        # TODO: change santizied_scopes to return [] in case scope is empty
                         ScopeService.assert_scopes_granted(org_entity, client.sanatized_scopes or [])
                         client_scopes = ScopeService.make_client_scope_from_org(
                             org_entity, client_entitiy, client.sanatized_scopes or []
@@ -94,11 +96,14 @@ class OrganizationService:
 
                     org_entity.clients.append(client_entitiy)
 
-            new_org = org_repo.add_one(org_entity)
+            org_repo.add_one(org_entity)
+            new_org = org_repo.find_one(org_entity.id)
+            if new_org is None:
+                raise RuntimeError("Something went wrong")
 
             return Organization.from_entity(new_org)
 
-    def get_one(self, id: UUID) -> Organization | None:
+    def get_one(self, id: UUID) -> Organization:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
             entity = repo.find_one(id)
@@ -140,19 +145,20 @@ class OrganizationService:
             if change_happened is False:
                 return OrganizationUpdate.from_entity(org)
 
+            org.external_id = dto.external_id
             org.name = dto.name
             if dto.sanitized_scopes:
                 scope_repo = session.get_repository(ScopeRepository)
                 app_scope = scope_repo.find_many()
                 valid_scopes = ScopeService.validate_requested_scopes(app_scope, dto.sanitized_scopes)
                 if not valid_scopes:
-                    raise ScopeNotAllowedError(dto.sanitized_scopes)
+                    raise ScopeNotAllowedError(dto.sanitized_scopes, [s.name for s in app_scope])
 
                 org_scopes = [s for s in app_scope if s.name in dto.sanitized_scopes]
                 org.scopes = org_scopes
             else:
                 org.scopes = []
-
+            # TODO: check against client as well
             if dto.certificates:
                 update_certs = OrganizationCertificateService.compute_certs_to_update_from_org(org, dto.certificates)
                 org.certificates = update_certs
@@ -175,16 +181,16 @@ class OrganizationService:
             session.commit()
             return OrganizationUpdate.from_entity(org)
 
-    def delete_one(self, id: UUID) -> OrganizationEntity | None:
+    def delete_one(self, id: UUID) -> None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
             org = repo.find_one(id)
             if org is None:
-                return None
+                raise RecordNotFoundError(id)
 
-            valid_for_delete = OrganizationService.validate_org_for_delete(org)
-            if not valid_for_delete:
-                raise OrganizationHasActiveClientsError(id)
+            active_member = OrganizationService.validate_org_for_delete(org)
+            if active_member:
+                raise EntityHasActiveMemebersError("Organization", active_member, id)
 
             org.deleted_at = datetime.now()
 
@@ -195,18 +201,22 @@ class OrganizationService:
             session.commit()
             session.session.refresh(org)
 
-            return org
-
     @staticmethod
-    def validate_org_for_delete(org: OrganizationEntity) -> bool:
+    def validate_org_for_delete(org: OrganizationEntity) -> str | None:
         valid_for_delete = True
         if org.clients:
             valid_for_delete = any(c.deleted_at is not None for c in org.clients)
+            if valid_for_delete is False:
+                return "Clients"
 
         if org.certificates:
             valid_for_delete = any(c.deleted_at is not None for c in org.certificates)
+            if valid_for_delete is False:
+                return "Certificates"
 
         if org.sources:
             valid_for_delete = any(s.deleted_at is not None for s in org.sources)
+            if valid_for_delete is False:
+                return "Sources"
 
-        return valid_for_delete
+        return None

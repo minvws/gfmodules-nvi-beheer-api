@@ -14,7 +14,7 @@ from app.models.oin import Oin
 from app.models.source import Source, SourceCreate, SourceUpdate
 from app.models.ura import UraNumber
 
-ORG_URA_DESCRIPTION = "The URA (register_id) of the organization the client acts on behalf of"
+ORG_URA_DESCRIPTION = "The URA (external_id) of the organization the client acts on behalf of"
 COMMON_NAME_DESCRIPTION = "The certificate CN of the client"
 EXTERNAL_ID_DESCRIPTION = "The OIN of the client"
 SOURCE_ID_DESCRIPTION = "The optional source ID of the client"
@@ -23,16 +23,11 @@ ORGANIZATION_NAME_DESCRIPTION = "The name of the organization the client acts on
 
 
 class ClientResolveRequest(BaseModel):
-    client_organization_id: Oin = Field(..., description=EXTERNAL_ID_DESCRIPTION)
-    client_common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
+    client_id: UUID
     organization_id: UraNumber = Field(..., description=ORG_URA_DESCRIPTION)
-
-
-class ClientResolveResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
-    source_id: str | None = Field(default=None, description=SOURCE_ID_DESCRIPTION)
-    organization_name: str | None = Field(default=None, description=ORGANIZATION_NAME_DESCRIPTION)
+    sub: Oin
+    common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
+    source_id: str | None = None
 
 
 class ClientFields(BaseModel):
@@ -67,6 +62,7 @@ class ClientUpdate(ClientFields):
 
 
 class ClientQueryParams(ClientOptionalFields):
+    model_config = ConfigDict(extra="forbid")
     cert_organization_identifier: Oin | None = None
     cert_domain: str | None = None
     source_id: str | None = None
@@ -86,7 +82,7 @@ class Client(CommonModel, ClientFields):
 
     @classmethod
     def from_entity(cls, entity: ClientEntity) -> Self:
-        scopes = " ".join([s.name for s in entity.scopes]) if entity.scopes else None
+        scopes = " ".join(sorted([s.name for s in entity.scopes])) if entity.scopes else None
 
         return cls(
             id=entity.id,
@@ -97,4 +93,6 @@ class Client(CommonModel, ClientFields):
             certificates=[Certificate.from_entity(c) for c in entity.certificates] if entity.certificates else None,
             sources=[Source.from_entity(s) for s in entity.sources] if entity.sources else None,
             created_at=entity.created_at,
+            modified_at=entity.modified_at,
+            deleted_at=entity.deleted_at,
         )

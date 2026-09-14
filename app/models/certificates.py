@@ -1,7 +1,7 @@
 from typing import Self
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from app.db.models.certificate import CertificateEntity
 from app.models.base import CommonModel, CommonQueryParams
@@ -14,7 +14,7 @@ class CertificateOptionalFields(BaseModel):
 
 
 class CertificateQueryParams(CommonQueryParams, CertificateOptionalFields):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class ClientCertificateQueryParams(CertificateOptionalFields):
@@ -24,6 +24,10 @@ class ClientCertificateQueryParams(CertificateOptionalFields):
 class CertificateField(BaseModel):
     organization_identifier: Oin
     domain: str
+
+    @field_serializer("organization_identifier")
+    def serialize_organization_identifier(self, organization_identifier: Oin) -> str:
+        return organization_identifier.value
 
     def make_unique_key(self, organization_id: UUID) -> str:
         return f"{str(organization_id)}-{str(self.organization_identifier)}-{self.domain}"
@@ -42,6 +46,8 @@ class CertificateUpdate(CertificateField):
 
 
 class Certificate(CommonModel, CertificateField):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     @classmethod
     def from_entity(cls, entity: CertificateEntity) -> Self:
         return cls(
@@ -49,4 +55,5 @@ class Certificate(CommonModel, CertificateField):
             organization_identifier=entity.organization_identifier,
             domain=entity.domain,
             created_at=entity.created_at,
+            deleted_at=entity.deleted_at,
         )

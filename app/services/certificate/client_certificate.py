@@ -5,13 +5,13 @@ from app.db.db import Database
 from app.db.models.certificate import CertificateEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.client import ClientRepository
-from app.db.repository.organization import OrganizationRepository
-from app.db.repository.query_builder.context.client_context import ClientCertificateQueryContext, ClientQueryContext
-from app.db.repository.query_builder.context.organization_context import (
+from app.db.repository.contexts.client_context import ClientCertificateQueryContext, ClientQueryContext
+from app.db.repository.contexts.organization_context import (
     OrganizationCertificateQueryContext,
     OrganizationClientQueryContext,
     OrganizationQueryContext,
 )
+from app.db.repository.organization import OrganizationRepository
 from app.models.certificates import (
     Certificate,
     CertificateCreate,

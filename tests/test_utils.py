@@ -18,15 +18,15 @@ def test_parse_empty_string_is_empty() -> None:
 
 
 def test_is_subset_true() -> None:
-    assert utils.is_subset(["read"], ["read write"]) is True
+    assert utils.is_subset(["read", "write"], ["read"]) is True
 
 
 def test_is_subset_equal() -> None:
-    assert utils.is_subset(["read write"], ["write read"]) is True
+    assert utils.is_subset(["read", "write"], ["write", "read"]) is True
 
 
 def test_is_subset_empty_child_is_always_subset() -> None:
-    assert utils.is_subset([""], ["read"]) is True
+    assert utils.is_subset(["read"], []) is True
     assert utils.is_subset(None, None) is True
 
 

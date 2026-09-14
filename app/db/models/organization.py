@@ -41,7 +41,7 @@ class OrganizationEntity(CommonColumns):
     certificates: Mapped[list["CertificateEntity"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan", lazy="raise"
     )
-    scopes: Mapped[list["ScopeEntity"]] = relationship(secondary=organizations_scopes_association, lazy="raise")
+    scopes: Mapped[list["ScopeEntity"]] = relationship(secondary=organizations_scopes_association)
     sources: Mapped[list["SourceEntity"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan", lazy="raise"
     )

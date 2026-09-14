@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.conftest import TEST_REGISTER_ID, VALID_OIN, make_client_entity, make_organization_entity
+from tests.conftest import TEST_EXTERNAL_ID, VALID_OIN, make_client_entity, make_organization_entity
 
 RESOLVE = "/clients/resolve"
 
@@ -12,7 +12,7 @@ def _body(**overrides: object) -> dict[str, object]:
     body: dict[str, object] = {
         "client_organization_id": str(VALID_OIN),
         "client_common_name": "Client",
-        "organization_id": str(TEST_REGISTER_ID),
+        "organization_id": str(TEST_EXTERNAL_ID),
     }
     body.update(overrides)
     return body
@@ -31,7 +31,7 @@ def test_resolve_returns_scopes_and_source_id(api: TestClient, mock_client_servi
     call = mock_client_service.resolve.call_args
     assert str(call.kwargs["oin"]) == str(VALID_OIN)
     assert call.kwargs["common_name"] == "Client"
-    assert str(call.kwargs["org_ura"]) == str(TEST_REGISTER_ID)
+    assert str(call.kwargs["org_ura"]) == str(TEST_EXTERNAL_ID)
 
 
 def test_resolve_returns_no_source_id_when_absent(api: TestClient, mock_client_service: MagicMock) -> None:
@@ -62,16 +62,17 @@ def test_resolve_client_without_scopes_returns_404(api: TestClient, mock_client_
 @pytest.mark.parametrize(
     "body",
     [
-        {"client_common_name": "CN", "organization_id": str(TEST_REGISTER_ID)},  # missing client_organization_id
+        {"client_common_name": "CN", "organization_id": str(TEST_EXTERNAL_ID)},  # missing client_organization_id
         {
             "client_organization_id": str(VALID_OIN),
-            "organization_id": str(TEST_REGISTER_ID),
+            "organization_id": str(TEST_EXTERNAL_ID),
         },  # missing client_common_name
-        {"client_organization_id": str(VALID_OIN), "client_common_name": "C"},  # missing organization_id
+        # missing organization_id
+        {"client_organization_id": str(VALID_OIN), "client_common_name": "C"},
         {
             "client_organization_id": "invalid-oin",
             "client_common_name": "C",
-            "organization_id": str(TEST_REGISTER_ID),
+            "organization_id": str(TEST_EXTERNAL_ID),
         },  # malformed oin
     ],
 )

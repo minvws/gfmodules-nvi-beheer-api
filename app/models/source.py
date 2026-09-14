@@ -32,6 +32,7 @@ class SourceUpdate(SourceFields):
 
 
 class SourceQueryParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     source_id: str | None = None
     name: str | None = None
 
@@ -48,4 +49,6 @@ class Source(SourceFields, CommonModel):
             source_id=entity.source_id,
             name=entity.name,
             created_at=entity.created_at,
+            modified_at=entity.modified_at,
+            deleted_at=entity.deleted_at,
         )

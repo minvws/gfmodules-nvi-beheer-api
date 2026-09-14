@@ -1,67 +1,57 @@
+from uuid import uuid4
+
 import pytest
 from pydantic import ValidationError
 
+from app.models.certificates import CertificateCreate
 from app.models.client import (
     ClientCreate,
     ClientQueryParams,
     ClientResolveRequest,
     ClientUpdate,
 )
+from app.models.source import SourceCreate
 from app.models.ura import UraNumber
-from tests.conftest import TEST_OIN
+from tests.conftest import TEST_CLIENT_NAME, TEST_OIN
 
 
-def test_create_should_succeed() -> None:
-    model = ClientCreate(external_id=TEST_OIN, common_name="Test Client")
-    assert str(model.external_id) == str(TEST_OIN)
-    assert model.common_name == "Test Client"
-    assert model.source_id is None
-    assert model.scopes is None
-
-
-def test_create_source_id_is_optional() -> None:
-    model = ClientCreate(external_id=TEST_OIN, common_name="Test Client", source_id="source-1")
-    assert model.source_id == "source-1"
+def test_create_should_succeed(cert_create_dto_1: CertificateCreate, source_create_dto_1: SourceCreate) -> None:
+    model = ClientCreate(name=TEST_CLIENT_NAME, certificates=[cert_create_dto_1], sources=[source_create_dto_1])
+    assert model.name == TEST_CLIENT_NAME
+    assert model.sources is not None
+    assert model.certificates is not None
+    assert model.certificates == [cert_create_dto_1]
+    assert model.sources == [source_create_dto_1]
 
 
 def test_create_with_scopes_should_succeed() -> None:
-    model = ClientCreate(external_id=TEST_OIN, common_name="Test Client", scopes="read")
-    assert model.scopes == "read"
+    model = ClientCreate(name="Test Client", scopes="nvi:read")
+    assert model.scopes == "nvi:read"
+    assert model.sanatized_scopes == ["nvi:read"]
 
 
-def test_create_missing_oin_should_raise() -> None:
+def test_create_missing_name_should_raise() -> None:
     with pytest.raises(ValidationError):
-        ClientCreate(common_name="Test Client")  # type: ignore[call-arg]
-
-
-def test_create_missing_common_name_should_raise() -> None:
-    with pytest.raises(ValidationError):
-        ClientCreate(external_id=TEST_OIN)  # type: ignore[call-arg]
+        ClientCreate(description="some desc")  # type: ignore[call-arg]
 
 
 def test_update_is_partial_all_fields_optional() -> None:
-    model = ClientUpdate()
-    assert model.external_id is None
-    assert model.common_name is None
-    assert model.source_id is None
-    assert model.scopes is None
+    model = ClientUpdate(id=uuid4(), name="some name")
+    assert model.description is None
+    assert model.sources is None
+    assert model.certificates is None
 
 
 def test_update_only_tracks_supplied_fields() -> None:
-    model = ClientUpdate(common_name="New Name")
-    assert model.model_dump(exclude_unset=True) == {"common_name": "New Name"}
-
-
-def test_update_can_set_oin_and_source_id() -> None:
-    model = ClientUpdate(external_id=TEST_OIN, source_id="source-1")
-    assert str(model.external_id) == str(TEST_OIN)
-    assert model.source_id == "source-1"
+    mock_id = uuid4()
+    model = ClientUpdate(id=mock_id, name="New Name")
+    assert model.model_dump(exclude_unset=True) == {"id": mock_id, "name": "New Name"}
 
 
 def test_query_params_all_optional_and_track_supplied_only() -> None:
     assert ClientQueryParams().model_dump(exclude_unset=True) == {}
-    params = ClientQueryParams(common_name="CN-1", scopes="read")
-    assert params.model_dump(exclude_unset=True) == {"common_name": "CN-1", "scopes": "read"}
+    params = ClientQueryParams(name="some name", scopes="nvi:read")
+    assert params.model_dump(exclude_unset=True) == {"name": "some name", "scopes": "nvi:read"}
 
 
 def test_resolve_request_should_succeed() -> None:
