@@ -13,7 +13,7 @@ from app.models.organization import (
     OrganizationQueryParams,
     OrganizationUpdate,
 )
-from app.services.exceptions import OrganizationHasActiveClientsError
+from app.services.exceptions import EntityHasActiveMemebersError
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ def delete(
 ) -> Response:
     try:
         result = service.delete_one(id)
-    except OrganizationHasActiveClientsError as error:
+    except EntityHasActiveMemebersError as error:
         raise HTTPException(status_code=409, detail=str(error))
     if result is None:
         raise HTTPException(status_code=404)

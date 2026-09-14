@@ -23,7 +23,7 @@ from app.models.oin import Oin
 from app.models.ura import UraNumber
 from app.services import scopes
 from app.services.certificate import ClientCertificateService
-from app.services.exceptions import OrganizationHasActiveClientsError, RecordNotFoundError
+from app.services.exceptions import EntityHasActiveMemebersError, RecordNotFoundError
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
 
@@ -192,7 +192,7 @@ class ClientService:
                 raise RecordNotFoundError(id)
 
             if not self.valid_for_delete(client):
-                raise OrganizationHasActiveClientsError(id)
+                raise EntityHasActiveMemebersError(id)
 
             client.deleted_at = datetime.now()
             session.commit()

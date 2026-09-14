@@ -26,7 +26,11 @@ class OrganizationQueryBuilder:
         self._include_deleted: bool = include_deleted
 
     def apply_context(self, ctx: OrganizationQueryContext) -> Self:
-        self.include_scopes(ctx.scopes)
+        self.with_scopes(ctx.scopes)
+
+        if ctx.id:
+            self.with_id(ctx.id)
+
         if ctx.external_id:
             self.with_external_id(ctx.external_id)
 
@@ -65,27 +69,11 @@ class OrganizationQueryBuilder:
         self._stmt = self._stmt.where(OrganizationEntity.name == name)
         return self
 
-    def include_scopes(self, scopes: list[str] | None = None) -> Self:
-        match self._load_strategy:
-            case LoadStrategy.SELECTIN_LOAD:
-                self._selectinload_scopes(scopes)
-            case LoadStrategy.OUTERJOIN_LOAD:
-                self._joinload_scopes(scopes)
+    def with_scopes(self, scopes: list[str] | None = None) -> Self:
+        self._stmt = self._stmt.options(selectinload(OrganizationEntity.scopes))
 
-        return self
-
-    def _selectinload_scopes(self, scopes: list[str] | None = None) -> Self:
-        attr: QueryableAttribute[Any] = OrganizationEntity.scopes
         if scopes:
-            attr = attr.and_(or_(*[ScopeEntity.name == s for s in scopes]))
-
-        self._stmt = self._stmt.options(selectinload(attr))
-        return self
-
-    def _joinload_scopes(self, scopes: list[str] | None = None) -> Self:
-        self._stmt = self._stmt.outerjoin(OrganizationEntity.scopes).options(contains_eager(OrganizationEntity.scopes))
-        if scopes:
-            self._stmt = self._stmt.where(or_(*[ScopeEntity.name == s for s in scopes]))
+            self._stmt = self._stmt.where(OrganizationEntity.scopes.any(ScopeEntity.name.in_(scopes)))
 
         return self
 
@@ -222,11 +210,23 @@ class OrganizationQueryBuilder:
     ) -> Self:
         main_attr: QueryableAttribute[Any] = OrganizationEntity.clients
         scope_attr: QueryableAttribute[Any] = ClientEntity.scopes
-        if ctx.id:
-            main_attr = main_attr.and_(ClientEntity.id == ctx.id)
 
+        main_options = []
         if self._include_deleted is False:
-            main_attr = main_attr.and_(ClientEntity.deleted_at.is_(None))
+            # main_attr = main_attr.and_(ClientEntity.deleted_at.is_(None))
+            main_options.append(ClientEntity.deleted_at.is_(None))
+
+        if ctx.id:
+            main_options.append(ClientEntity.id == ctx.id)
+        if ctx.organization_id:
+            main_options.append(ClientEntity.organization_id == ctx.organization_id)
+        if ctx.name:
+            main_options.append(ClientEntity.name == ctx.name)
+        if ctx.description:
+            main_options.append(ClientEntity.description == ctx.description)
+
+        if main_options:
+            main_attr = main_attr.and_(*main_options)
 
         load_options = []
 

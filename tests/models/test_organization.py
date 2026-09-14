@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
-from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
+from tests.conftest import TEST_EXTERNAL_ID, TEST_ORG_NAME
 
 
 @pytest.fixture(autouse=True)
@@ -19,7 +19,7 @@ def configure_allowed_scopes() -> Generator[Any, Any, Any]:
 
 def test_create_with_disallowed_scopes_should_raise() -> None:
     with pytest.raises(ValidationError):
-        OrganizationCreate(external_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="admin")
+        OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, scopes="admin")
 
 
 def test_update_with_disallowed_scopes_should_raise() -> None:
@@ -28,14 +28,14 @@ def test_update_with_disallowed_scopes_should_raise() -> None:
 
 
 def test_create_should_succeed() -> None:
-    model = OrganizationCreate(external_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
-    assert str(model.external_id) == str(TEST_REGISTER_ID)
+    model = OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME)
+    assert str(model.external_id) == str(TEST_EXTERNAL_ID)
     assert model.name == TEST_ORG_NAME
     assert model.scopes is None
 
 
 def test_create_with_scopes_should_succeed() -> None:
-    model = OrganizationCreate(external_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="read write")
+    model = OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, scopes="read write")
     assert model.scopes == "read write"
 
 
@@ -47,7 +47,7 @@ def test_create_missing_register_id_should_raise() -> None:
 def test_create_missing_name_should_raise() -> None:
     with pytest.raises(ValidationError):
         # type: ignore[call-arg]
-        OrganizationCreate(external_id=TEST_REGISTER_ID)
+        OrganizationCreate(external_id=TEST_EXTERNAL_ID)
 
 
 def test_update_should_succeed() -> None:
@@ -70,7 +70,7 @@ def test_update_only_tracks_supplied_fields() -> None:
 def test_response_model_from_entity_with_none_scopes() -> None:
     class _Entity:
         id = uuid4()
-        register_id = TEST_REGISTER_ID
+        register_id = TEST_EXTERNAL_ID
         name = TEST_ORG_NAME
         scopes = None
         created_at = now.now()
@@ -85,7 +85,7 @@ def test_response_model_allows_scopes_no_longer_configured() -> None:
 
     class _Entity:
         id = uuid4()
-        register_id = TEST_REGISTER_ID
+        register_id = TEST_EXTERNAL_ID
         name = TEST_ORG_NAME
         scopes = "admin"
         created_at = now.now()

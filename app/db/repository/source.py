@@ -23,9 +23,11 @@ class SourceRepository(RepositoryBase):
         stmt = SourceQueryBuilder().with_id(id).with_organization_id(organization_id).build()
         return self.db_session.execute(stmt).scalar_one_or_none()
 
-    def find_many(self, ctx: SourceQueryContext) -> Sequence[SourceEntity]:
+    def find_many(self, ctx: SourceQueryContext, include_deleted: bool = False) -> Sequence[SourceEntity]:
         load_strategy = self._determine_strategy(ctx)
-        stmt = SourceQueryBuilder(load_strategy=load_strategy).apply_context(ctx).build()
+        stmt = (
+            SourceQueryBuilder(load_strategy=load_strategy, include_deleted=include_deleted).apply_context(ctx).build()
+        )
 
         return self.db_session.execute(stmt).scalars().unique().all()
 

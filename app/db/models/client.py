@@ -31,7 +31,6 @@ class ClientEntity(CommonColumns):
         secondary=clients_scopes_association,
         primaryjoin="and_(ClientEntity.id == clients_scopes.c.client_id, ClientEntity.organization_id == clients_scopes.c.organization_id)",
         secondaryjoin="ScopeEntity.id == clients_scopes.c.scope_id",
-        lazy="raise",
     )
     certificates: Mapped[list["CertificateEntity"]] = relationship(
         back_populates="clients", secondary=clients_certificates_association, lazy="raise"

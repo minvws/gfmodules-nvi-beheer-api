@@ -1,7 +1,7 @@
 from typing import Self
 from uuid import UUID
 
-from sqlalchemy import Select, or_, select
+from sqlalchemy import Select, select
 from sqlalchemy.orm import contains_eager, selectinload
 
 from app.db.models.certificate import CertificateEntity
@@ -23,7 +23,7 @@ class ClientQueryBuilder:
         self._include_deleted: bool = include_deleted
 
     def apply_context(self, ctx: ClientQueryContext) -> Self:
-        self.include_scopes(ctx.scopes)
+        self.with_scopes(ctx.scopes)
 
         if ctx.id:
             self.with_id(ctx.id)
@@ -72,29 +72,10 @@ class ClientQueryBuilder:
         self._stmt = self._stmt.where(ClientEntity.description == description)
         return self
 
-    def include_scopes(self, scopes: list[str] | None = None) -> Self:
-        match self._load_strategy:
-            case LoadStrategy.SELECTIN_LOAD:
-                self._selectinload_scopes(scopes)
-
-            case LoadStrategy.OUTERJOIN_LOAD:
-                self._joinload_scopes(scopes)
-
-        return self
-
-    def _selectinload_scopes(self, scopes: list[str] | None = None) -> Self:
-        attr = ClientEntity.scopes
+    def with_scopes(self, scopes: list[str] | None = None) -> Self:
+        self._stmt = self._stmt.options(selectinload(ClientEntity.scopes))
         if scopes:
-            attr = attr.and_(or_(*[ScopeEntity.name == s for s in scopes]))
-
-        self._stmt = self._stmt.options(selectinload(attr))
-        return self
-
-    def _joinload_scopes(self, scopes: list[str] | None = None) -> Self:
-        self._stmt = self._stmt.outerjoin(ClientEntity.scopes).options(contains_eager(ClientEntity.scopes))
-
-        if scopes:
-            self._stmt = self._stmt.where(or_(*[ScopeEntity.name == s for s in scopes]))
+            self._stmt = self._stmt.where(ClientEntity.scopes.any(ScopeEntity.name.in_(scopes)))
 
         return self
 

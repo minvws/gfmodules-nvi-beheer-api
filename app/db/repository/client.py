@@ -37,7 +37,7 @@ class ClientRepository(RepositoryBase):
             ClientQueryBuilder()
             .with_id(id)
             .with_organization_id(organization_id)
-            .include_scopes()
+            .with_scopes()
             .include_certificate(ClientCertificateQueryContext.default())
             .include_sources(ClientSourceQueryContext.default())
             .build()

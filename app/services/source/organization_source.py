@@ -14,8 +14,8 @@ from app.db.repository.source import SourceRepository
 from app.models.source import Source, SourceCreate, SourceQueryParams, SourceUpdate
 from app.services.exceptions import (
     ConflictError,
+    EntityHasActiveMemebersError,
     ForbidenOperationError,
-    OrganizationHasActiveClientsError,
     RecordNotFoundError,
 )
 
@@ -110,7 +110,7 @@ class OrganizationSourceService:
 
             valid_for_delete = self.validate_for_delete(target)
             if not valid_for_delete:
-                raise OrganizationHasActiveClientsError(target.id)
+                raise EntityHasActiveMemebersError(target.id)
 
             target.deleted_at = datetime.datetime.now()
             session.commit()

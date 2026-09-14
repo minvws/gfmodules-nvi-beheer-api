@@ -1,27 +1,25 @@
 # TODO: make specific errors for these generics
 
 
-from fastapi import HTTPException
-
-
 class ScopesNotGrantedError(Exception):
     def __init__(self, ungranted: set[str]) -> None:
         super().__init__(f"Scopes not granted by the organization: {', '.join(sorted(ungranted))}")
 
 
 class ScopeNotAllowedError(Exception):
-    def __init__(self, scope: list[str]) -> None:
-        super().__init__(f"Scope `{', '.join(scope)}` is not allowed")
+    def __init__(self, request_scope: list[str], allowed_scopes: list[str]) -> None:
+        forbidden_scope = set(request_scope) - set(allowed_scopes)
+        super().__init__(f"Scope `{', '.join(forbidden_scope)}` is not allowed")
 
 
-class OrganizationHasActiveClientsError(Exception):
-    def __init__(self, organization_id: object) -> None:
-        super().__init__(f"Organization {organization_id} has active clients and cannot be deleted.")
+class EntityHasActiveMemebersError(Exception):
+    def __init__(self, entity: str, member: str, entity_id: object) -> None:
+        super().__init__(f"{entity} {entity_id} has active {member} and cannot be deleted.")
 
 
-class RecordNotFoundError(HTTPException):
+class RecordNotFoundError(Exception):
     def __init__(self, record_id: object) -> None:
-        super().__init__(status_code=404, detail=f"Record {record_id} not found")
+        super().__init__(f"Record {record_id} not found")
 
 
 class ConflictError(Exception):

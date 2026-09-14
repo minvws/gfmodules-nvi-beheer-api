@@ -86,7 +86,7 @@ class Client(CommonModel, ClientFields):
 
     @classmethod
     def from_entity(cls, entity: ClientEntity) -> Self:
-        scopes = " ".join([s.name for s in entity.scopes]) if entity.scopes else None
+        scopes = " ".join(sorted([s.name for s in entity.scopes])) if entity.scopes else None
 
         return cls(
             id=entity.id,

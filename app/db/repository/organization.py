@@ -25,11 +25,13 @@ class OrganizationRepository(RepositoryBase):
         try:
             self.db_session.add(data)
             self.db_session.commit()
-            self.db_session.session.refresh(
-                data,
-                attribute_names=["scopes", "certificates", "sources", "clients"],
+            ctx = OrganizationQueryContext(
+                client_ctx=OrganizationClientQueryContext.default(),
+                certificate_ctx=OrganizationCertificateQueryContext.default(),
+                source_ctx=OrganizationSourceQueryContext.default(),
             )
-            return data
+            stmt = OrganizationQueryBuilder().with_id(data.id).apply_context(ctx).build()
+            return self.db_session.execute(stmt).unique().scalar_one()
         except SQLAlchemyError:
             self.db_session.rollback()
             raise
@@ -43,7 +45,7 @@ class OrganizationRepository(RepositoryBase):
             OrganizationQueryBuilder(include_deleted=include_deleted)
             .with_id(id)
             .include_clients(OrganizationClientQueryContext.default())
-            .include_scopes()
+            .with_scopes()
             .include_sources(OrganizationSourceQueryContext.default())
             .include_certificate(OrganizationCertificateQueryContext.default())
             .build()

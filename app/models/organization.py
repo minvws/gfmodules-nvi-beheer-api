@@ -173,9 +173,19 @@ class Organization(CommonModel, OrganizationFields):
     sources: list[Source] | None = Field(default=None)
     clients: list[Client] | None = Field(default=None)
 
+    @property
+    def sanitized_scopes(self) -> list[str] | None:
+        return sanatize_model_scopes(self.scopes)
+
     @classmethod
     def from_entity(cls, entity: OrganizationEntity) -> Self:
-        scopes = " ".join([s.name for s in entity.scopes]) if entity.scopes else None
+        scopes = " ".join(sorted([s.name for s in entity.scopes]))
+        print()
+
+        print(entity.scopes)
+        print("from model")
+        print(scopes)
+        print()
         return cls(
             id=entity.id,
             external_id=entity.external_id,

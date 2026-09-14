@@ -6,12 +6,15 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from app.config import ConfigDatabase
 from app.container import get_client_service, get_organization_service
 from app.db.db import Database
+from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
+from app.db.models.source import SourceEntity
 from app.db.repository.certificate import CertificateRepository
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
@@ -25,12 +28,16 @@ from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
+from app.services.source.client_source import ClientSourceService
+from app.services.source.organization_source import OrganizationSourceService
 
 TEST_OIN = Oin("00000099000000001000")
-TEST_REGISTER_ID = UraNumber("12345678")
+TEST_EXTERNAL_ID = UraNumber("12345678")
 TEST_ORG_NAME = "Test Organization"
+TEST_SCOPES = "nvi:create nvi:read nvi:delete nvi:localize"
+TEST_CLIENT_NAME = "Test Client"
 TEST_SOURCE_ID = "source-001"
-TEST_COMMON_NAME = "Test Client"
+TEST_DOMAIN = "example.com"
 VALID_OIN = TEST_OIN
 FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0)
 
@@ -40,6 +47,12 @@ def database() -> Generator[Database, Any, None]:
     config_database = ConfigDatabase(dsn="sqlite:///:memory:", retry_backoff=[])
     db = Database(config_database=config_database)
     db.generate_tables()
+    # setup system scopes
+    stmt = text("INSERT INTO scopes (name) VALUES ('nvi:create'), ('nvi:delete'),('nvi:read'),('nvi:localize');")
+    with db.get_db_session() as session:
+        session.session.execute(stmt)
+        session.commit()
+
     yield db
     db.engine.dispose()
 
@@ -87,25 +100,33 @@ def client_certificate_service(database: Database) -> ClientCertificateService:
 
 
 @pytest.fixture()
+def organization_source_service(database: Database) -> OrganizationSourceService:
+    return OrganizationSourceService(database)
+
+
+@pytest.fixture()
+def client_source_service(database: Database) -> ClientSourceService:
+    return ClientSourceService(database)
+
+
+@pytest.fixture()
 def organization_entity() -> OrganizationEntity:
-    return OrganizationEntity(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
+    return OrganizationEntity(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME)
 
 
 @pytest.fixture()
-def persisted_organization(
-    organization_service: OrganizationService,
-) -> OrganizationEntity:
-    return organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
+def client_entity() -> ClientEntity:
+    return ClientEntity(name=TEST_CLIENT_NAME, description="Test description")
 
 
 @pytest.fixture()
-def client_entity(persisted_organization: OrganizationEntity) -> ClientEntity:
-    return ClientEntity(
-        organization_id=persisted_organization.id,
-        source_id=TEST_SOURCE_ID,
-        oin=TEST_OIN,
-        common_name=TEST_COMMON_NAME,
-    )
+def certificate_entity() -> CertificateEntity:
+    return CertificateEntity(organization_identifier=TEST_OIN, domain="example.com")
+
+
+@pytest.fixture()
+def source_entity() -> SourceEntity:
+    return SourceEntity(source_id=TEST_SOURCE_ID, name="Source Example")
 
 
 @pytest.fixture()
@@ -133,14 +154,14 @@ def api(mock_client_service: MagicMock, mock_organization_service: MagicMock) ->
 def make_organization_entity(
     *,
     id: UUID | None = None,
-    register_id: UraNumber = TEST_REGISTER_ID,
+    external_id: UraNumber = TEST_EXTERNAL_ID,
     name: str = "Test Organization",
     scopes: str | None = None,
     deleted_at: datetime | None = None,
 ) -> OrganizationEntity:
     return OrganizationEntity(
         id=id or uuid4(),
-        register_id=register_id,
+        external_id=external_id,
         name=name,
         scopes=scopes,
         created_at=FIXED_CREATED_AT,

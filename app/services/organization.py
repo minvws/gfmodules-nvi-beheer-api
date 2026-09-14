@@ -20,7 +20,7 @@ from app.services.certificate import OrganizationCertificateService
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.exceptions import (
     ConflictError,
-    OrganizationHasActiveClientsError,
+    EntityHasActiveMemebersError,
     RecordNotFoundError,
     ScopeNotAllowedError,
 )
@@ -48,7 +48,7 @@ class OrganizationService:
                 app_scopes = scopes_repo.find_many()
                 valid_scopes = ScopeService.validate_requested_scopes(app_scopes, dto.sanitized_scopes)
                 if not valid_scopes:
-                    raise ScopeNotAllowedError(dto.sanitized_scopes)
+                    raise ScopeNotAllowedError(dto.sanitized_scopes, app_scopes)
 
                 org_scopes = [s for s in app_scopes if s.name in dto.sanitized_scopes]
                 org_entity.scopes = org_scopes
@@ -64,7 +64,7 @@ class OrganizationService:
                 existing_sources = src_repo.find_many_by_external_ids(dto.source_ids)
                 if len(existing_sources) > 0:
                     raise ConflictError(
-                        f"Sources with source_id {[s.source_id for s in existing_sources]} already exists"
+                        f"Sources with source_id {' '.join([s.source_id for s in existing_sources])} already exists"
                     )
 
                 org_entity.sources = [s.into_entity() for s in dto.sources]
@@ -146,7 +146,7 @@ class OrganizationService:
                 app_scope = scope_repo.find_many()
                 valid_scopes = ScopeService.validate_requested_scopes(app_scope, dto.sanitized_scopes)
                 if not valid_scopes:
-                    raise ScopeNotAllowedError(dto.sanitized_scopes)
+                    raise ScopeNotAllowedError(dto.sanitized_scopes, [s.name for s in app_scope])
 
                 org_scopes = [s for s in app_scope if s.name in dto.sanitized_scopes]
                 org.scopes = org_scopes
@@ -182,9 +182,9 @@ class OrganizationService:
             if org is None:
                 return None
 
-            valid_for_delete = OrganizationService.validate_org_for_delete(org)
-            if not valid_for_delete:
-                raise OrganizationHasActiveClientsError(id)
+            active_member = OrganizationService.validate_org_for_delete(org)
+            if active_member:
+                raise EntityHasActiveMemebersError("Organization", active_member, id)
 
             org.deleted_at = datetime.now()
 
@@ -198,15 +198,19 @@ class OrganizationService:
             return org
 
     @staticmethod
-    def validate_org_for_delete(org: OrganizationEntity) -> bool:
+    def validate_org_for_delete(org: OrganizationEntity) -> str | None:
         valid_for_delete = True
         if org.clients:
             valid_for_delete = any(c.deleted_at is not None for c in org.clients)
+            if valid_for_delete is False:
+                return "Clients"
 
         if org.certificates:
             valid_for_delete = any(c.deleted_at is not None for c in org.certificates)
+            if valid_for_delete is False:
+                return "Certificates"
 
         if org.sources:
             valid_for_delete = any(s.deleted_at is not None for s in org.sources)
-
-        return valid_for_delete
+            if valid_for_delete is False:
+                return "Sources"
