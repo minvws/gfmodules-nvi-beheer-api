@@ -127,6 +127,7 @@ class TestUnhandledExceptionHandler:
             raise RuntimeError("explode")
 
         fastapi.add_exception_handler(Exception, application._unhandled_exception_handler)
+        fastapi.add_middleware(RequestContextMiddleware)
         return fastapi
 
     def test_returns_500_and_routes_the_exception_to_app_and_siem(self) -> None:
