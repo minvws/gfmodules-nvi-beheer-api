@@ -15,6 +15,7 @@ from app.db.repository.contexts.organization_context import (
     OrganizationSourceQueryContext,
 )
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.scope import ScopeRepository
 from app.models.oin import Oin
 from app.models.ura import UraNumber
 from tests.conftest import TEST_EXTERNAL_ID
@@ -357,6 +358,39 @@ def test_find_many_should_filter_on_children(
 
         assert len(actual_sources) == 1
         assert actual_sources[0] == source_entity
+
+
+def test_find_should_filter_clients_on_scopes(
+    organization_entity: OrganizationEntity,
+    client_entity: ClientEntity,
+    organization_repository: OrganizationRepository,
+    scope_repository: ScopeRepository,
+) -> None:
+    with scope_repository.db_session:
+        org_scopes = scope_repository.find_many(["nvi:create", "nvi:read, nvi:delete"])
+
+    organization_entity.scopes.extend(org_scopes)
+    client_entity.scopes = organization_entity.scopes[:2]
+    client_entity_2 = ClientEntity(name="client-2")
+    organization_entity.clients.extend([client_entity, client_entity_2])
+
+    with organization_repository.db_session as session:
+        org = organization_repository.add_one(organization_entity)
+        session.flush()
+        session.session.expire_all()
+
+        result = organization_repository.find(
+            ctx=OrganizationQueryContext(
+                id=org.id,
+                client_ctx=OrganizationClientQueryContext(scopes=[s.name for s in org.scopes[:2]]),
+            )
+        )
+
+        assert result is not None
+        assert result.scopes == org_scopes
+        assert len(result.clients) == 1
+        assert result.clients[0].id == org.clients[0].id
+        assert result.clients[0].scopes == org.clients[0].scopes
 
 
 def test_find_many_excludes_deleted(
