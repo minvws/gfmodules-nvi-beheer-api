@@ -57,5 +57,5 @@ class Database:
             logger.info("Database is not healthy: %s", e)
             return False
 
-    def get_db_session(self) -> DbSession:
-        return DbSession(self.engine, self._config_database.retry_backoff)
+    def get_db_session(self, commit: bool = False) -> DbSession:
+        return DbSession(self.engine, self._config_database.retry_backoff, commit)

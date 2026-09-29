@@ -62,6 +62,7 @@ def ok_or_error(value: bool) -> str:
 def health(
     db: Annotated[Database, Depends(get_database)],
 ) -> JSONResponse:
+
     logger.info("Checking application health")
 
     components = {

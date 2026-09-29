@@ -1,7 +1,7 @@
 import logging
 import random
 from time import sleep
-from typing import Any, Callable, List, ParamSpec, Tuple, Type, TypeVar
+from typing import Any, Callable, ParamSpec, Tuple, Type, TypeVar
 
 from sqlalchemy import Delete, Engine, Insert, Result
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
@@ -49,11 +49,13 @@ R = TypeVar("R", bound=Tuple[Any, ...])
 
 class DbSession:
     _engine: Engine
-    _retry_backoff: List[float]
+    _retry_backoff: list[float]
+    _commit: bool
 
-    def __init__(self, engine: Engine, retry_backoff: List[float]) -> None:
+    def __init__(self, engine: Engine, retry_backoff: list[float], commit: bool) -> None:
         self._engine = engine
         self._retry_backoff = retry_backoff
+        self._commit = commit
 
     def __enter__(self) -> "DbSession":
         """
@@ -66,7 +68,11 @@ class DbSession:
         """
         Close the session when exiting the context manager
         """
-        self.session.close()
+        try:
+            if exc_type is None and exc_val is None and self._commit:
+                self.commit()
+        finally:
+            self.session.close()
 
     def get_repository(self, repository_class: Type["base.TRepositoryBase"]) -> "base.TRepositoryBase":
         """
@@ -102,6 +108,24 @@ class DbSession:
         :return:
         """
         self._run_once(self.session.commit)
+
+    def flush(self) -> None:
+        """Flush all the object changes to the database.
+
+        Writes out all pending object creations, deletions and modifications
+        to the database as INSERTs, DELETEs, UPDATEs, etc.  Operations are
+        automatically ordered by the Session's unit of work dependency
+        solver.
+
+        Database operations will be issued in the current transactional
+        context and do not affect the state of the transaction, unless an
+        error occurs, in which case the entire transaction is rolled back.
+        You may flush() as often as you like within a transaction to move
+        changes from Python to the database's transaction buffer.
+
+        :return:
+        """
+        self._run_once(self.session.flush)
 
     def rollback(self) -> None:
         """
