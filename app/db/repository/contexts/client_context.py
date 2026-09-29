@@ -9,6 +9,7 @@ from app.db.repository.contexts.data import (
     ClientQueryContextBase,
     SourceQueryContextBase,
 )
+from app.models.scopes import AuthorizationScope
 
 
 @dataclass()
@@ -44,7 +45,7 @@ class ClientSourceQueryContext(SourceQueryContextBase):
 
 @dataclass()
 class ClientQueryContext(ClientQueryContextBase):
-    scopes: list[str] | None = None
+    scopes: list[AuthorizationScope] | None = None
     certificate_ctx: ClientCertificateQueryContext | None = None
     source_ctx: ClientSourceQueryContext | None = None
 

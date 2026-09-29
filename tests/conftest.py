@@ -2,7 +2,6 @@ from collections.abc import Generator
 from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock
-from uuid import UUID, uuid4
 
 import gfmodules.logging as gflog
 import pytest
@@ -23,6 +22,7 @@ from app.db.models.source import SourceEntity
 from app.db.repository.certificate import CertificateRepository
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.scope import ScopeRepository
 from app.db.repository.source import SourceRepository
 from app.logging.events import Log
 from app.models.certificates import CertificateCreate
@@ -91,6 +91,11 @@ def database() -> Generator[Database, Any, None]:
 
     yield db
     db.engine.dispose()
+
+
+@pytest.fixture()
+def scope_repository(database: Database) -> ScopeRepository:
+    return ScopeRepository(db_session=database.get_db_session())
 
 
 @pytest.fixture()
@@ -255,45 +260,3 @@ def api(
     app.dependency_overrides[get_client_service] = lambda: client_service
     app.dependency_overrides[get_organization_service] = lambda: organization_service
     return TestClient(app)
-
-
-def make_organization_entity(
-    *,
-    id: UUID | None = None,
-    external_id: UraNumber = TEST_EXTERNAL_ID,
-    name: str = "Test Organization",
-    scopes: str | None = None,
-    deleted_at: datetime | None = None,
-) -> OrganizationEntity:
-    return OrganizationEntity(
-        id=id or uuid4(),
-        external_id=external_id,
-        name=name,
-        scopes=scopes,
-        created_at=FIXED_CREATED_AT,
-        deleted_at=deleted_at,
-    )
-
-
-def make_client_entity(
-    *,
-    id: UUID | None = None,
-    organization_id: UUID | None = None,
-    oin: Oin = VALID_OIN,
-    common_name: str = "Test Client",
-    source_id: str | None = None,
-    scopes: str | None = None,
-    deleted_at: datetime | None = None,
-    org_entity: OrganizationEntity | None = None,
-) -> ClientEntity:
-    return ClientEntity(
-        id=id or uuid4(),
-        organization_id=organization_id or (org_entity.id if org_entity else uuid4()),
-        oin=oin,
-        common_name=common_name,
-        source_id=source_id,
-        scopes=scopes,
-        created_at=FIXED_CREATED_AT,
-        deleted_at=deleted_at,
-        organization=org_entity,
-    )

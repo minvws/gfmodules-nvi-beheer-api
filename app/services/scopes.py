@@ -4,13 +4,14 @@ from app import utils
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.models.scope import ScopeEntity
+from app.models.scopes import AuthorizationScope
 from app.services.exceptions import ScopesNotGrantedError
 
 
 class ScopeService:
     @staticmethod
     def make_client_scope_from_org(
-        org: OrganizationEntity, client: ClientEntity, new_scopes: list[str]
+        org: OrganizationEntity, client: ClientEntity, new_scopes: list[AuthorizationScope]
     ) -> list[ScopeEntity]:
 
         client_scope_map = {s.name: s for s in client.scopes} if client.scopes else {}
@@ -29,14 +30,14 @@ class ScopeService:
         return target
 
     @staticmethod
-    def validate_requested_scopes(existing: Sequence[ScopeEntity], incoming: list[str]) -> bool:
+    def validate_requested_scopes(existing: Sequence[ScopeEntity], incoming: list[AuthorizationScope]) -> bool:
         existing_set = {s.name for s in existing}
-        incoming_set = set(incoming)
+        incoming_set = {s.value for s in incoming}
 
         return incoming_set.issubset(existing_set)
 
     @staticmethod
-    def assert_scopes_granted(organization: OrganizationEntity, requested: list[str]) -> None:
+    def assert_scopes_granted(organization: OrganizationEntity, requested: list[AuthorizationScope]) -> None:
         available = [c.name for c in organization.scopes]
         if not utils.is_subset(available, requested):
             ungranted = set(requested) - set(available or [])

@@ -13,6 +13,7 @@ from app.db.repository.contexts.data import (
     OrganizationQueryContextBase,
     SourceQueryContextBase,
 )
+from app.models.scopes import AuthorizationScope
 
 
 @dataclass()
@@ -49,7 +50,7 @@ class OrganizationSourceQueryContext(SourceQueryContextBase):
 
 @dataclass()
 class OrganizationClientQueryContext(ClientQueryContextBase):
-    scopes: list[str] | None = None
+    scopes: list[AuthorizationScope] | None = None
     certificate_ctx: OrganizationCertificateQueryContext | None = None
     source_ctx: OrganizationSourceQueryContext | None = None
     include_scopes: bool = True
@@ -80,7 +81,7 @@ class OrganizationClientQueryContext(ClientQueryContextBase):
 @dataclass()
 class OrganizationQueryContext(OrganizationQueryContextBase):
     id: UUID | None = None
-    scopes: list[str] | None = None
+    scopes: list[AuthorizationScope] | None = None
     client_ctx: OrganizationClientQueryContext | None = None
     certificate_ctx: OrganizationCertificateQueryContext | None = None
     source_ctx: OrganizationSourceQueryContext | None = None

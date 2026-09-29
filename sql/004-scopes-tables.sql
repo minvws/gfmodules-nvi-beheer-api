@@ -6,10 +6,10 @@ BEGIN;
 	);
 	/*Scopes as defined by the TO*/
 	INSERT INTO scopes (name) VALUES 
-	  ('nvi:create'),
-	  ('nvi:delete'),
-	  ('nvi:read'),
-	  ('nvi:localize');
+	  ('CREATE'),
+	  ('DELETE'),
+	  ('READ'),
+	  ('LOCALIZE');
 
 
 	 -- create backup for organizations and clients 
