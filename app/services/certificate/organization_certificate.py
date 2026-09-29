@@ -3,7 +3,6 @@ from uuid import UUID
 
 from app.db.db import Database
 from app.db.models.certificate import CertificateEntity
-from app.db.models.organization import OrganizationEntity
 from app.db.repository.certificate import CertificateRepository
 from app.db.repository.contexts.certificate_context import (
     CertificateClientQueryContext,
@@ -22,8 +21,7 @@ from app.models.certificates import (
 )
 from app.services.exceptions import (
     ConflictError,
-    EntityHasActiveMemebersError,
-    ForbidenOperationError,
+    EntityHasActiveMembersError,
     RecordNotFoundError,
 )
 
@@ -60,7 +58,7 @@ class OrganizationCertificateService:
             return [Certificate.from_entity(c) for c in certs]
 
     def create_one(self, organization_id: UUID, dto: CertificateCreate) -> Certificate:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(
                 id=organization_id, certificate_ctx=OrganizationCertificateQueryContext.default()
@@ -85,12 +83,12 @@ class OrganizationCertificateService:
             else:
                 org.certificates = [new_cert]
 
-            session.commit()
+            session.flush()
 
             return Certificate.from_entity(new_cert)
 
     def update_one(self, id: UUID, organization_id: UUID, dto: CertificateUpdate) -> Certificate:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             ctx = OrganizationQueryContext(
                 id=organization_id, certificate_ctx=OrganizationCertificateQueryContext(id=id)
             )
@@ -99,6 +97,9 @@ class OrganizationCertificateService:
 
             if org is None:
                 raise RecordNotFoundError(organization_id)
+
+            if not org.certificates:
+                raise RecordNotFoundError(id)
 
             target = org.certificates[0]
 
@@ -114,11 +115,12 @@ class OrganizationCertificateService:
             if target.domain != target.domain:
                 target.domain = target.domain
 
-            session.commit()
+            session.flush()
+
             return Certificate.from_entity(target)
 
     def delete_one(self, organization_id: UUID, id: UUID) -> Certificate:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
@@ -133,10 +135,10 @@ class OrganizationCertificateService:
 
             active_memebers = self.validated_for_delete(target)
             if active_memebers is not None:
-                raise EntityHasActiveMemebersError("Certificate", active_memebers, id)
+                raise EntityHasActiveMembersError("Certificate", active_memebers, id)
 
             target.deleted_at = datetime.now()
-            session.commit()
+            session.flush()
 
             return Certificate.from_entity(target)
 
@@ -149,36 +151,3 @@ class OrganizationCertificateService:
                 return "Clients"
 
         return None
-
-    @staticmethod
-    def compute_certs_to_update_from_org(
-        org: OrganizationEntity, target: list[CertificateCreate | CertificateUpdate]
-    ) -> list[CertificateEntity]:
-        # handle new certs
-        results = [CertificateEntity(**c.model_dump()) for c in target if isinstance(c, CertificateCreate)]
-        updated_ids: list[UUID] = []
-
-        current_cert_map = {c.id: c for c in org.certificates}
-
-        for cert in target:
-            if not isinstance(cert, CertificateUpdate):
-                continue
-
-            current_cert = current_cert_map.get(cert.id)
-            if current_cert is None:
-                raise ForbidenOperationError(
-                    f"id {cert.id} is not allowed to be added."
-                )  # TODO: more descriptive error
-            current_cert.organization_identifier = cert.organization_identifier
-            current_cert.domain = cert.domain
-
-            results.append(current_cert)
-            updated_ids.append(current_cert.id)
-
-        # handle soft delete
-        for key, value in current_cert_map.items():
-            if key not in updated_ids:
-                value.deleted_at = datetime.now()
-                results.append(value)
-
-        return results

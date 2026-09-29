@@ -19,7 +19,7 @@ from app.db.repository.contexts.organization_context import (
 from app.db.repository.organization import OrganizationRepository
 from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
 from app.services.certificate import ClientCertificateService
-from app.services.exceptions import EntityHasActiveMemebersError, RecordNotFoundError
+from app.services.exceptions import EntityHasActiveMembersError, RecordNotFoundError
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
 
@@ -34,7 +34,7 @@ class ClientService:
         self.db = db
 
     def create_one(self, organization_id: UUID, dto: ClientCreate) -> Client:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.find_one(organization_id)
             if not org:
@@ -102,7 +102,7 @@ class ClientService:
         organization_id: UUID,
         dto: ClientUpdate,
     ) -> Client:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(
                 id=organization_id,
@@ -145,14 +145,12 @@ class ClientService:
                 client.certificates = updated_certs
             else:
                 client.certificates = []
-
-            session.add(client)
-            session.commit()
+            session.flush()
 
             return Client.from_entity(client)
 
     def delete_one(self, id: UUID, organization_id: UUID) -> None:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             if not org_repo.exists(organization_id):
                 raise RecordNotFoundError(organization_id)
@@ -164,10 +162,9 @@ class ClientService:
 
             active_member = self.validate_for_delete(client)
             if active_member:
-                raise EntityHasActiveMemebersError("Client", active_member, id)
+                raise EntityHasActiveMembersError("Client", active_member, id)
 
             client.deleted_at = datetime.now()
-            session.commit()
 
     @staticmethod
     def validate_for_delete(client: ClientEntity) -> str | None:

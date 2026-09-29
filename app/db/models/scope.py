@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 class ScopeEntity(Base):
     __tablename__ = "scopes"
 
-    id: Mapped[int] = mapped_column("id", Integer, primary_key=True)
-    name: Mapped[str] = mapped_column("name", String)
-    created_at: Mapped[datetime] = mapped_column("created_at", TIMESTAMP, server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP, server_default=func.now())
 
     organizations: Mapped["OrganizationEntity"] = relationship(secondary=organizations_scopes_association, lazy="raise")
     clients: Mapped["ClientEntity"] = relationship(

@@ -22,9 +22,9 @@ if TYPE_CHECKING:
 class ClientEntity(CommonColumns):
     __tablename__ = "clients"
 
-    name: Mapped[str] = mapped_column("name", String)
-    description: Mapped[str | None] = mapped_column("description", String)
-    organization_id: Mapped[UUID] = mapped_column("organization_id", Uuid, ForeignKey("organizations.id"))
+    name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(String)
+    organization_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("organizations.id"))
 
     organization: Mapped["OrganizationEntity"] = relationship(back_populates="clients", lazy="raise")
     scopes: Mapped[list["ScopeEntity"]] = relationship(

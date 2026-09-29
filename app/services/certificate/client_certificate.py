@@ -68,7 +68,7 @@ class ClientCertificateService:
             return [Certificate.from_entity(c) for c in client.certificates]
 
     def assign_one(self, organization_id: UUID, client_id: UUID, id: UUID) -> Certificate:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             repo = session.get_repository(OrganizationRepository)
             cert_ctx = OrganizationCertificateQueryContext(id=id)
             ctx = OrganizationQueryContext(
@@ -94,11 +94,12 @@ class ClientCertificateService:
                 raise ConflictError(f"Certificate {id} already assigned to client {client_id}")
 
             client.certificates.append(target_cert)
-            session.commit()
+            session.flush()
+
             return Certificate.from_entity(target_cert)
 
     def unassign_one(self, organization_id: UUID, client_id: UUID, id: UUID) -> Certificate:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
 
             cert_ctx = OrganizationCertificateQueryContext(id=id)
@@ -122,7 +123,7 @@ class ClientCertificateService:
                 raise RecordNotFoundError(f"Client {client_id} has not certificate {id} assigned")
 
             target = client.certificates.pop(0)
-            session.commit()
+            session.flush()
 
             return Certificate.from_entity(target)
 

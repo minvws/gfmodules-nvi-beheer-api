@@ -59,7 +59,7 @@ class ClientSourceService:
             return [Source.from_entity(e) for e in client.sources]
 
     def assign_one(self, organization_id: UUID, client_id: UUID, id: UUID) -> Source:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             src_ctx = OrganizationSourceQueryContext(id=id)
             ctx = OrganizationQueryContext(

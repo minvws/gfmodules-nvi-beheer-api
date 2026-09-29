@@ -10,7 +10,7 @@ from app.models.source import SourceCreate, SourceQueryParams, SourceUpdate
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
 from app.services.exceptions import (
-    EntityHasActiveMemebersError,
+    EntityHasActiveMembersError,
     ForbidenOperationError,
     RecordNotFoundError,
     ScopesNotGrantedError,
@@ -554,5 +554,5 @@ def test_delete_one_should_raise_when_client_has_active_memebers(
     org = organization_service.create_one(org_create_dto_1)
     new_client = client_service.create_one(org.id, dto)
 
-    with pytest.raises(EntityHasActiveMemebersError):
+    with pytest.raises(EntityHasActiveMembersError):
         client_service.delete_one(new_client.id, org.id)

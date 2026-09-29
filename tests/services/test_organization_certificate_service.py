@@ -2,10 +2,10 @@ from uuid import uuid4
 
 import pytest
 
-from app.models.certificates import CertificateCreate, CertificateQueryParams
+from app.models.certificates import CertificateCreate, CertificateQueryParams, CertificateUpdate
 from app.models.organization import OrganizationCreate
 from app.services.certificate.organization_certificate import OrganizationCertificateService
-from app.services.exceptions import ConflictError, EntityHasActiveMemebersError, RecordNotFoundError
+from app.services.exceptions import ConflictError, EntityHasActiveMembersError, RecordNotFoundError
 from app.services.organization import OrganizationService
 from tests.conftest import SECOND_DOMAIN, SECOND_OIN, TEST_DOMAIN, TEST_OIN
 
@@ -212,5 +212,40 @@ def test_delete_one_should_raise_when_cert_has_clients(
     assert client.certificates is not None
     assert target.id in [c.id for c in client.certificates]
 
-    with pytest.raises(EntityHasActiveMemebersError):
+    with pytest.raises(EntityHasActiveMembersError):
         _ = organization_certificate_service.delete_one(org.id, target.id)
+
+
+def test_update_one_should_succeed(
+    organization_certificate_service: OrganizationCertificateService,
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.certificates is not None
+    assert org.clients is not None
+    target = org.certificates[0]
+    update_dto = CertificateUpdate(id=target.id, organization_identifier=SECOND_OIN, domain=target.domain)
+
+    expected = organization_certificate_service.update_one(target.id, org.id, update_dto)
+    actual = organization_certificate_service.get_one(target.id, org.id)
+
+    assert expected == actual
+
+
+def test_update_one_should_raise_on_id_missmatch(
+    organization_certificate_service: OrganizationCertificateService,
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.certificates is not None
+    assert org.clients is not None
+    target = org.certificates[0]
+    update_dto = CertificateUpdate(id=target.id, organization_identifier=SECOND_OIN, domain=target.domain)
+
+    with pytest.raises(RecordNotFoundError):
+        _ = organization_certificate_service.update_one(target.id, uuid4(), update_dto)
+
+    with pytest.raises(RecordNotFoundError):
+        _ = organization_certificate_service.update_one(uuid4(), target.id, update_dto)

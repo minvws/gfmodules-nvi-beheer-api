@@ -35,13 +35,7 @@ class OrganizationEntity(CommonColumns):
     external_id: Mapped[UraNumber] = mapped_column("external_id", UraType)
     name: Mapped[str] = mapped_column("name", String)
 
-    clients: Mapped[list["ClientEntity"]] = relationship(
-        back_populates="organization", cascade="all, delete-orphan", lazy="raise"
-    )
-    certificates: Mapped[list["CertificateEntity"]] = relationship(
-        back_populates="organization", cascade="all, delete-orphan", lazy="raise"
-    )
+    clients: Mapped[list["ClientEntity"]] = relationship(back_populates="organization", lazy="raise")
+    certificates: Mapped[list["CertificateEntity"]] = relationship(back_populates="organization", lazy="raise")
     scopes: Mapped[list["ScopeEntity"]] = relationship(secondary=organizations_scopes_association)
-    sources: Mapped[list["SourceEntity"]] = relationship(
-        back_populates="organization", cascade="all, delete-orphan", lazy="raise"
-    )
+    sources: Mapped[list["SourceEntity"]] = relationship(back_populates="organization", lazy="raise")

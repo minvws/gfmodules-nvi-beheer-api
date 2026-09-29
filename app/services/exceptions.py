@@ -15,7 +15,7 @@ class ScopeNotAllowedError(HTTPException):
         super().__init__(status_code=403, detail=f"Scope `{', '.join(forbidden_scope)}` is not allowed")
 
 
-class EntityHasActiveMemebersError(HTTPException):
+class EntityHasActiveMembersError(HTTPException):
     def __init__(self, entity: str, member: str, entity_id: object) -> None:
         super().__init__(status_code=403, detail=f"{entity} {entity_id} has active {member} and cannot be deleted.")
 

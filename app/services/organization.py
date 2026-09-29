@@ -18,7 +18,7 @@ from app.models.organization import Organization, OrganizationCreate, Organizati
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.exceptions import (
     ConflictError,
-    EntityHasActiveMemebersError,
+    EntityHasActiveMembersError,
     ForbidenOperationError,
     RecordNotFoundError,
     ScopeNotAllowedError,
@@ -128,7 +128,7 @@ class OrganizationService:
             return [Organization.from_entity(org) for org in orgs]
 
     def update_one(self, id: UUID, dto: OrganizationUpdate) -> OrganizationUpdate:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(id=id)
             org = org_repo.find(ctx)
@@ -146,7 +146,6 @@ class OrganizationService:
 
             # scope the dangerous transaction in a try catch block
             try:
-                print("I entered the dangerous scope")
                 if dto.sanitized_scopes:
                     scope_repo = session.get_repository(ScopeRepository)
                     app_scope = scope_repo.find_many()
@@ -159,18 +158,18 @@ class OrganizationService:
                 else:
                     org.scopes = []
 
-                session.add(org)
-                session.commit()
-                print("I have committed the transaction")
+                session.flush()
             except IntegrityError:
                 raise ForbidenOperationError(f"Organization {org.id} has Clients using scopes marked for change")
+                session.rollback()
             except DatabaseError:
+                session.rollback()
                 raise
 
             return OrganizationUpdate.from_entity(org)
 
     def delete_one(self, id: UUID) -> None:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             repo = session.get_repository(OrganizationRepository)
             org = repo.find_one(id)
             if org is None:
@@ -178,16 +177,12 @@ class OrganizationService:
 
             active_member = OrganizationService.validate_org_for_delete(org)
             if active_member:
-                raise EntityHasActiveMemebersError("Organization", active_member, id)
+                raise EntityHasActiveMembersError("Organization", active_member, id)
 
             org.deleted_at = datetime.now()
 
             if org.scopes:
                 org.scopes.clear()
-
-            session.add(org)
-            session.commit()
-            session.session.refresh(org)
 
     @staticmethod
     def validate_org_for_delete(org: OrganizationEntity) -> str | None:

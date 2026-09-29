@@ -13,7 +13,7 @@ from app.services.certificate.organization_certificate import OrganizationCertif
 from app.services.client import ClientService
 from app.services.exceptions import (
     ConflictError,
-    EntityHasActiveMemebersError,
+    EntityHasActiveMembersError,
     ForbidenOperationError,
     RecordNotFoundError,
     ScopeNotAllowedError,
@@ -376,7 +376,7 @@ def test_delete_one_rejects_when_active_members_exist(
 ) -> None:
     org = organization_service.create_one(dto)
 
-    with pytest.raises(EntityHasActiveMemebersError):
+    with pytest.raises(EntityHasActiveMembersError):
         organization_service.delete_one(org.id)
 
 

@@ -4,7 +4,7 @@ import pytest
 
 from app.models.organization import OrganizationCreate
 from app.models.source import SourceCreate, SourceQueryParams, SourceUpdate
-from app.services.exceptions import ConflictError, EntityHasActiveMemebersError, RecordNotFoundError
+from app.services.exceptions import ConflictError, EntityHasActiveMembersError, RecordNotFoundError
 from app.services.organization import OrganizationService
 from app.services.source.organization_source import OrganizationSourceService
 from tests.conftest import TEST_SOURCE_ID, TEST_SOURCE_NAME
@@ -206,7 +206,7 @@ def test_delete_one_should_raise_on_active_memebers(
     target = org.sources[0]
     client = org.clients[0]
 
-    with pytest.raises(EntityHasActiveMemebersError):
+    with pytest.raises(EntityHasActiveMembersError):
         _ = organization_source_service.delete_one(org.id, target.id)
 
     assert client.sources is not None
