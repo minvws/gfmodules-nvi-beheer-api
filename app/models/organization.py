@@ -92,7 +92,7 @@ class OrganizationQueryParams(BaseModel):
     def into_org_client_query_context(self) -> OrganizationClientQueryContext:
         return OrganizationClientQueryContext(
             name=self.client_name,
-            scopes=self.scopes if self.scopes else None,
+            scopes=self.client_scopes,
             certificate_ctx=OrganizationCertificateQueryContext(
                 organization_identifier=self.client_cert_identifier, domain=self.client_cert_domain
             ),
@@ -114,7 +114,7 @@ class OrganizationQueryParams(BaseModel):
         return OrganizationQueryContext(
             external_id=self.external_id,
             name=self.name,
-            scopes=self.scopes if self.scopes else None,
+            scopes=self.scopes,
             client_ctx=client_ctx,
             source_ctx=src_ctx,
             certificate_ctx=crt_ctx,
