@@ -15,4 +15,4 @@ class ScopeRepository(RepositoryBase):
         if scopes:
             stmt = stmt.where(ScopeEntity.name.in_(scopes))
 
-        return self.db_session.session.execute(stmt).scalars().all()
+        return self.db_session.execute(stmt).scalars().all()

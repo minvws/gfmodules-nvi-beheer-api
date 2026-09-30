@@ -55,5 +55,6 @@ class Certificate(CommonModel, CertificateField):
             organization_identifier=entity.organization_identifier,
             domain=entity.domain,
             created_at=entity.created_at,
+            modified_at=entity.modified_at,
             deleted_at=entity.deleted_at,
         )

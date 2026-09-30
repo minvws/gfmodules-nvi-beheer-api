@@ -17,8 +17,9 @@ from app.db.repository.contexts.organization_context import (
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.scope import ScopeRepository
 from app.models.oin import Oin
+from app.models.scopes import AuthorizationScope
 from app.models.ura import UraNumber
-from tests.conftest import TEST_EXTERNAL_ID
+from tests.conftest import TEST_CLIENT_NAME, TEST_EXTERNAL_ID, TEST_OIN, TEST_SOURCE_ID
 
 
 def test_add_one(
@@ -367,7 +368,9 @@ def test_find_should_filter_clients_on_scopes(
     scope_repository: ScopeRepository,
 ) -> None:
     with scope_repository.db_session:
-        org_scopes = scope_repository.find_many(["nvi:create", "nvi:read, nvi:delete"])
+        org_scopes = scope_repository.find_many(
+            [AuthorizationScope("nvi:create"), AuthorizationScope("nvi:read"), AuthorizationScope("nvi:delete")]
+        )
 
     organization_entity.scopes.extend(org_scopes)
     client_entity.scopes = organization_entity.scopes[:2]
@@ -393,7 +396,7 @@ def test_find_should_filter_clients_on_scopes(
         assert result.clients[0].scopes == org.clients[0].scopes
 
 
-def test_find_many_excludes_deleted(
+def test_find_many_excludes_deleted_orgs(
     organization_repository: OrganizationRepository,
     organization_entity: OrganizationEntity,
 ) -> None:
@@ -402,6 +405,180 @@ def test_find_many_excludes_deleted(
         organization_repository.add_one(organization_entity)
         ctx = OrganizationQueryContext()
         assert organization_repository.find_many(ctx) == []
+
+
+def test_find_many_should_return_correctly_with_source_on_include_deleted_flag(
+    organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
+    source_entity: SourceEntity,
+) -> None:
+    with organization_repository.db_session as session:
+        organization_entity.sources.append(source_entity)
+        new_org = organization_repository.add_one(organization_entity)
+        org = organization_repository.find_one(new_org.id)
+        assert org is not None
+        assert len(org.sources) > 0
+        org.sources[0].deleted_at = datetime.now()
+        session.commit()
+        session.flush()
+
+        actual = organization_repository.find_many(
+            OrganizationQueryContext(source_ctx=OrganizationSourceQueryContext(source_id=TEST_SOURCE_ID))
+        )
+        actual_with_deleted_records = organization_repository.find_many(
+            OrganizationQueryContext(source_ctx=OrganizationSourceQueryContext(source_id=TEST_SOURCE_ID)),
+            include_deleted=True,
+        )
+
+        assert actual == []
+        assert len(actual_with_deleted_records) > 0
+        assert actual_with_deleted_records == [org]
+
+
+def test_find_many_should_return_correctly_with_certificates_on_include_deleted_flag(
+    organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
+    certificate_entity: CertificateEntity,
+) -> None:
+    with organization_repository.db_session as session:
+        organization_entity.certificates.append(certificate_entity)
+        new_org = organization_repository.add_one(organization_entity)
+        org = organization_repository.find_one(new_org.id)
+        assert org is not None
+        assert len(org.certificates) > 0
+        org.certificates[0].deleted_at = datetime.now()
+        session.commit()
+        session.flush()
+
+        actual = organization_repository.find_many(
+            OrganizationQueryContext(
+                certificate_ctx=OrganizationCertificateQueryContext(organization_identifier=TEST_OIN)
+            )
+        )
+
+        actual_with_deleted_records = organization_repository.find_many(
+            OrganizationQueryContext(
+                certificate_ctx=OrganizationCertificateQueryContext(organization_identifier=TEST_OIN)
+            ),
+            include_deleted=True,
+        )
+
+        assert actual == []
+        assert len(actual_with_deleted_records) > 0
+        assert actual_with_deleted_records == [org]
+
+
+def test_find_many_should_return_correctly_with_clients_on_include_deleted_flag(
+    organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
+    client_entity: ClientEntity,
+) -> None:
+    with organization_repository.db_session as session:
+        organization_entity.clients.append(client_entity)
+        new_org = organization_repository.add_one(organization_entity)
+        org = organization_repository.find_one(new_org.id)
+        assert org is not None
+        assert len(org.clients) > 0
+        org.clients[0].deleted_at = datetime.now()
+        session.commit()
+        session.flush()
+
+        actual = organization_repository.find_many(
+            OrganizationQueryContext(client_ctx=OrganizationClientQueryContext(name=TEST_CLIENT_NAME))
+        )
+
+        actual_with_deleted_records = organization_repository.find_many(
+            OrganizationQueryContext(client_ctx=OrganizationClientQueryContext(name=TEST_CLIENT_NAME)),
+            include_deleted=True,
+        )
+
+        assert actual == []
+        assert len(actual_with_deleted_records) > 0
+        assert actual_with_deleted_records == [org]
+
+
+def test_find_many_should_return_correctly_with_clients_source_on_include_deleted_flag(
+    organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
+    client_entity: ClientEntity,
+    source_entity: SourceEntity,
+) -> None:
+    with organization_repository.db_session as session:
+        client_entity.sources.append(source_entity)
+        organization_entity.clients.append(client_entity)
+        organization_entity.sources.append(source_entity)
+        new_org = organization_repository.add_one(organization_entity)
+        org = organization_repository.find_one(new_org.id)
+        assert org is not None
+        assert len(org.clients) > 0
+        assert org.clients[0].sources is not None
+        org.sources[0].deleted_at = datetime.now()
+        session.commit()
+        session.flush()
+
+        actual = organization_repository.find_many(
+            OrganizationQueryContext(
+                client_ctx=OrganizationClientQueryContext(
+                    name=TEST_CLIENT_NAME, source_ctx=OrganizationSourceQueryContext(source_id=TEST_SOURCE_ID)
+                )
+            )
+        )
+
+        actual_with_deleted_records = organization_repository.find_many(
+            OrganizationQueryContext(
+                client_ctx=OrganizationClientQueryContext(
+                    name=TEST_CLIENT_NAME, source_ctx=OrganizationSourceQueryContext(source_id=TEST_SOURCE_ID)
+                )
+            ),
+            include_deleted=True,
+        )
+
+        assert actual == []
+        assert len(actual_with_deleted_records) > 0
+        assert actual_with_deleted_records == [org]
+
+
+def test_find_many_should_return_correctly_with_clients_certificates_on_include_deleted_flag(
+    organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
+    client_entity: ClientEntity,
+    certificate_entity: CertificateEntity,
+) -> None:
+    with organization_repository.db_session as session:
+        client_entity.certificates.append(certificate_entity)
+        organization_entity.clients.append(client_entity)
+        organization_entity.certificates.append(certificate_entity)
+        new_org = organization_repository.add_one(organization_entity)
+        org = organization_repository.find_one(new_org.id)
+        assert org is not None
+        assert len(org.clients) > 0
+        assert org.clients[0].certificates is not None
+        org.certificates[0].deleted_at = datetime.now()
+        session.commit()
+        session.flush()
+
+        actual = organization_repository.find_many(
+            OrganizationQueryContext(
+                client_ctx=OrganizationClientQueryContext(
+                    name=TEST_CLIENT_NAME,
+                    certificate_ctx=OrganizationCertificateQueryContext(organization_identifier=TEST_OIN),
+                )
+            )
+        )
+
+        actual_with_deleted_records = organization_repository.find_many(
+            OrganizationQueryContext(
+                client_ctx=OrganizationClientQueryContext(
+                    name=TEST_CLIENT_NAME,
+                    certificate_ctx=OrganizationCertificateQueryContext(organization_identifier=TEST_OIN),
+                )
+            ),
+            include_deleted=True,
+        )
+
+        assert actual == []
+        assert len(actual_with_deleted_records) > 0
+        assert actual_with_deleted_records == [org]
 
 
 def test_find_many_include_deleted_returns_deleted(

@@ -11,12 +11,6 @@ class ScopesNotGrantedError(HTTPException):
         )
 
 
-class ScopeNotAllowedError(HTTPException):
-    def __init__(self, request_scope: list[str], allowed_scopes: list[str]) -> None:
-        forbidden_scope = set(request_scope) - set(allowed_scopes)
-        super().__init__(status_code=403, detail=f"Scope `{', '.join(forbidden_scope)}` is not allowed")
-
-
 class EntityHasActiveMembersError(HTTPException):
     def __init__(self, entity: str, member: str, entity_id: object) -> None:
         super().__init__(status_code=403, detail=f"{entity} {entity_id} has active {member} and cannot be deleted.")
@@ -30,10 +24,10 @@ class RecordNotFoundError(HTTPException):
 class ConflictError(HTTPException):
     def __init__(self, msg: str | None = None) -> None:
         _msg = msg if msg else "record already exists"
-        super().__init__(status_code=409, detail=msg)
+        super().__init__(status_code=409, detail=_msg)
 
 
 class ForbidenOperationError(HTTPException):
     def __init__(self, msg: str | None = None) -> None:
         _msg = msg if msg else "Operation is not allowed"
-        super().__init__(status_code=409, detail=msg)
+        super().__init__(status_code=403, detail=_msg)

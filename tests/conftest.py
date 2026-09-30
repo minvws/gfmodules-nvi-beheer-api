@@ -29,6 +29,7 @@ from app.models.certificates import CertificateCreate
 from app.models.client import ClientCreate
 from app.models.oin import Oin
 from app.models.organization import OrganizationCreate
+from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.models.ura import UraNumber
 from app.routers.client import router as client_router
@@ -43,7 +44,12 @@ from app.services.source.organization_source import OrganizationSourceService
 TEST_OIN = Oin("00000099000000001000")
 TEST_EXTERNAL_ID = UraNumber("12345678")
 TEST_ORG_NAME = "Test Organization"
-TEST_SCOPES = "nvi:create nvi:read nvi:delete nvi:localize"
+TEST_SCOPES = [
+    AuthorizationScope("nvi:create"),
+    AuthorizationScope("nvi:read"),
+    AuthorizationScope("nvi:delete"),
+    AuthorizationScope("nvi:localize"),
+]
 TEST_CLIENT_NAME = "Test Client"
 TEST_SOURCE_ID = "source-001"
 TEST_SOURCE_NAME = "test-source-1"
@@ -53,7 +59,7 @@ FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0)
 
 SECOND_EXTERNAL_ID = UraNumber("87654321")
 SECOND_ORG_NAME = "Second Test Organization"
-SECON_SCOPES = "nvi:create nvi:localize"
+SECOND_SCOPES = [AuthorizationScope("nvi:create"), AuthorizationScope("nvi:localize")]
 SECOND_OIN = Oin("00000099000000002000")
 SECOND_DOMAIN = "Other-Domain"
 SECOND_CLIENT_NAME = "Test Client 2"
@@ -81,7 +87,7 @@ def database() -> Generator[Database, Any, None]:
     db = Database(config_database=config_database)
     db.generate_tables()
     # setup system scopes
-    stmt = text("INSERT INTO scopes (name) VALUES ('nvi:create'), ('nvi:delete'),('nvi:read'),('nvi:localize');")
+    stmt = text("INSERT INTO scopes (name) VALUES ('CREATE'), ('DELETE'),('READ'),('LOCALIZE');")
     with db.get_db_session() as session:
         session.session.execute(stmt)
         session.commit()
@@ -196,7 +202,7 @@ def client_create_dto_1(
 ) -> ClientCreate:
     return ClientCreate(
         name=TEST_CLIENT_NAME,
-        scopes="nvi:create nvi:read",
+        scopes=[AuthorizationScope("nvi:create"), AuthorizationScope("nvi:read")],
         certificates=[cert_create_dto_1],
         sources=[source_create_dto_1, source_create_dto_2],
     )
@@ -225,13 +231,13 @@ def org_create_dto_2() -> OrganizationCreate:
     return OrganizationCreate(
         external_id=SECOND_EXTERNAL_ID,
         name=SECOND_ORG_NAME,
-        scopes=SECON_SCOPES,
+        scopes=SECOND_SCOPES,
         sources=[SourceCreate(source_id="source-3", name="third-source")],
         certificates=[CertificateCreate(organization_identifier=SECOND_OIN, domain=SECOND_DOMAIN)],
         clients=[
             ClientCreate(
                 name=SECOND_CLIENT_NAME,
-                scopes="nvi:localize",
+                scopes=[AuthorizationScope("nvi:localize")],
                 sources=[SourceCreate(source_id="source-3", name="third-source")],
             )
         ],

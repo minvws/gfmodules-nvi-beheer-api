@@ -6,6 +6,7 @@ from app import utils
 from app.models.certificates import CertificateCreate, CertificateQueryParams, CertificateUpdate
 from app.models.client import ClientCreate, ClientQueryParams, ClientUpdate
 from app.models.organization import OrganizationCreate
+from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate, SourceQueryParams, SourceUpdate
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
@@ -41,9 +42,17 @@ from tests.conftest import (
         ),
         (
             OrganizationCreate(
-                external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, scopes="nvi:create nvi:read nvi:delete"
+                external_id=TEST_EXTERNAL_ID,
+                name=TEST_ORG_NAME,
+                scopes=[
+                    AuthorizationScope("nvi:create"),
+                    AuthorizationScope("nvi:read"),
+                    AuthorizationScope("nvi:delete"),
+                ],
             ),
-            ClientCreate(name=TEST_CLIENT_NAME, scopes="nvi:create nvi:read"),
+            ClientCreate(
+                name=TEST_CLIENT_NAME, scopes=[AuthorizationScope("nvi:create"), AuthorizationScope("nvi:read")]
+            ),
         ),
         (
             OrganizationCreate(
@@ -119,7 +128,7 @@ def test_create_one_should_succeed(
         [c.id for c in client.certificates] if client.certificates else [],
     )
     if org.scopes and client.scopes:
-        assert utils.is_subset(org.scopes.split(" "), client.scopes.split(" "))
+        assert utils.is_subset(org.scopes, client.scopes)
 
 
 def test_create_should_raise_when_mismatch_scopes(
@@ -129,8 +138,12 @@ def test_create_should_raise_when_mismatch_scopes(
     client_create_dto_1: ClientCreate,
 ) -> None:
     org_create_dto_1.clients = None
-    org_create_dto_1.scopes = "nvi:create nvi:delete nvi:localize"
-    client_create_dto_1.scopes = "nvi:read"
+    org_create_dto_1.scopes = [
+        AuthorizationScope("nvi:create"),
+        AuthorizationScope("nvi:delete"),
+        AuthorizationScope("nvi:localize"),
+    ]
+    client_create_dto_1.scopes = [AuthorizationScope("nvi:read")]
 
     org = organization_service.create_one(org_create_dto_1)
 
@@ -313,7 +326,10 @@ def test_update_one_should_succeed(
 ) -> None:
     org = organization_service.create_one(org_create_dto_1)
     create_dto = ClientCreate(
-        name="old_name", certificates=[cert_create_dto_1], sources=[source_create_dto_1], scopes="nvi:create"
+        name="old_name",
+        certificates=[cert_create_dto_1],
+        sources=[source_create_dto_1],
+        scopes=[AuthorizationScope("nvi:create")],
     )
     new_client = client_service.create_one(org.id, create_dto)
     update_dto = ClientUpdate(id=new_client.id, name="new_name")
@@ -338,7 +354,10 @@ def test_update_one_should_add_sources_to_client(
     sources = organization_source_service.get_many(org.id, SourceQueryParams())
     sources_dto = [SourceUpdate(id=s.id, source_id=s.source_id, name=s.name) for s in sources]
     create_dto = ClientCreate(
-        name="old_name", certificates=[cert_create_dto_1], sources=[source_create_dto_1], scopes="nvi:create"
+        name="old_name",
+        certificates=[cert_create_dto_1],
+        sources=[source_create_dto_1],
+        scopes=[AuthorizationScope("nvi:create")],
     )
     new_client = client_service.create_one(org.id, create_dto)
     update_dto = ClientUpdate(id=new_client.id, name="new_name", sources=sources_dto)
@@ -365,7 +384,10 @@ def test_update_one_should_swap_sources_to_client(
     src_to_swap = org.sources[1]
     src_update_dto = SourceUpdate(**src_to_swap.model_dump())
     create_dto = ClientCreate(
-        name="old_name", certificates=[cert_create_dto_1], sources=[source_create_dto_1], scopes="nvi:create"
+        name="old_name",
+        certificates=[cert_create_dto_1],
+        sources=[source_create_dto_1],
+        scopes=[AuthorizationScope("nvi:create")],
     )
     new_client = client_service.create_one(org.id, create_dto)
     update_dto = ClientUpdate(id=new_client.id, name="new name", sources=[src_update_dto])
@@ -391,7 +413,7 @@ def test_update_one_should_add_certificates_to_client(
         CertificateUpdate(id=c.id, organization_identifier=c.organization_identifier, domain=c.domain)
         for c in certs_to_add
     ]
-    create_dto = ClientCreate(name="old_name", scopes="nvi:create")
+    create_dto = ClientCreate(name="old_name", scopes=[AuthorizationScope("nvi:create")])
     new_client = client_service.create_one(org.id, create_dto)
     update_dto = ClientUpdate(id=new_client.id, name="new name", certificates=certs_dto)
 
@@ -414,7 +436,7 @@ def test_update_one_should_raise_when_source_not_in_org(
     org_create_dto_1.sources = [source_create_dto_1]
     org_create_dto_1.clients = None
     org = organization_service.create_one(org_create_dto_1)
-    create_dto = ClientCreate(name="old_name", scopes="nvi:create")
+    create_dto = ClientCreate(name="old_name", scopes=[AuthorizationScope("nvi:create")])
     new_client = client_service.create_one(org.id, create_dto)
     update_dto = ClientUpdate(
         id=new_client.id, name="new name", sources=[SourceUpdate(**source_create_dto_2.model_dump(), id=uuid4())]
@@ -436,7 +458,9 @@ def test_upate_one_should_swap_certificates(
     assert org.certificates is not None
     cert_to_swap = org.certificates[1]
     cert_dto = CertificateUpdate(**cert_to_swap.model_dump())
-    create_dto = ClientCreate(name="old_name", scopes="nvi:create", certificates=[cert_create_dto_1])
+    create_dto = ClientCreate(
+        name="old_name", scopes=[AuthorizationScope("nvi:create")], certificates=[cert_create_dto_1]
+    )
     new_client = client_service.create_one(org.id, create_dto)
     update_dto = ClientUpdate(id=new_client.id, name="new name", certificates=[cert_dto])
 
@@ -472,24 +496,26 @@ def test_update_one_should_successfully_change_scope(
     client_service: ClientService, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
     org = organization_service.create_one(org_create_dto_1)
-    create_dto = ClientCreate(name="old_name", scopes="nvi:create")
+    create_dto = ClientCreate(name="old_name", scopes=[AuthorizationScope("nvi:create")])
     new_client = client_service.create_one(org.id, create_dto)
-    update_dto = ClientUpdate(id=new_client.id, name="new name", scopes="nvi:read nvi:delete")
+    update_dto = ClientUpdate(
+        id=new_client.id, name="new name", scopes=[AuthorizationScope("nvi:read"), AuthorizationScope("nvi:delete")]
+    )
 
     actual = client_service.update_one(new_client.id, org.id, update_dto)
 
     assert actual.id == update_dto.id
-    assert " ".split(actual.scopes) == " ".split(update_dto.scopes)
+    assert actual.scopes == update_dto.scopes
 
 
 def test_update_one_should_raise_with_scope_not_in_org(
     client_service: ClientService, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
-    org_create_dto_1.scopes = "nvi:create nvi:read"
+    org_create_dto_1.scopes = [AuthorizationScope("nvi:create"), AuthorizationScope("nvi:read")]
     org = organization_service.create_one(org_create_dto_1)
-    create_dto = ClientCreate(name="old_name", scopes="nvi:create")
+    create_dto = ClientCreate(name="old_name", scopes=[AuthorizationScope("nvi:create")])
     new_client = client_service.create_one(org.id, create_dto)
-    update_dto = ClientUpdate(id=new_client.id, name="new name", scopes="nvi:delete")
+    update_dto = ClientUpdate(id=new_client.id, name="new name", scopes=[AuthorizationScope("nvi:delete")])
 
     with pytest.raises(ScopesNotGrantedError):
         _ = client_service.update_one(new_client.id, org.id, update_dto)

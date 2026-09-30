@@ -8,6 +8,7 @@ from app.models.certificates import CertificateCreate
 from app.models.client import ClientCreate
 from app.models.oin import Oin
 from app.models.organization import OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
+from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
@@ -16,7 +17,6 @@ from app.services.exceptions import (
     EntityHasActiveMembersError,
     ForbidenOperationError,
     RecordNotFoundError,
-    ScopeNotAllowedError,
     ScopesNotGrantedError,
 )
 from app.services.organization import OrganizationService
@@ -42,22 +42,10 @@ def test_create_one_should_succeed(
 
     assert actual.external_id == org_create_dto_1.external_id
     assert actual.name == org_create_dto_1.name
-    assert actual.sanitized_scopes is not None
-    assert org_create_dto_1.sanitized_scopes is not None
-    assert set(actual.sanitized_scopes) == set(org_create_dto_1.sanitized_scopes)
+    assert actual.scopes is not None
+    assert org_create_dto_1.scopes is not None
+    assert set(actual.scopes) == set(org_create_dto_1.scopes)
     assert actual.created_at is not None
-
-
-def test_create_one_should_raise_with_unknown_scope(
-    organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
-) -> None:
-    unkown_scope = "nvi:some-scope"
-    org_create_dto_1.scopes = unkown_scope
-
-    with pytest.raises(ScopeNotAllowedError) as exc:
-        _ = organization_service.create_one(org_create_dto_1)
-
-    assert f"Scope `{unkown_scope}` is not allowed" in exc.value.detail
 
 
 @pytest.mark.parametrize(
@@ -150,9 +138,9 @@ def test_create_one_should_succeed_with_different_variattions_of_complex_object(
     assert isinstance(actual.id, UUID)
     assert actual.external_id == dto.external_id
     assert actual.name == dto.name
-    if actual.sanitized_scopes:
-        assert dto.sanitized_scopes is not None
-        assert set(actual.sanitized_scopes) == set(dto.sanitized_scopes)
+    if actual.scopes:
+        assert dto.scopes is not None
+        assert set(actual.scopes) == set(dto.scopes)
 
     if actual.certificates:
         for expected_org_cert in actual.certificates:
@@ -197,8 +185,8 @@ def test_create_one_should_raise_when_source_id_exists(
 def test_create_one_should_raise_when_client_scope_does_not_match_org(
     organization_service: OrganizationService,
 ) -> None:
-    org_scopes = "nvi:create nvi:delete"
-    client_scope = "nvi:read nvi:localize"
+    org_scopes = [AuthorizationScope("nvi:create"), AuthorizationScope("nvi:delete")]
+    client_scope = [AuthorizationScope("nvi:read"), AuthorizationScope("nvi:localize")]
     dto = OrganizationCreate(
         external_id=TEST_EXTERNAL_ID,
         name=TEST_ORG_NAME,
@@ -400,8 +388,8 @@ def test_get_many_should_return_all(
         OrganizationQueryParams(name=TEST_ORG_NAME),
         OrganizationQueryParams(external_id=TEST_EXTERNAL_ID),
         # only org_create_dto_1 has the following scopes
-        OrganizationQueryParams(scopes="nvi:delete"),
-        OrganizationQueryParams(scopes="nvi:read"),
+        OrganizationQueryParams(scopes=[AuthorizationScope("nvi:delete")]),
+        OrganizationQueryParams(scopes=[AuthorizationScope("nvi:read")]),
         OrganizationQueryParams(cert_identifier=TEST_OIN),
         OrganizationQueryParams(cert_identifier=TEST_OIN, cert_domain=TEST_DOMAIN),
         OrganizationQueryParams(source_id=TEST_SOURCE_ID),
@@ -516,7 +504,7 @@ def test_update_one_should_succeed(
     assert actual.name == new_name
     assert actual.scopes is not None
     assert update_dto.scopes is not None
-    assert actual.scopes.split().sort() == update_dto.scopes.split().sort()
+    assert sorted(actual.scopes) == sorted(update_dto.scopes)
 
 
 def test_update_should_raise_when_org_has_clients_with_scopes(
