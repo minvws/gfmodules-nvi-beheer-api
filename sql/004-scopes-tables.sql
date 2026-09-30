@@ -55,18 +55,20 @@ BEGIN;
 	
 	ALTER INDEX uq_organizations_register_id_active RENAME TO uq_organizations_external_id_active;
 	
-	ALTER TABLE clients 
-	  ALTER COLUMN id SET DEFAULT gen_random_uuid(),
-    ADD COLUMN name VARCHAR(100) NOT NULL,
-    ADD COLUMN description VARCHAR(255),
-	  ADD COLUMN modified_at TIMESTAMP,
-	  DROP COLUMN common_name,
-    DROP COLUMN oin,
-	  DROP COLUMN scopes;
-	
-	TRUNCATE TABLE clients;
-	INSERT INTO clients (id, organization_id, name) SELECT id, organization_id, name FROM new_clients; 
-		
+	ALTER TABLE clients
+		ALTER COLUMN id SET DEFAULT gen_random_uuid(),
+		ADD COLUMN name VARCHAR(100),          -- nullable for now
+		ADD COLUMN description VARCHAR(255),
+		ADD COLUMN modified_at TIMESTAMP,
+		DROP COLUMN common_name,
+		DROP COLUMN oin,
+		DROP COLUMN scopes;
+
+		TRUNCATE TABLE clients;
+		INSERT INTO clients (id, organization_id, name) SELECT id, organization_id, name FROM new_clients;
+
+		ALTER TABLE clients ALTER COLUMN name SET NOT NULL;
+				
 	-- define new tables
 	
 	CREATE TABLE organizations_scopes (
@@ -163,7 +165,6 @@ BEGIN;
 	
 	DROP TABLE IF EXISTS new_clients;
 	DROP TABLE IF EXISTS new_org_certs; 
-	DROP TABLE IF EXISTS new_clients_scopes;
 	DROP TABLE IF EXISTS new_clients_scopes;
 COMMIT;
 
