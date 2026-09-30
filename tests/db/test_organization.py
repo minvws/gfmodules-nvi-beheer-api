@@ -17,6 +17,7 @@ from app.db.repository.contexts.organization_context import (
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.scope import ScopeRepository
 from app.models.oin import Oin
+from app.models.scopes import AuthorizationScope
 from app.models.ura import UraNumber
 from tests.conftest import TEST_EXTERNAL_ID
 
@@ -367,7 +368,9 @@ def test_find_should_filter_clients_on_scopes(
     scope_repository: ScopeRepository,
 ) -> None:
     with scope_repository.db_session:
-        org_scopes = scope_repository.find_many(["nvi:create", "nvi:read, nvi:delete"])
+        org_scopes = scope_repository.find_many(
+            [AuthorizationScope("nvi:create"), AuthorizationScope("nvi:read"), AuthorizationScope("nvi:delete")]
+        )
 
     organization_entity.scopes.extend(org_scopes)
     client_entity.scopes = organization_entity.scopes[:2]

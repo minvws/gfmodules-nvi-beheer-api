@@ -3,6 +3,7 @@ from typing import Any, Self
 
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
+from app.db.models.scope import ScopeEntity
 from app.db.models.source import SourceEntity
 from app.db.repository.contexts.data import (
     CertificateQueryContextBase,
@@ -71,5 +72,8 @@ class ClientQueryContext(ClientQueryContextBase):
 
         if self.description:
             root_filter.append(ClientEntity.description == self.description)
+
+        if self.scopes:
+            root_filter.append(ClientEntity.scopes.any(ScopeEntity.name.in_(self.scopes)))
 
         return root_filter

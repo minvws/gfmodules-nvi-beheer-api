@@ -92,7 +92,7 @@ class OrganizationQueryParams(BaseModel):
     def into_org_client_query_context(self) -> OrganizationClientQueryContext:
         return OrganizationClientQueryContext(
             name=self.client_name,
-            scopes=self.scopes if self.scopes else None,
+            scopes=self.client_scopes,
             certificate_ctx=OrganizationCertificateQueryContext(
                 organization_identifier=self.client_cert_identifier, domain=self.client_cert_domain
             ),
@@ -114,7 +114,7 @@ class OrganizationQueryParams(BaseModel):
         return OrganizationQueryContext(
             external_id=self.external_id,
             name=self.name,
-            scopes=self.scopes if self.scopes else None,
+            scopes=self.scopes,
             client_ctx=client_ctx,
             source_ctx=src_ctx,
             certificate_ctx=crt_ctx,
@@ -134,7 +134,7 @@ class Organization(CommonModel, OrganizationFields):
             id=entity.id,
             external_id=entity.external_id,
             name=entity.name,
-            scopes=[s.name for s in entity.scopes] if entity else None,
+            scopes=[s.name for s in entity.scopes] if entity.scopes else None,
             clients=[Client.from_entity(c) for c in entity.clients] if entity.clients else None,
             certificates=[Certificate.from_entity(c) for c in entity.certificates] if entity.certificates else None,
             sources=[Source.from_entity(s) for s in entity.sources] if entity.sources else None,

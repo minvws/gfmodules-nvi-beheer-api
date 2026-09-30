@@ -184,8 +184,16 @@ class OrganizationRepository(RepositoryBase):
             selectinload(crt_attr),
             selectinload(src_attr),
             selectinload(client_attr).selectinload(ClientEntity.scopes),
-            selectinload(client_attr).selectinload(ClientEntity.certificates),
-            selectinload(client_attr).selectinload(ClientEntity.sources),
+            selectinload(client_attr).selectinload(
+                ClientEntity.certificates.and_(CertificateEntity.deleted_at.is_(None))
+                if include_deleted is False
+                else ClientEntity.certificates
+            ),
+            selectinload(client_attr).selectinload(
+                ClientEntity.sources.and_(SourceEntity.deleted_at.is_(None))
+                if include_deleted is False
+                else ClientEntity.sources
+            ),
         )
 
         root_filter = ctx.get_conditions()
@@ -207,15 +215,11 @@ class OrganizationRepository(RepositoryBase):
             src_ctx = ctx.source_ctx
             src_filters = src_ctx.get_conditions()
             if src_filters:
-                if include_deleted is False:
-                    src_filters.append(SourceEntity.deleted_at.is_(None))
                 stmt = stmt.where(OrganizationEntity.sources.any(and_(*src_filters)))
 
         if ctx.client_ctx:
             client_ctx = ctx.client_ctx
             client_filters = client_ctx.get_conditions()
-            if include_deleted is False:
-                client_filters.append(ClientEntity.deleted_at.is_(None))
 
             if client_ctx.certificate_ctx:
                 client_crt_ctx = client_ctx.certificate_ctx

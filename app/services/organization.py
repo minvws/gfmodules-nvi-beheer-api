@@ -21,7 +21,6 @@ from app.services.exceptions import (
     EntityHasActiveMembersError,
     ForbidenOperationError,
     RecordNotFoundError,
-    ScopeNotAllowedError,
 )
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
@@ -47,9 +46,6 @@ class OrganizationService:
             if dto.scopes:
                 scopes_repo = session.get_repository(ScopeRepository)
                 app_scopes = scopes_repo.find_many()
-                valid_scopes = ScopeService.validate_requested_scopes(app_scopes, dto.scopes)
-                if not valid_scopes:
-                    raise ScopeNotAllowedError([s.value for s in dto.scopes], [s.name for s in app_scopes])
 
                 org_scopes = [s for s in app_scopes if s.name in dto.scopes]
                 org_entity.scopes = org_scopes
@@ -149,11 +145,8 @@ class OrganizationService:
                 if dto.scopes:
                     scope_repo = session.get_repository(ScopeRepository)
                     app_scope = scope_repo.find_many()
-                    valid_scopes = ScopeService.validate_requested_scopes(app_scope, dto.scopes)
-                    if not valid_scopes:
-                        raise ScopeNotAllowedError([s.value for s in dto.scopes], [s.name for s in app_scope])
 
-                    org_scopes = [s for s in app_scope if s.name in [s.value for s in dto.scopes]]
+                    org_scopes = [s for s in app_scope if s.name in dto.scopes]
                     org.scopes = org_scopes
                 else:
                     org.scopes = []
