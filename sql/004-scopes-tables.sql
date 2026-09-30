@@ -28,17 +28,17 @@ BEGIN;
 	
 	CREATE TEMP TABLE new_org_scopes AS SELECT  o.id AS organization_id, s.id AS scope_id FROM organizations o
  	CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(o.scopes, ' ')) AS parsed(scope_name)
-	JOIN scopes s ON s.name = parsed.scope_name
+	JOIN scopes s ON s.name = UPPER(SPLIT_PART(parsed.scope_name, ':', 2))
 	WHERE o.scopes IS NOT NULL AND o.scopes != '';
-	
-	CREATE TEMP TABLE new_clients_scopes AS SELECT 
-	c.id AS client_id, 
-	old_c.organization_id AS organization_id, 
+
+	CREATE TEMP TABLE new_clients_scopes AS SELECT
+	c.id AS client_id,
+	old_c.organization_id AS organization_id,
 	s.id AS scope_id
 	FROM clients old_c
-	
+
 	CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(old_c.scopes, ' ')) AS parsed(scope_name)
-	JOIN scopes s ON s.name = parsed.scope_name
+	JOIN scopes s ON s.name = UPPER(SPLIT_PART(parsed.scope_name, ':', 2))
 	JOIN new_org_scopes os ON os.scope_id = s.id AND os.organization_id = old_c.organization_id
 	JOIN new_clients c on old_c.organization_id = c.organization_id
 	WHERE old_c.scopes IS NOT NULL AND old_c.scopes != '';
