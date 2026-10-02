@@ -3,12 +3,14 @@ from typing import Any, Self
 
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
+from app.db.models.scope import ScopeEntity
 from app.db.models.source import SourceEntity
 from app.db.repository.contexts.data import (
     CertificateQueryContextBase,
     ClientQueryContextBase,
     SourceQueryContextBase,
 )
+from app.models.scopes import AuthorizationScope
 
 
 @dataclass()
@@ -44,7 +46,7 @@ class ClientSourceQueryContext(SourceQueryContextBase):
 
 @dataclass()
 class ClientQueryContext(ClientQueryContextBase):
-    scopes: list[str] | None = None
+    scopes: list[AuthorizationScope] | None = None
     certificate_ctx: ClientCertificateQueryContext | None = None
     source_ctx: ClientSourceQueryContext | None = None
 
@@ -70,5 +72,8 @@ class ClientQueryContext(ClientQueryContextBase):
 
         if self.description:
             root_filter.append(ClientEntity.description == self.description)
+
+        if self.scopes:
+            root_filter.append(ClientEntity.scopes.any(ScopeEntity.name.in_(self.scopes)))
 
         return root_filter

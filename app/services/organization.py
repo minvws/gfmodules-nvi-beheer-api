@@ -21,7 +21,6 @@ from app.services.exceptions import (
     EntityHasActiveMembersError,
     ForbidenOperationError,
     RecordNotFoundError,
-    ScopeNotAllowedError,
 )
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
@@ -44,14 +43,11 @@ class OrganizationService:
                 external_id=dto.external_id,
                 name=dto.name,
             )
-            if dto.sanitized_scopes:
+            if dto.scopes:
                 scopes_repo = session.get_repository(ScopeRepository)
                 app_scopes = scopes_repo.find_many()
-                valid_scopes = ScopeService.validate_requested_scopes(app_scopes, dto.sanitized_scopes)
-                if not valid_scopes:
-                    raise ScopeNotAllowedError(dto.sanitized_scopes, [s.name for s in app_scopes])
 
-                org_scopes = [s for s in app_scopes if s.name in dto.sanitized_scopes]
+                org_scopes = [s for s in app_scopes if s.name in dto.scopes]
                 org_entity.scopes = org_scopes
 
             if dto.certificates:
@@ -74,9 +70,9 @@ class OrganizationService:
                 for client in dto.clients:
                     client_entitiy = ClientEntity(name=client.name, description=client.description)
                     if client.scopes:
-                        ScopeService.assert_scopes_granted(org_entity, client.sanatized_scopes or [])
+                        ScopeService.assert_scopes_granted(org_entity, client.scopes)
                         client_scopes = ScopeService.make_client_scope_from_org(
-                            org_entity, client_entitiy, client.sanatized_scopes or []
+                            org_entity, client_entitiy, client.scopes
                         )
                         client_entitiy.scopes = client_scopes
 
@@ -146,14 +142,11 @@ class OrganizationService:
 
             # scope the dangerous transaction in a try catch block
             try:
-                if dto.sanitized_scopes:
+                if dto.scopes:
                     scope_repo = session.get_repository(ScopeRepository)
                     app_scope = scope_repo.find_many()
-                    valid_scopes = ScopeService.validate_requested_scopes(app_scope, dto.sanitized_scopes)
-                    if not valid_scopes:
-                        raise ScopeNotAllowedError(dto.sanitized_scopes, [s.name for s in app_scope])
 
-                    org_scopes = [s for s in app_scope if s.name in dto.sanitized_scopes]
+                    org_scopes = [s for s in app_scope if s.name in dto.scopes]
                     org.scopes = org_scopes
                 else:
                     org.scopes = []

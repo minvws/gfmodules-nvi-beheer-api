@@ -7,10 +7,10 @@ from app.db.models.client import ClientEntity
 from app.models.base import (
     INCLUDE_DELETED_DESCRIPTION,
     CommonModel,
-    sanatize_model_scopes,
 )
 from app.models.certificates import Certificate, CertificateCreate, CertificateUpdate
 from app.models.oin import Oin
+from app.models.scopes import AuthorizationScope
 from app.models.source import Source, SourceCreate, SourceUpdate
 from app.models.ura import UraNumber
 
@@ -33,39 +33,31 @@ class ClientResolveRequest(BaseModel):
 class ClientResolveResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
+    scopes: list[AuthorizationScope] | None = Field(default=None, description=SCOPES_DESCRIPTION)
     organization_name: str = Field(description=ORGANIZATION_NAME_DESCRIPTION)
 
 
 class ClientFields(BaseModel):
     name: str
     description: str | None = Field(default=None)
-    scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
+    scopes: list[AuthorizationScope] | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
 
 class ClientCreate(ClientFields):
     certificates: list[CertificateCreate] | None = None
     sources: list[SourceCreate] | None = None
 
-    @property
-    def sanatized_scopes(self) -> list[str] | None:
-        return sanatize_model_scopes(self.scopes)
-
 
 class ClientOptionalFields(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     name: str | None = None
-    scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
+    scopes: list[AuthorizationScope] | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
 
 class ClientUpdate(ClientFields):
     id: UUID
     certificates: list[CertificateUpdate] | None = None
     sources: list[SourceUpdate] | None = None
-
-    @property
-    def sanatized_scopes(self) -> list[str] | None:
-        return sanatize_model_scopes(self.scopes)
 
 
 class ClientQueryParams(ClientOptionalFields):
@@ -76,10 +68,6 @@ class ClientQueryParams(ClientOptionalFields):
     source_name: str | None = None
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
-    @property
-    def sanatized_scope(self) -> list[str] | None:
-        return sanatize_model_scopes(self.scopes)
-
 
 class Client(CommonModel, ClientFields):
     model_config = ConfigDict(from_attributes=True)
@@ -89,14 +77,12 @@ class Client(CommonModel, ClientFields):
 
     @classmethod
     def from_entity(cls, entity: ClientEntity) -> Self:
-        scopes = " ".join(sorted([s.name for s in entity.scopes])) if entity.scopes else None
-
         return cls(
             id=entity.id,
             name=entity.name,
             description=entity.description,
             organization_id=entity.organization_id,
-            scopes=scopes,
+            scopes=[s.name for s in entity.scopes] if entity.scopes else None,
             certificates=[Certificate.from_entity(c) for c in entity.certificates] if entity.certificates else None,
             sources=[Source.from_entity(s) for s in entity.sources] if entity.sources else None,
             created_at=entity.created_at,

@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from app.models.certificates import CertificateCreate
 from app.models.client import ClientCreate
 from app.models.organization import OrganizationCreate
+from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.services.organization import OrganizationService
 from tests.conftest import (
@@ -70,8 +71,8 @@ def test_register_ungranted_scope_returns_403(
     client_create_dto_1: ClientCreate,
 ) -> None:
     org_create_dto_1.clients = None
-    org_create_dto_1.scopes = "nvi:create nvi:read"
-    client_create_dto_1.scopes = "nvi:localize"
+    org_create_dto_1.scopes = [AuthorizationScope("nvi:create"), AuthorizationScope("nvi:read")]
+    client_create_dto_1.scopes = [AuthorizationScope("nvi:localize")]
     org = organization_service.create_one(org_create_dto_1)
 
     response = api.post(f"/organizations/{str(org.id)}/clients", json=client_create_dto_1.model_dump())
@@ -128,7 +129,7 @@ def test_register_ungranted_scope_returns_403(
         ),
     ],
 )
-def test_register_conflict_returns_409(
+def test_register_conflict_returns_403(
     api: TestClient,
     organization_service: OrganizationService,
     org_dto: OrganizationCreate,
@@ -136,7 +137,7 @@ def test_register_conflict_returns_409(
 ) -> None:
     org = organization_service.create_one(org_dto)
     response = api.post(f"/organizations/{str(org.id)}/clients", json=client_dto.model_dump())
-    assert response.status_code == 409
+    assert response.status_code == 403
 
 
 @pytest.mark.parametrize(
@@ -222,14 +223,14 @@ def test_update_not_found_returns_404(api: TestClient) -> None:
 def test_update_ungranted_scope_returns_403(
     api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
-    org_create_dto_1.scopes = "nvi:create nvi:read"
+    org_create_dto_1.scopes = [AuthorizationScope("nvi:create"), AuthorizationScope("nvi:read")]
     org = organization_service.create_one(org_create_dto_1)
     assert org.clients is not None
     target = org.clients[0]
 
     response = api.put(
         f"/organizations/{str(org.id)}/clients/{str(target.id)}",
-        json={"id": str(target.id), "name": "some name", "scopes": "nvi:delete"},
+        json={"id": str(target.id), "name": "some name", "scopes": ["nvi:delete"]},
     )
 
     assert response.status_code == 403

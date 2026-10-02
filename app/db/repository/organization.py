@@ -184,8 +184,16 @@ class OrganizationRepository(RepositoryBase):
             selectinload(crt_attr),
             selectinload(src_attr),
             selectinload(client_attr).selectinload(ClientEntity.scopes),
-            selectinload(client_attr).selectinload(ClientEntity.certificates),
-            selectinload(client_attr).selectinload(ClientEntity.sources),
+            selectinload(client_attr).selectinload(
+                ClientEntity.certificates.and_(CertificateEntity.deleted_at.is_(None))
+                if include_deleted is False
+                else ClientEntity.certificates
+            ),
+            selectinload(client_attr).selectinload(
+                ClientEntity.sources.and_(SourceEntity.deleted_at.is_(None))
+                if include_deleted is False
+                else ClientEntity.sources
+            ),
         )
 
         root_filter = ctx.get_conditions()
@@ -214,22 +222,26 @@ class OrganizationRepository(RepositoryBase):
         if ctx.client_ctx:
             client_ctx = ctx.client_ctx
             client_filters = client_ctx.get_conditions()
-            if include_deleted is False:
-                client_filters.append(ClientEntity.deleted_at.is_(None))
 
             if client_ctx.certificate_ctx:
                 client_crt_ctx = client_ctx.certificate_ctx
                 client_crt_filters = client_crt_ctx.get_conditions()
                 if client_crt_filters:
+                    if include_deleted is False:
+                        client_crt_filters.append(CertificateEntity.deleted_at.is_(None))
                     client_filters.append(ClientEntity.certificates.any(and_(*client_crt_filters)))
 
             if client_ctx.source_ctx:
                 client_src_ctx = client_ctx.source_ctx
                 client_src_filters = client_src_ctx.get_conditions()
                 if client_src_filters:
+                    if include_deleted is False:
+                        client_src_filters.append(SourceEntity.deleted_at.is_(None))
                     client_filters.append(ClientEntity.sources.any(and_(*client_src_filters)))
 
             if client_filters:
+                if include_deleted is False:
+                    client_filters.append(ClientEntity.deleted_at.is_(None))
                 stmt = stmt.where(OrganizationEntity.clients.any(and_(*client_filters)))
 
         return self.db_session.execute(stmt).scalars().unique().all()

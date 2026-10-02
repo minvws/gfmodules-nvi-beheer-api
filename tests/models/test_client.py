@@ -10,6 +10,7 @@ from app.models.client import (
     ClientResolveRequest,
     ClientUpdate,
 )
+from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.models.ura import UraNumber
 from tests.conftest import TEST_CLIENT_NAME, TEST_DOMAIN, TEST_EXTERNAL_ID, TEST_OIN
@@ -25,9 +26,8 @@ def test_create_should_succeed(cert_create_dto_1: CertificateCreate, source_crea
 
 
 def test_create_with_scopes_should_succeed() -> None:
-    model = ClientCreate(name="Test Client", scopes="nvi:read")
-    assert model.scopes == "nvi:read"
-    assert model.sanatized_scopes == ["nvi:read"]
+    model = ClientCreate(name="Test Client", scopes=[AuthorizationScope("nvi:read")])
+    assert model.scopes == [AuthorizationScope("nvi:read")]
 
 
 def test_create_missing_name_should_raise() -> None:
@@ -50,8 +50,8 @@ def test_update_only_tracks_supplied_fields() -> None:
 
 def test_query_params_all_optional_and_track_supplied_only() -> None:
     assert ClientQueryParams().model_dump(exclude_unset=True) == {}
-    params = ClientQueryParams(name="some name", scopes="nvi:read")
-    assert params.model_dump(exclude_unset=True) == {"name": "some name", "scopes": "nvi:read"}
+    params = ClientQueryParams(name="some name", scopes=[AuthorizationScope("nvi:read")])
+    assert params.model_dump(exclude_unset=True) == {"name": "some name", "scopes": ["nvi:read"]}
 
 
 def test_resolve_request_should_succeed() -> None:

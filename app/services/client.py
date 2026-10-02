@@ -42,8 +42,8 @@ class ClientService:
 
             target = ClientEntity(name=dto.name, description=dto.description, organization_id=organization_id)
             if dto.scopes:
-                ScopeService.assert_scopes_granted(org, dto.sanatized_scopes or [])
-                target_scope = ScopeService.make_client_scope_from_org(org, target, dto.sanatized_scopes or [])
+                ScopeService.assert_scopes_granted(org, dto.scopes)
+                target_scope = ScopeService.make_client_scope_from_org(org, target, dto.scopes)
                 target.scopes = target_scope
 
             if dto.certificates:
@@ -85,7 +85,7 @@ class ClientService:
             ctx = ClientQueryContext(
                 organization_id=organization_id,
                 name=params.name,
-                scopes=params.sanatized_scope,
+                scopes=params.scopes if params.scopes else None,
                 source_ctx=ClientSourceQueryContext(source_id=params.source_id, name=params.source_name),
                 certificate_ctx=ClientCertificateQueryContext(
                     organization_identifier=params.cert_organization_identifier, domain=params.cert_domain
@@ -127,9 +127,9 @@ class ClientService:
             if dto.description:
                 client.description = dto.description
 
-            if dto.sanatized_scopes:
-                ScopeService.assert_scopes_granted(org, dto.sanatized_scopes)
-                updated_scopes = ScopeService.make_client_scope_from_org(org, client, dto.sanatized_scopes)
+            if dto.scopes:
+                ScopeService.assert_scopes_granted(org, dto.scopes)
+                updated_scopes = ScopeService.make_client_scope_from_org(org, client, dto.scopes)
                 client.scopes = updated_scopes
             else:
                 client.scopes = []

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.models.certificates import CertificateCreate
 from app.models.client import ClientCreate
 from app.models.organization import OrganizationCreate
+from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.services.organization import OrganizationService
 from tests.conftest import (
@@ -36,14 +37,12 @@ def test_register_should_succeed(api: TestClient, org_create_dto_1: Organization
 @pytest.mark.parametrize(
     "body",
     [
-        # unknown scopes
-        OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, scopes="some:scopes"),
         # mismatch in org client scope
         OrganizationCreate(
             external_id=TEST_EXTERNAL_ID,
             name=TEST_ORG_NAME,
-            scopes="nvi:create",
-            clients=[ClientCreate(name=TEST_CLIENT_NAME, scopes="nvi:read")],
+            scopes=[AuthorizationScope("nvi:create")],
+            clients=[ClientCreate(name=TEST_CLIENT_NAME, scopes=[AuthorizationScope("nvi:read")])],
         ),
         # mismatch in org client certs
         OrganizationCreate(
@@ -71,9 +70,7 @@ def test_register_should_succeed(api: TestClient, org_create_dto_1: Organization
     ],
 )
 def test_register_should_return_403(api: TestClient, body: OrganizationCreate) -> None:
-    body.scopes = "some:scope"
     response = api.post("/organizations", json=body.model_dump())
-
     assert response.status_code == 403
 
 
@@ -156,17 +153,6 @@ def test_update_null_scopes_is_accepted(
     assert response.status_code == 200
 
 
-def test_register_scopes_with_extra_whitespace_is_accepted(
-    api: TestClient,
-) -> None:
-    response = api.post(
-        "/organizations",
-        json={"external_id": str(TEST_EXTERNAL_ID), "name": "Org", "scopes": "  nvi:read  nvi:create    "},
-    )
-
-    assert response.status_code == 201
-
-
 def test_get_by_id_returns_200(
     api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
@@ -203,7 +189,7 @@ def test_get_many_returns_list(
 
 @pytest.mark.parametrize(
     "query",
-    [f"external_id={str(TEST_EXTERNAL_ID)}", "name=Acme", "scopes=read+write", "include_deleted=true"],
+    [f"external_id={str(TEST_EXTERNAL_ID)}", "name=Acme", "scopes=nvi:read&scopes=nvi:create", "include_deleted=true"],
 )
 def test_get_many_passes_query_params(api: TestClient, query: str) -> None:
     resp = api.get(f"/organizations?{query}")
