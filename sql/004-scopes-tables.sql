@@ -20,7 +20,7 @@ BEGIN;
 	
 	-- Migrate existing data into the newly created tables 
 	CREATE TEMP TABLE new_clients AS SELECT DISTINCT organization_id, common_name AS name FROM clients;
-	ALTER TABLE new_clients ADD COLUMN id UUID default gen_random_uuid();
+	ALTER TABLE new_clients ADD COLUMN id UUID DEFAULT gen_random_uuid();
 	
 	
 	CREATE TEMP TABLE new_org_certs AS SELECT nc.organization_id, c.oin AS organization_identifier, c.common_name AS domain FROM new_clients nc
@@ -28,8 +28,13 @@ BEGIN;
 	
 	CREATE TEMP TABLE new_org_scopes AS SELECT  o.id AS organization_id, s.id AS scope_id FROM organizations o
  	CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(o.scopes, ' ')) AS parsed(scope_name)
-	JOIN scopes s ON s.name = parsed.scope_name
+	JOIN scopes s ON s.name = UPPER(SPLIT_PART(parsed.scope_name, ':', 2))
 	WHERE o.scopes IS NOT NULL AND o.scopes != '';
+
+  CREATE TEMP TABLE new_sources AS SELECT DISTINCT ns.organization_id, source_id FROM clients ns;
+  ALTER TABLE new_sources ADD COLUMN id UUID DEFAULT gen_random_uuid();
+
+  CREATE TEMP TABLE new_client_sources AS SELECT c.id as client_id, ns.id as source_id FROM clients c JOIN new_sources ns ON c.source_id = ns.source_id;
 	
 	CREATE TEMP TABLE new_clients_scopes AS SELECT 
 	c.id AS client_id, 
@@ -38,7 +43,7 @@ BEGIN;
 	FROM clients old_c
 	
 	CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(old_c.scopes, ' ')) AS parsed(scope_name)
-	JOIN scopes s ON s.name = parsed.scope_name
+	JOIN scopes s ON s.name = UPPER(SPLIT_PART(parsed.scope_name, ':', 2)) 
 	JOIN new_org_scopes os ON os.scope_id = s.id AND os.organization_id = old_c.organization_id
 	JOIN new_clients c on old_c.organization_id = c.organization_id
 	WHERE old_c.scopes IS NOT NULL AND old_c.scopes != '';
@@ -57,15 +62,18 @@ BEGIN;
 	
 	ALTER TABLE clients 
 	  ALTER COLUMN id SET DEFAULT gen_random_uuid(),
-    ADD COLUMN name VARCHAR(100) NOT NULL,
+    ADD COLUMN name VARCHAR(100), -- nullable for now
     ADD COLUMN description VARCHAR(255),
 	  ADD COLUMN modified_at TIMESTAMP,
 	  DROP COLUMN common_name,
     DROP COLUMN oin,
+    DROP COLUMN source_id,
 	  DROP COLUMN scopes;
 	
 	TRUNCATE TABLE clients;
 	INSERT INTO clients (id, organization_id, name) SELECT id, organization_id, name FROM new_clients; 
+
+  ALTER TABLE clients ALTER COLUMN name SET NOT NULL;
 		
 	-- define new tables
 	
@@ -145,6 +153,12 @@ BEGIN;
 	  CONSTRAINT fk_clients_sources_clients FOREIGN KEY (client_id) REFERENCES clients (id),
 	  CONSTRAINT fk_clients_sources_sources FOREIGN KEY (source_id) REFERENCES sources (id) 
 	);
+
+  INSERT INTO sources (id,organization_id, source_id, name)
+    SELECT id, organization_id, source_id, 'DEFAULT_NAME' from new_sources;
+
+  INSERT INTO clients_sources (client_id, source_id)
+    SELECT client_id, source_id from new_client_sources;
 	
 	INSERT INTO certificates (organization_identifier, domain, organization_id) 
 		SELECT organization_identifier, domain, organization_id from new_org_certs;
