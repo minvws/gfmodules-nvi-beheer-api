@@ -18,6 +18,7 @@ class SourceEntity(CommonColumns):
     __table_args__ = (
         Index(
             "uq_sources_source_id_active",
+            "organization_id",
             "source_id",
             unique=True,
             sqlite_where=text("deleted_at IS NULL"),
