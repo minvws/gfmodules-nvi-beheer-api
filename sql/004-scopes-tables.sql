@@ -28,17 +28,17 @@ BEGIN;
 	
 	CREATE TEMP TABLE new_org_scopes AS SELECT  o.id AS organization_id, s.id AS scope_id FROM organizations o
  	CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(o.scopes, ' ')) AS parsed(scope_name)
-	JOIN scopes s ON s.name = parsed.scope_name
+	JOIN scopes s ON s.name = UPPER(SPLIT_PART(parsed.scope_name, ':', 2))
 	WHERE o.scopes IS NOT NULL AND o.scopes != '';
-	
-	CREATE TEMP TABLE new_clients_scopes AS SELECT 
-	c.id AS client_id, 
-	old_c.organization_id AS organization_id, 
+
+	CREATE TEMP TABLE new_clients_scopes AS SELECT
+	c.id AS client_id,
+	old_c.organization_id AS organization_id,
 	s.id AS scope_id
 	FROM clients old_c
-	
+
 	CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(old_c.scopes, ' ')) AS parsed(scope_name)
-	JOIN scopes s ON s.name = parsed.scope_name
+	JOIN scopes s ON s.name = UPPER(SPLIT_PART(parsed.scope_name, ':', 2))
 	JOIN new_org_scopes os ON os.scope_id = s.id AND os.organization_id = old_c.organization_id
 	JOIN new_clients c on old_c.organization_id = c.organization_id
 	WHERE old_c.scopes IS NOT NULL AND old_c.scopes != '';
@@ -55,18 +55,20 @@ BEGIN;
 	
 	ALTER INDEX uq_organizations_register_id_active RENAME TO uq_organizations_external_id_active;
 	
-	ALTER TABLE clients 
-	  ALTER COLUMN id SET DEFAULT gen_random_uuid(),
-    ADD COLUMN name VARCHAR(100) NOT NULL,
-    ADD COLUMN description VARCHAR(255),
-	  ADD COLUMN modified_at TIMESTAMP,
-	  DROP COLUMN common_name,
-    DROP COLUMN oin,
-	  DROP COLUMN scopes;
-	
-	TRUNCATE TABLE clients;
-	INSERT INTO clients (id, organization_id, name) SELECT id, organization_id, name FROM new_clients; 
-		
+	ALTER TABLE clients
+		ALTER COLUMN id SET DEFAULT gen_random_uuid(),
+		ADD COLUMN name VARCHAR(100),          -- nullable for now
+		ADD COLUMN description VARCHAR(255),
+		ADD COLUMN modified_at TIMESTAMP,
+		DROP COLUMN common_name,
+		DROP COLUMN oin,
+		DROP COLUMN scopes;
+
+		TRUNCATE TABLE clients;
+		INSERT INTO clients (id, organization_id, name) SELECT id, organization_id, name FROM new_clients;
+
+		ALTER TABLE clients ALTER COLUMN name SET NOT NULL;
+				
 	-- define new tables
 	
 	CREATE TABLE organizations_scopes (
@@ -163,7 +165,6 @@ BEGIN;
 	
 	DROP TABLE IF EXISTS new_clients;
 	DROP TABLE IF EXISTS new_org_certs; 
-	DROP TABLE IF EXISTS new_clients_scopes;
 	DROP TABLE IF EXISTS new_clients_scopes;
 COMMIT;
 
