@@ -8,12 +8,13 @@ from app.models.client import (
     ClientCreate,
     ClientQueryParams,
     ClientResolveRequest,
+    ClientResolveResponse,
     ClientUpdate,
 )
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.models.ura import UraNumber
-from tests.conftest import TEST_CLIENT_NAME, TEST_DOMAIN, TEST_EXTERNAL_ID, TEST_OIN
+from tests.conftest import TEST_CLIENT_NAME, TEST_DOMAIN, TEST_EXTERNAL_ID, TEST_OIN, TEST_ORG_NAME
 
 
 def test_create_should_succeed(cert_create_dto_1: CertificateCreate, source_create_dto_1: SourceCreate) -> None:
@@ -59,14 +60,15 @@ def test_resolve_request_should_succeed() -> None:
     mock_client_id = uuid4()
     model = ClientResolveRequest(
         client_id=mock_client_id,
-        organization_id=TEST_EXTERNAL_ID,
-        sub=TEST_OIN,
-        common_name=TEST_DOMAIN,
+        organization_external_id=TEST_EXTERNAL_ID,
+        certificate_organization_identifier=TEST_OIN,
+        certificate_domains=[TEST_DOMAIN],
     )
     assert str(model.client_id) == str(mock_client_id)
-    assert str(model.sub) == str(TEST_OIN)
-    assert str(model.organization_id) == str(org_ura)
-    assert model.common_name == TEST_DOMAIN
+    assert str(model.certificate_organization_identifier) == str(TEST_OIN)
+    assert str(model.organization_external_id) == str(org_ura)
+    assert model.certificate_domains == [TEST_DOMAIN]
+    assert model.source_id is None
 
 
 def test_resolve_request_missing_org_id_should_raise() -> None:
@@ -75,3 +77,12 @@ def test_resolve_request_missing_org_id_should_raise() -> None:
             client_organization_id=TEST_OIN,
             client_common_name="Test Client",
         )
+
+
+def test_resolve_response_requires_scopes_and_matched_domain() -> None:
+    with pytest.raises(ValidationError):
+        ClientResolveResponse(organization_name=TEST_ORG_NAME)  # type: ignore[call-arg]
+
+    model = ClientResolveResponse(scopes="nvi:localize", organization_name=TEST_ORG_NAME, matched_domain=TEST_DOMAIN)
+    assert model.matched_domain == TEST_DOMAIN
+    assert model.scopes == "nvi:localize"
