@@ -46,9 +46,8 @@ def test_commit_failure_is_not_masked_by_retry(retrying_database: Database) -> N
             OperationalError("stmt", {}, Exception("connection refused")),
             PendingRollbackError("transaction has been rolled back"),
         )
-        with patch.object(session.session, "commit", side_effect=flaky) as commit:
-            with pytest.raises(DatabaseError):
-                session.commit()
+        with patch.object(session.session, "commit", side_effect=flaky) as commit, pytest.raises(DatabaseError):
+            session.commit()
 
         assert commit.call_count == 1, "commit must not be retried once its unit of work is lost"
 
@@ -59,9 +58,8 @@ def test_commit_failure_leaves_nothing_persisted(retrying_database: Database) ->
         session.add(OrganizationEntity(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME))
 
         flaky = _failing(OperationalError("stmt", {}, Exception("connection refused")))
-        with patch.object(session.session, "commit", side_effect=flaky):
-            with pytest.raises(DatabaseError):
-                session.commit()
+        with patch.object(session.session, "commit", side_effect=flaky), pytest.raises(DatabaseError):
+            session.commit()
 
     with retrying_database.get_db_session() as session:
         rows = session.execute(select(OrganizationEntity)).scalars().all()

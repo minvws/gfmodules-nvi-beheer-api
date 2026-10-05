@@ -1,5 +1,6 @@
+from collections.abc import Generator
 from datetime import datetime as now
-from typing import Any, Generator
+from typing import Any
 from uuid import uuid4
 
 import inject

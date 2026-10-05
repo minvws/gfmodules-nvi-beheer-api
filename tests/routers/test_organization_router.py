@@ -147,7 +147,7 @@ def test_update_null_scopes_is_accepted(
     org_create_dto_1.clients = None
     org = organization_service.create_one(org_create_dto_1)
     response = api.put(
-        f"/organizations/{str(org.id)}",
+        f"/organizations/{org.id!s}",
         json={"id": str(org.id), "name": org.name, "external_id": org.external_id.value, "scopes": None},
     )
     assert response.status_code == 200
@@ -165,7 +165,7 @@ def test_get_by_id_returns_200(
 
 
 def test_get_by_id_not_found_returns_404(api: TestClient) -> None:
-    response = api.get(f"/organizations/{str(uuid4())}")
+    response = api.get(f"/organizations/{uuid4()!s}")
     assert response.status_code == 404
 
 
@@ -189,7 +189,7 @@ def test_get_many_returns_list(
 
 @pytest.mark.parametrize(
     "query",
-    [f"external_id={str(TEST_EXTERNAL_ID)}", "name=Acme", "scopes=nvi:read&scopes=nvi:create", "include_deleted=true"],
+    [f"external_id={TEST_EXTERNAL_ID!s}", "name=Acme", "scopes=nvi:read&scopes=nvi:create", "include_deleted=true"],
 )
 def test_get_many_passes_query_params(api: TestClient, query: str) -> None:
     resp = api.get(f"/organizations?{query}")
@@ -208,7 +208,7 @@ def test_update_returns_200(
 ) -> None:
     org = organization_service.create_one(org_create_dto_1)
     response = api.put(
-        f"/organizations/{str(org.id)}",
+        f"/organizations/{org.id!s}",
         json={"name": "New Name", "external_id": SECOND_EXTERNAL_ID.value, "scopes": TEST_SCOPES},
     )
     data = response.json()
@@ -234,7 +234,7 @@ def test_delete_returns_204(
     org_create_dto_1.certificates = None
     org_create_dto_1.clients = None
     org = organization_service.create_one(org_create_dto_1)
-    response = api.delete(f"/organizations/{str(org.id)}")
+    response = api.delete(f"/organizations/{org.id!s}")
     assert response.status_code == 204
 
 
@@ -242,12 +242,12 @@ def test_delete_returns_403(
     api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
     org = organization_service.create_one(org_create_dto_1)
-    response = api.delete(f"/organizations/{str(org.id)}")
+    response = api.delete(f"/organizations/{org.id!s}")
     assert response.status_code == 403
 
 
 def test_delete_not_found_returns_404(api: TestClient) -> None:
-    response = api.delete(f"/organizations/{str(uuid4())}")
+    response = api.delete(f"/organizations/{uuid4()!s}")
     assert response.status_code == 404
 
 
@@ -255,7 +255,7 @@ def test_delete_with_active_clients_returns_403(
     api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
     org = organization_service.create_one(org_create_dto_1)
-    response = api.delete(f"/organizations/{str(org.id)}")
+    response = api.delete(f"/organizations/{org.id!s}")
     assert response.status_code == 403
 
 

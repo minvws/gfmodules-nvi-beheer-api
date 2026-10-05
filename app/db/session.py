@@ -1,7 +1,8 @@
 import logging
 import random
+from collections.abc import Callable
 from time import sleep
-from typing import Any, Callable, ParamSpec, Tuple, Type, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 from sqlalchemy import Delete, Engine, Insert, Result
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
@@ -44,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 P = ParamSpec("P")
-R = TypeVar("R", bound=Tuple[Any, ...])
+R = TypeVar("R", bound=tuple[Any, ...])
 
 
 class DbSession:
@@ -74,7 +75,7 @@ class DbSession:
         finally:
             self.session.close()
 
-    def get_repository(self, repository_class: Type["base.TRepositoryBase"]) -> "base.TRepositoryBase":
+    def get_repository(self, repository_class: type["base.TRepositoryBase"]) -> "base.TRepositoryBase":
         """
         Returns an instantiated repository for the given model class
         """
