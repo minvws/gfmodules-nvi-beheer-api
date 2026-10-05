@@ -1,12 +1,10 @@
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
 
 from app import utils
 from app.models.certificates import CertificateCreate, CertificateQueryParams, CertificateUpdate
-from app.models.client import ClientCreate, ClientQueryParams, ClientResolveRequest, ClientUpdate
-from app.models.oin import Oin
+from app.models.client import ClientCreate, ClientQueryParams, ClientUpdate
 from app.models.organization import OrganizationCreate
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate, SourceQueryParams, SourceUpdate
@@ -21,8 +19,6 @@ from app.services.exceptions import (
 from app.services.organization import OrganizationService
 from app.services.source.organization_source import OrganizationSourceService
 from tests.conftest import (
-    SECOND_EXTERNAL_ID,
-    SECOND_OIN,
     TEST_CLIENT_NAME,
     TEST_DOMAIN,
     TEST_EXTERNAL_ID,
@@ -586,181 +582,3 @@ def test_delete_one_should_raise_when_client_has_active_memebers(
 
     with pytest.raises(EntityHasActiveMembersError):
         client_service.delete_one(new_client.id, org.id)
-
-
-def test_resolve_should_strip_crd_scopes_when_no_source_id(
-    client_service: ClientService,
-    organization_service: OrganizationService,
-    org_create_dto_1: OrganizationCreate,
-) -> None:
-    org_create_dto_1.scopes = [
-        AuthorizationScope.CREATE,
-        AuthorizationScope.READ,
-        AuthorizationScope.DELETE,
-        AuthorizationScope.LOCALIZE,
-    ]
-    assert org_create_dto_1.clients is not None
-    org_create_dto_1.clients[0].scopes = [
-        AuthorizationScope.CREATE,
-        AuthorizationScope.READ,
-        AuthorizationScope.LOCALIZE,
-    ]
-    org = organization_service.create_one(org_create_dto_1)
-    assert org.clients is not None
-    client = org.clients[0]
-
-    request = ClientResolveRequest(
-        client_id=client.id,
-        organization_external_id=TEST_EXTERNAL_ID,
-        certificate_organization_identifier=TEST_OIN,
-        certificate_domains=[TEST_DOMAIN],
-    )
-
-    result = client_service.resolve(request)
-
-    assert result.organization_name == TEST_ORG_NAME
-    assert result.matched_domain == TEST_DOMAIN
-    assert result.scopes == "nvi:localize"
-
-
-def test_resolve_should_return_full_scopes_when_source_owned(
-    client_service: ClientService,
-    organization_service: OrganizationService,
-    org_create_dto_1: OrganizationCreate,
-) -> None:
-    org_create_dto_1.scopes = [
-        AuthorizationScope.CREATE,
-        AuthorizationScope.READ,
-        AuthorizationScope.DELETE,
-        AuthorizationScope.LOCALIZE,
-    ]
-    assert org_create_dto_1.clients is not None
-    org_create_dto_1.clients[0].scopes = [
-        AuthorizationScope.CREATE,
-        AuthorizationScope.READ,
-        AuthorizationScope.LOCALIZE,
-    ]
-    org = organization_service.create_one(org_create_dto_1)
-    assert org.clients is not None
-    client = org.clients[0]
-
-    request = ClientResolveRequest(
-        client_id=client.id,
-        organization_external_id=TEST_EXTERNAL_ID,
-        certificate_organization_identifier=TEST_OIN,
-        certificate_domains=[TEST_DOMAIN],
-        source_id=TEST_SOURCE_ID,
-    )
-
-    result = client_service.resolve(request)
-
-    assert set(result.scopes.split()) == {"nvi:create", "nvi:read", "nvi:localize"}
-
-
-def test_resolve_should_match_one_of_several_certificate_domains(
-    client_service: ClientService,
-    organization_service: OrganizationService,
-    org_create_dto_1: OrganizationCreate,
-) -> None:
-    org = organization_service.create_one(org_create_dto_1)
-    assert org.clients is not None
-    client = org.clients[0]
-
-    request = ClientResolveRequest(
-        client_id=client.id,
-        organization_external_id=TEST_EXTERNAL_ID,
-        certificate_organization_identifier=TEST_OIN,
-        certificate_domains=["not-matching.example", TEST_DOMAIN],
-    )
-
-    result = client_service.resolve(request)
-
-    assert result.matched_domain == TEST_DOMAIN
-
-
-def test_resolve_should_raise_404_when_client_not_found(
-    client_service: ClientService,
-) -> None:
-    request = ClientResolveRequest(
-        client_id=uuid4(),
-        organization_external_id=TEST_EXTERNAL_ID,
-        certificate_organization_identifier=TEST_OIN,
-        certificate_domains=[TEST_DOMAIN],
-    )
-
-    with pytest.raises(HTTPException) as exc_info:
-        client_service.resolve(request)
-    assert exc_info.value.status_code == 404
-
-
-def test_resolve_should_raise_404_when_organization_id_mismatch(
-    client_service: ClientService,
-    organization_service: OrganizationService,
-    org_create_dto_1: OrganizationCreate,
-) -> None:
-    org = organization_service.create_one(org_create_dto_1)
-    assert org.clients is not None
-    client = org.clients[0]
-
-    request = ClientResolveRequest(
-        client_id=client.id,
-        organization_external_id=SECOND_EXTERNAL_ID,
-        certificate_organization_identifier=TEST_OIN,
-        certificate_domains=[TEST_DOMAIN],
-    )
-
-    with pytest.raises(HTTPException) as exc_info:
-        client_service.resolve(request)
-    assert exc_info.value.status_code == 404
-
-
-@pytest.mark.parametrize(
-    "certificate_organization_identifier, certificate_domains",
-    [
-        (SECOND_OIN, [TEST_DOMAIN]),
-        (TEST_OIN, ["not-matching.example"]),
-    ],
-)
-def test_resolve_should_raise_404_when_no_certificate_matches(
-    client_service: ClientService,
-    organization_service: OrganizationService,
-    org_create_dto_1: OrganizationCreate,
-    certificate_organization_identifier: Oin,
-    certificate_domains: list[str],
-) -> None:
-    org = organization_service.create_one(org_create_dto_1)
-    assert org.clients is not None
-    client = org.clients[0]
-
-    request = ClientResolveRequest(
-        client_id=client.id,
-        organization_external_id=TEST_EXTERNAL_ID,
-        certificate_organization_identifier=certificate_organization_identifier,
-        certificate_domains=certificate_domains,
-    )
-
-    with pytest.raises(HTTPException) as exc_info:
-        client_service.resolve(request)
-    assert exc_info.value.status_code == 404
-
-
-def test_resolve_should_raise_404_when_source_id_not_owned(
-    client_service: ClientService,
-    organization_service: OrganizationService,
-    org_create_dto_1: OrganizationCreate,
-) -> None:
-    org = organization_service.create_one(org_create_dto_1)
-    assert org.clients is not None
-    client = org.clients[0]
-
-    request = ClientResolveRequest(
-        client_id=client.id,
-        organization_external_id=TEST_EXTERNAL_ID,
-        certificate_organization_identifier=TEST_OIN,
-        certificate_domains=[TEST_DOMAIN],
-        source_id="unknown-source",
-    )
-
-    with pytest.raises(HTTPException) as exc_info:
-        client_service.resolve(request)
-    assert exc_info.value.status_code == 404

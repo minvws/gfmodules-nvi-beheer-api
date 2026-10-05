@@ -15,32 +15,26 @@ from app.models.source import Source, SourceCreate, SourceUpdate
 from app.models.ura import UraNumber
 
 ORG_URA_DESCRIPTION = "The URA (external_id) of the organization the client acts on behalf of"
-DOMAIN_DESCRIPTION = "The domains from the client certificate's CN and SAN entries"
-ORGANIZATION_IDENTIFIER_DESCRIPTION = "The organization_identifier of the client certificate"
-MATCHED_DOMAIN_DESCRIPTION = "The registered domain that matched one of the presented certificate_domains"
+COMMON_NAME_DESCRIPTION = "The certificate CN of the client"
 EXTERNAL_ID_DESCRIPTION = "The OIN of the client"
 SOURCE_ID_DESCRIPTION = "The optional source ID of the client"
 SCOPES_DESCRIPTION = "The space separated scopes granted to the client"
 ORGANIZATION_NAME_DESCRIPTION = "The name of the organization the client acts on behalf of"
-RESOLVE_SCOPES_DESCRIPTION = (
-    f"{SCOPES_DESCRIPTION}. One or more of: {', '.join(scope.value for scope in AuthorizationScope)}"
-)
 
 
 class ClientResolveRequest(BaseModel):
     client_id: UUID
-    organization_external_id: UraNumber = Field(..., description=ORG_URA_DESCRIPTION)
-    certificate_organization_identifier: Oin = Field(..., description=ORGANIZATION_IDENTIFIER_DESCRIPTION)
-    certificate_domains: list[str] = Field(..., description=DOMAIN_DESCRIPTION)
-    source_id: str | None = Field(default=None, description=SOURCE_ID_DESCRIPTION)
+    organization_id: UraNumber = Field(..., description=ORG_URA_DESCRIPTION)
+    sub: Oin
+    common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
+    source_id: str | None = None
 
 
 class ClientResolveResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    scopes: str = Field(description=RESOLVE_SCOPES_DESCRIPTION)
+    scopes: list[AuthorizationScope] | None = Field(default=None, description=SCOPES_DESCRIPTION)
     organization_name: str = Field(description=ORGANIZATION_NAME_DESCRIPTION)
-    matched_domain: str = Field(description=MATCHED_DOMAIN_DESCRIPTION)
 
 
 class ClientFields(BaseModel):

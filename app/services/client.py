@@ -17,23 +17,13 @@ from app.db.repository.contexts.organization_context import (
     OrganizationSourceQueryContext,
 )
 from app.db.repository.organization import OrganizationRepository
-from app.models.client import (
-    Client,
-    ClientCreate,
-    ClientQueryParams,
-    ClientResolveRequest,
-    ClientResolveResponse,
-    ClientUpdate,
-)
-from app.models.scopes import AuthorizationScope
+from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
 from app.services.certificate import ClientCertificateService
-from app.services.exceptions import EntityHasActiveMembersError, RecordNotFoundError, ResolveError
+from app.services.exceptions import EntityHasActiveMembersError, RecordNotFoundError
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
 
 logger = logging.getLogger(__name__)
-
-SOURCE_INDEPENDENT_SCOPES = frozenset({AuthorizationScope.LOCALIZE})
 
 
 class ClientService:
@@ -175,32 +165,6 @@ class ClientService:
                 raise EntityHasActiveMembersError("Client", active_member, id)
 
             client.deleted_at = datetime.now()
-
-    def resolve(self, request: ClientResolveRequest) -> ClientResolveResponse:
-        with self.db.get_db_session() as session:
-            client_repo = session.get_repository(ClientRepository)
-            client = client_repo.find_for_resolve(
-                request.client_id,
-                request.organization_external_id,
-                request.certificate_organization_identifier,
-                request.certificate_domains,
-                request.source_id,
-            )
-            if client is None or not client.certificates:
-                raise ResolveError
-
-            if request.source_id is not None and not client.sources:
-                raise ResolveError
-
-            scope_names = {s.name for s in client.scopes}
-            if request.source_id is None:
-                scope_names &= SOURCE_INDEPENDENT_SCOPES  # keeps only the elements present in both sets
-
-            return ClientResolveResponse(
-                scopes=" ".join(sorted(scope_names)),
-                organization_name=client.organization.name,
-                matched_domain=client.certificates[0].domain,
-            )
 
     @staticmethod
     def validate_for_delete(client: ClientEntity) -> str | None:
