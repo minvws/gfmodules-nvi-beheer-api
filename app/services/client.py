@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from app.db.db import Database
@@ -164,7 +164,7 @@ class ClientService:
             if active_member:
                 raise EntityHasActiveMembersError("Client", active_member, id)
 
-            client.deleted_at = datetime.now()
+            client.deleted_at = datetime.now(UTC)
 
     @staticmethod
     def validate_for_delete(client: ClientEntity) -> str | None:

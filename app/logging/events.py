@@ -1,4 +1,5 @@
 import logging
+from typing import ClassVar
 
 from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
 
@@ -58,7 +59,7 @@ class Log(_Base):
         },
     )
 
-    access_event_id = {
+    access_event_id: ClassVar = {
         ("POST", "/organizations"): "100700",
         ("PUT", "/organizations/{id}"): "100701",
         ("DELETE", "/organizations/{id}"): "100702",

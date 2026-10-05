@@ -114,7 +114,6 @@ def set_config(config: Config) -> None:
 
 def get_config(path: str | None = None) -> Config:
     global _CONFIG
-    global _PATH
 
     if _CONFIG is not None:
         return _CONFIG
@@ -130,6 +129,6 @@ def get_config(path: str | None = None) -> Config:
         _CONFIG = Config.model_validate(ini_data)
     except ValidationError as e:
         logger.error(f"Configuration validation error: {e}")
-        raise e
+        raise
 
     return _CONFIG

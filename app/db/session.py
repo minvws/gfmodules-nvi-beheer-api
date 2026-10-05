@@ -2,7 +2,8 @@ import logging
 import random
 from collections.abc import Callable
 from time import sleep
-from typing import Any, ParamSpec, TypeVar
+from types import TracebackType
+from typing import Any, ParamSpec, Self, TypeVar
 
 from sqlalchemy import Delete, Engine, Insert, Result
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
@@ -58,14 +59,19 @@ class DbSession:
         self._retry_backoff = retry_backoff
         self._commit = commit
 
-    def __enter__(self) -> "DbSession":
+    def __enter__(self) -> Self:
         """
         Create a new session when entering the context manager
         """
         self.session = Session(self._engine, expire_on_commit=False)
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """
         Close the session when exiting the context manager
         """
@@ -75,7 +81,7 @@ class DbSession:
         finally:
             self.session.close()
 
-    def get_repository(self, repository_class: type["base.TRepositoryBase"]) -> "base.TRepositoryBase":
+    def get_repository(self, repository_class: type["base.TRepositoryBase_co"]) -> "base.TRepositoryBase_co":
         """
         Returns an instantiated repository for the given model class
         """
@@ -201,10 +207,10 @@ class DbSession:
                 logger.warning("Retrying operation due to OperationalError: %s", e)
             except DatabaseError as e:
                 logger.warning("Retrying operation due to DatabaseError: %s", e)
-                raise e
+                raise
             except Exception as e:
                 logger.warning("Generic Exception during operation: %s", e)
-                raise e
+                raise
 
             if len(backoff) == 0:
                 logger.error("Operation failed after all retries")

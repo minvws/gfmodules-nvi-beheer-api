@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -55,7 +55,7 @@ TEST_SOURCE_ID = "source-001"
 TEST_SOURCE_NAME = "test-source-1"
 TEST_DOMAIN = "example.com"
 VALID_OIN = TEST_OIN
-FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0)
+FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
 SECOND_EXTERNAL_ID = UraNumber("87654321")
 SECOND_ORG_NAME = "Second Test Organization"

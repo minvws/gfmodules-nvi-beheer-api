@@ -39,7 +39,7 @@ class Oin:
             value = value.value
 
         if not isinstance(value, (int, str)):
-            raise ValueError(f"OIN must be a string or integer, got {type(value).__name__}")
+            raise TypeError(f"OIN must be a string or integer, got {type(value).__name__}")
 
         if isinstance(value, int) and value < 0:
             raise ValueError("OIN must be a positive integer")
