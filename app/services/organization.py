@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -172,7 +172,7 @@ class OrganizationService:
             if active_member:
                 raise EntityHasActiveMembersError("Organization", active_member, id)
 
-            org.deleted_at = datetime.now()
+            org.deleted_at = datetime.now(UTC)
 
             if org.scopes:
                 org.scopes.clear()

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -131,7 +131,9 @@ def test_find_many_should_return_deleted_based_on_flag(
     organization_repository: OrganizationRepository,
 ) -> None:
     cert_entity_2 = CertificateEntity(
-        organization_identifier=Oin("00000099000000002000"), domain="some-other-domain", deleted_at=datetime.now()
+        organization_identifier=Oin("00000099000000002000"),
+        domain="some-other-domain",
+        deleted_at=datetime.now(UTC),
     )
     with organization_repository.db_session:
         organization_entity.certificates.extend([certificate_entity, cert_entity_2])
@@ -261,7 +263,7 @@ def test_find_should_return_based_on_deleted_flag(
     organization_repository: OrganizationRepository,
     certificate_repository: CertificateRepository,
 ) -> None:
-    certificate_entity.deleted_at = datetime.now()
+    certificate_entity.deleted_at = datetime.now(UTC)
     with organization_repository.db_session:
         organization_entity.certificates.append(certificate_entity)
         org = organization_repository.add_one(organization_entity)

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -51,7 +51,7 @@ def test_find_one_not_found(organization_repository: OrganizationRepository) -> 
 def test_find_one_include_deleted(
     organization_repository: OrganizationRepository, organization_entity: OrganizationEntity
 ) -> None:
-    organization_entity.deleted_at = datetime.now()
+    organization_entity.deleted_at = datetime.now(UTC)
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)
 
@@ -267,7 +267,7 @@ def test_find_should_include_deleted(
     organization_repository: OrganizationRepository,
     organization_entity: OrganizationEntity,
 ) -> None:
-    organization_entity.deleted_at = datetime.now()
+    organization_entity.deleted_at = datetime.now(UTC)
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)
 
@@ -401,7 +401,7 @@ def test_find_many_excludes_deleted_orgs(
     organization_entity: OrganizationEntity,
 ) -> None:
     with organization_repository.db_session:
-        organization_entity.deleted_at = datetime.now()
+        organization_entity.deleted_at = datetime.now(UTC)
         organization_repository.add_one(organization_entity)
         ctx = OrganizationQueryContext()
         assert organization_repository.find_many(ctx) == []
@@ -418,7 +418,7 @@ def test_find_many_should_return_correctly_with_source_on_include_deleted_flag(
         org = organization_repository.find_one(new_org.id)
         assert org is not None
         assert len(org.sources) > 0
-        org.sources[0].deleted_at = datetime.now()
+        org.sources[0].deleted_at = datetime.now(UTC)
         session.commit()
         session.flush()
 
@@ -446,7 +446,7 @@ def test_find_many_should_return_correctly_with_certificates_on_include_deleted_
         org = organization_repository.find_one(new_org.id)
         assert org is not None
         assert len(org.certificates) > 0
-        org.certificates[0].deleted_at = datetime.now()
+        org.certificates[0].deleted_at = datetime.now(UTC)
         session.commit()
         session.flush()
 
@@ -479,7 +479,7 @@ def test_find_many_should_return_correctly_with_clients_on_include_deleted_flag(
         org = organization_repository.find_one(new_org.id)
         assert org is not None
         assert len(org.clients) > 0
-        org.clients[0].deleted_at = datetime.now()
+        org.clients[0].deleted_at = datetime.now(UTC)
         session.commit()
         session.flush()
 
@@ -512,7 +512,7 @@ def test_find_many_should_return_correctly_with_clients_source_on_include_delete
         assert org is not None
         assert len(org.clients) > 0
         assert org.clients[0].sources is not None
-        org.sources[0].deleted_at = datetime.now()
+        org.sources[0].deleted_at = datetime.now(UTC)
         session.commit()
         session.flush()
 
@@ -553,7 +553,7 @@ def test_find_many_should_return_correctly_with_clients_certificates_on_include_
         assert org is not None
         assert len(org.clients) > 0
         assert org.clients[0].certificates is not None
-        org.certificates[0].deleted_at = datetime.now()
+        org.certificates[0].deleted_at = datetime.now(UTC)
         session.commit()
         session.flush()
 
@@ -586,7 +586,7 @@ def test_find_many_include_deleted_returns_deleted(
     organization_entity: OrganizationEntity,
 ) -> None:
     with organization_repository.db_session:
-        organization_entity.deleted_at = datetime.now()
+        organization_entity.deleted_at = datetime.now(UTC)
         organization_repository.add_one(organization_entity)
         ctx = OrganizationQueryContext()
         results = organization_repository.find_many(ctx=ctx, include_deleted=True)

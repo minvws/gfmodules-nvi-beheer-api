@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -179,7 +179,7 @@ def test_find_many_should_return_based_on_include_deleted_flag(
     organization_repository: OrganizationRepository,
     source_repository: SourceRepository,
 ) -> None:
-    source_entity.deleted_at = datetime.now()
+    source_entity.deleted_at = datetime.now(UTC)
     with organization_repository.db_session:
         organization_entity.sources.append(source_entity)
         org = organization_repository.add_one(organization_entity)

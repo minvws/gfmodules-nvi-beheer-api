@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -144,10 +144,10 @@ def test_find_many_excludes_deleted(
 ) -> None:
 
     client_entity_2 = ClientEntity(
-        organization_id=client_entity.organization_id, name="Test Client 2", deleted_at=datetime.now()
+        organization_id=client_entity.organization_id, name="Test Client 2", deleted_at=datetime.now(UTC)
     )
     with organization_repository.db_session:
-        client_entity.deleted_at = datetime.now()
+        client_entity.deleted_at = datetime.now(UTC)
         organization_entity.clients.extend([client_entity, client_entity_2])
         org = organization_repository.add_one(organization_entity)
 
@@ -165,10 +165,10 @@ def test_find_many_include_deleted_returns_deleted(
     organization_entity: OrganizationEntity,
 ) -> None:
     client_entity_2 = ClientEntity(
-        organization_id=client_entity.organization_id, name="Test Client 2", deleted_at=datetime.now()
+        organization_id=client_entity.organization_id, name="Test Client 2", deleted_at=datetime.now(UTC)
     )
     with organization_repository.db_session:
-        client_entity.deleted_at = datetime.now()
+        client_entity.deleted_at = datetime.now(UTC)
         organization_entity.clients.extend([client_entity, client_entity_2])
         org = organization_repository.add_one(organization_entity)
 
