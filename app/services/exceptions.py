@@ -31,3 +31,9 @@ class ForbidenOperationError(HTTPException):
     def __init__(self, msg: str | None = None) -> None:
         _msg = msg if msg else "Operation is not allowed"
         super().__init__(status_code=403, detail=_msg)
+
+
+class ResolveError(HTTPException):
+    def __init__(self) -> None:
+        _msg = "Client authorization does not exist for given parameters"
+        super().__init__(status_code=404, detail=_msg)

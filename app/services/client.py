@@ -2,8 +2,6 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import HTTPException
-
 from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
@@ -29,14 +27,13 @@ from app.models.client import (
 )
 from app.models.scopes import AuthorizationScope
 from app.services.certificate import ClientCertificateService
-from app.services.exceptions import EntityHasActiveMembersError, RecordNotFoundError
+from app.services.exceptions import EntityHasActiveMembersError, RecordNotFoundError, ResolveError
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
 
 logger = logging.getLogger(__name__)
 
 SOURCE_INDEPENDENT_SCOPES = frozenset({AuthorizationScope.LOCALIZE})
-RESOLVE_ERROR_DETAIL = "Client authorization does not exist for given parameters"
 
 
 class ClientService:
@@ -190,10 +187,10 @@ class ClientService:
                 request.source_id,
             )
             if client is None or not client.certificates:
-                raise HTTPException(status_code=404, detail=RESOLVE_ERROR_DETAIL)
+                raise ResolveError
 
             if request.source_id is not None and not client.sources:
-                raise HTTPException(status_code=404, detail=RESOLVE_ERROR_DETAIL)
+                raise ResolveError
 
             scope_names = {s.name for s in client.scopes}
             if request.source_id is None:
