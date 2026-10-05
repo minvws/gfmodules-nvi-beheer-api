@@ -1,17 +1,10 @@
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 from sqlalchemy import TIMESTAMP, Enum, Integer, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models.base import Base
-from app.db.models.client_scope import clients_scopes_association
-from app.db.models.organization_scope import organizations_scopes_association
 from app.models.scopes import AuthorizationScope
-
-if TYPE_CHECKING:
-    from app.db.models.client import ClientEntity
-    from app.db.models.organization import OrganizationEntity
 
 
 class ScopeEntity(Base):
@@ -20,11 +13,3 @@ class ScopeEntity(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[AuthorizationScope] = mapped_column(Enum(AuthorizationScope))
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP, server_default=func.now())
-
-    organizations: Mapped["OrganizationEntity"] = relationship(secondary=organizations_scopes_association, lazy="raise")
-    clients: Mapped["ClientEntity"] = relationship(
-        secondary=clients_scopes_association,
-        primaryjoin="ScopeEntity.id == clients_scopes.c.scope_id",
-        secondaryjoin="ClientEntity.id == clients_scopes.c.client_id",
-        lazy="raise",
-    )
