@@ -30,8 +30,18 @@ BEGIN;
 	JOIN scopes s ON s.name = UPPER(SPLIT_PART(parsed.scope_name, ':', 2))
 	WHERE o.scopes IS NOT NULL AND o.scopes != '';
 
-    CREATE TEMP TABLE new_sources AS SELECT DISTINCT ns.organization_id, ns.source_id, ns.created_at, ns.deleted_at FROM clients ns;
-    ALTER TABLE new_sources ADD COLUMN id UUID DEFAULT gen_random_uuid();
+  CREATE TEMP TABLE new_sources AS SELECT
+    ns.organization_id,
+    ns.source_id,
+    MIN(ns.created_at) AS created_at,
+    CASE
+        WHEN COUNT(*) > COUNT(ns.deleted_at) THEN NULL
+        ELSE MIN(ns.deleted_at)
+    END AS deleted_at
+	  FROM clients ns
+	  GROUP BY ns.organization_id, ns.source_id;
+
+	ALTER TABLE new_sources ADD COLUMN id UUID DEFAULT gen_random_uuid();
 
 	
   CREATE TEMP TABLE new_client_sources AS 
@@ -196,4 +206,3 @@ BEGIN;
   DROP TABLE IF EXISTS new_client_sources;
 	DROP TABLE IF EXISTS new_clients_certs;
 COMMIT;
-
