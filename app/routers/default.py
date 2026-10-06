@@ -104,7 +104,7 @@ def version_json() -> Response:
         with open(Path(__file__).parent.parent.parent / "version.json", "r") as file:
             content = json.load(file)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        logger.info("Version info could not be loaded: %s" % e)
+        logger.info("Version info could not be loaded: %s", e)
         return Response(
             status_code=404,
             content="Version info could not be loaded.",
