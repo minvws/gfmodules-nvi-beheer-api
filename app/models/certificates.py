@@ -30,7 +30,7 @@ class CertificateField(BaseModel):
         return organization_identifier.value
 
     def make_unique_key(self, organization_id: UUID) -> str:
-        return f"{str(organization_id)}-{str(self.organization_identifier)}-{self.domain}"
+        return f"{organization_id!s}-{self.organization_identifier!s}-{self.domain}"
 
 
 class CertificateCreate(CertificateField):
@@ -55,5 +55,6 @@ class Certificate(CommonModel, CertificateField):
             organization_identifier=entity.organization_identifier,
             domain=entity.domain,
             created_at=entity.created_at,
+            modified_at=entity.modified_at,
             deleted_at=entity.deleted_at,
         )

@@ -110,7 +110,7 @@ class OrganizationSourceService:
             if active_members is not None:
                 raise EntityHasActiveMembersError("Source", active_members, target.id)
 
-            target.deleted_at = datetime.datetime.now()
+            target.deleted_at = datetime.datetime.now(datetime.UTC)
 
             return Source.from_entity(target)
 

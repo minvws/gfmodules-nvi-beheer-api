@@ -18,7 +18,7 @@ class UraNumber:
         if isinstance(value, UraNumber):
             value = value.value
 
-        if (isinstance(value, int) or isinstance(value, str)) and len(str(value)) <= 8 and str(value).isdigit():
+        if isinstance(value, (int, str)) and len(str(value)) <= 8 and str(value).isdigit():
             self.value = str(value).zfill(8)
         else:
             raise ValueError("URA number must be 8 digits or less")
@@ -29,7 +29,7 @@ class UraNumber:
     def __repr__(self) -> str:
         return f"UraNumber({self.value})"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, UraNumber):
             return self.value == other.value
         return False

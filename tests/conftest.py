@@ -1,8 +1,7 @@
 from collections.abc import Generator
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
-from uuid import UUID, uuid4
 
 import gfmodules.logging as gflog
 import pytest
@@ -23,16 +22,19 @@ from app.db.models.source import SourceEntity
 from app.db.repository.certificate import CertificateRepository
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.scope import ScopeRepository
 from app.db.repository.source import SourceRepository
 from app.logging.events import Log
 from app.models.certificates import CertificateCreate
 from app.models.client import ClientCreate
 from app.models.oin import Oin
 from app.models.organization import OrganizationCreate
+from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.models.ura import UraNumber
 from app.routers.client import router as client_router
 from app.routers.organization import router as organization_router
+from app.routers.resolve import router as resolve_router
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
@@ -43,17 +45,22 @@ from app.services.source.organization_source import OrganizationSourceService
 TEST_OIN = Oin("00000099000000001000")
 TEST_EXTERNAL_ID = UraNumber("12345678")
 TEST_ORG_NAME = "Test Organization"
-TEST_SCOPES = "nvi:create nvi:read nvi:delete nvi:localize"
+TEST_SCOPES = [
+    AuthorizationScope("nvi:create"),
+    AuthorizationScope("nvi:read"),
+    AuthorizationScope("nvi:delete"),
+    AuthorizationScope("nvi:localize"),
+]
 TEST_CLIENT_NAME = "Test Client"
 TEST_SOURCE_ID = "source-001"
 TEST_SOURCE_NAME = "test-source-1"
 TEST_DOMAIN = "example.com"
 VALID_OIN = TEST_OIN
-FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0)
+FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
 SECOND_EXTERNAL_ID = UraNumber("87654321")
 SECOND_ORG_NAME = "Second Test Organization"
-SECON_SCOPES = "nvi:create nvi:localize"
+SECOND_SCOPES = [AuthorizationScope("nvi:create"), AuthorizationScope("nvi:localize")]
 SECOND_OIN = Oin("00000099000000002000")
 SECOND_DOMAIN = "Other-Domain"
 SECOND_CLIENT_NAME = "Test Client 2"
@@ -81,7 +88,7 @@ def database() -> Generator[Database, Any, None]:
     db = Database(config_database=config_database)
     db.generate_tables()
     # setup system scopes
-    stmt = text("INSERT INTO scopes (name) VALUES ('nvi:create'), ('nvi:delete'),('nvi:read'),('nvi:localize');")
+    stmt = text("INSERT INTO scopes (name) VALUES ('CREATE'), ('DELETE'),('READ'),('LOCALIZE');")
     with db.get_db_session() as session:
         session.session.execute(stmt)
         session.commit()
@@ -91,6 +98,11 @@ def database() -> Generator[Database, Any, None]:
 
     yield db
     db.engine.dispose()
+
+
+@pytest.fixture()
+def scope_repository(database: Database) -> ScopeRepository:
+    return ScopeRepository(db_session=database.get_db_session())
 
 
 @pytest.fixture()
@@ -191,7 +203,7 @@ def client_create_dto_1(
 ) -> ClientCreate:
     return ClientCreate(
         name=TEST_CLIENT_NAME,
-        scopes="nvi:create nvi:read",
+        scopes=[AuthorizationScope("nvi:create"), AuthorizationScope("nvi:read")],
         certificates=[cert_create_dto_1],
         sources=[source_create_dto_1, source_create_dto_2],
     )
@@ -220,13 +232,13 @@ def org_create_dto_2() -> OrganizationCreate:
     return OrganizationCreate(
         external_id=SECOND_EXTERNAL_ID,
         name=SECOND_ORG_NAME,
-        scopes=SECON_SCOPES,
+        scopes=SECOND_SCOPES,
         sources=[SourceCreate(source_id="source-3", name="third-source")],
         certificates=[CertificateCreate(organization_identifier=SECOND_OIN, domain=SECOND_DOMAIN)],
         clients=[
             ClientCreate(
                 name=SECOND_CLIENT_NAME,
-                scopes="nvi:localize",
+                scopes=[AuthorizationScope("nvi:localize")],
                 sources=[SourceCreate(source_id="source-3", name="third-source")],
             )
         ],
@@ -250,50 +262,8 @@ def api(
     mock_client_service: MagicMock, organization_service: OrganizationService, client_service: ClientService
 ) -> TestClient:
     app = FastAPI()
-    for router in (organization_router, client_router):
+    for router in (organization_router, client_router, resolve_router):
         app.include_router(router)
     app.dependency_overrides[get_client_service] = lambda: client_service
     app.dependency_overrides[get_organization_service] = lambda: organization_service
     return TestClient(app)
-
-
-def make_organization_entity(
-    *,
-    id: UUID | None = None,
-    external_id: UraNumber = TEST_EXTERNAL_ID,
-    name: str = "Test Organization",
-    scopes: str | None = None,
-    deleted_at: datetime | None = None,
-) -> OrganizationEntity:
-    return OrganizationEntity(
-        id=id or uuid4(),
-        external_id=external_id,
-        name=name,
-        scopes=scopes,
-        created_at=FIXED_CREATED_AT,
-        deleted_at=deleted_at,
-    )
-
-
-def make_client_entity(
-    *,
-    id: UUID | None = None,
-    organization_id: UUID | None = None,
-    oin: Oin = VALID_OIN,
-    common_name: str = "Test Client",
-    source_id: str | None = None,
-    scopes: str | None = None,
-    deleted_at: datetime | None = None,
-    org_entity: OrganizationEntity | None = None,
-) -> ClientEntity:
-    return ClientEntity(
-        id=id or uuid4(),
-        organization_id=organization_id or (org_entity.id if org_entity else uuid4()),
-        oin=oin,
-        common_name=common_name,
-        source_id=source_id,
-        scopes=scopes,
-        created_at=FIXED_CREATED_AT,
-        deleted_at=deleted_at,
-        organization=org_entity,
-    )

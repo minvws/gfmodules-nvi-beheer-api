@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from typing import Any
 from unittest.mock import patch
 
@@ -25,11 +25,12 @@ def _failing(*errors: Exception) -> Callable[..., Any]:
 
 
 @pytest.fixture()
-def retrying_database() -> Database:
+def retrying_database() -> Generator[Database, None, None]:
     """A database with a non-empty backoff, so the retry loop is actually exercised."""
     database = Database(config_database=ConfigDatabase(dsn=SecretStr("sqlite:///:memory:"), retry_backoff=[0.01, 0.01]))
     database.generate_tables()
-    return database
+    yield database
+    database.engine.dispose()
 
 
 def test_commit_failure_is_not_masked_by_retry(retrying_database: Database) -> None:
@@ -45,9 +46,8 @@ def test_commit_failure_is_not_masked_by_retry(retrying_database: Database) -> N
             OperationalError("stmt", {}, Exception("connection refused")),
             PendingRollbackError("transaction has been rolled back"),
         )
-        with patch.object(session.session, "commit", side_effect=flaky) as commit:
-            with pytest.raises(DatabaseError):
-                session.commit()
+        with patch.object(session.session, "commit", side_effect=flaky) as commit, pytest.raises(DatabaseError):
+            session.commit()
 
         assert commit.call_count == 1, "commit must not be retried once its unit of work is lost"
 
@@ -58,9 +58,8 @@ def test_commit_failure_leaves_nothing_persisted(retrying_database: Database) ->
         session.add(OrganizationEntity(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME))
 
         flaky = _failing(OperationalError("stmt", {}, Exception("connection refused")))
-        with patch.object(session.session, "commit", side_effect=flaky):
-            with pytest.raises(DatabaseError):
-                session.commit()
+        with patch.object(session.session, "commit", side_effect=flaky), pytest.raises(DatabaseError):
+            session.commit()
 
     with retrying_database.get_db_session() as session:
         rows = session.execute(select(OrganizationEntity)).scalars().all()
@@ -72,17 +71,20 @@ def test_reads_are_still_retried_after_a_rollback() -> None:
     database = Database(config_database=ConfigDatabase(dsn=SecretStr("sqlite:///:memory:"), retry_backoff=[0.01]))
     database.generate_tables()
 
-    with database.get_db_session() as session:
-        real_execute = session.session.execute
-        flaky = [PendingRollbackError("transaction has been rolled back")]
+    try:
+        with database.get_db_session() as session:
+            real_execute = session.session.execute
+            flaky = [PendingRollbackError("transaction has been rolled back")]
 
-        def execute(*args: Any, **kwargs: Any) -> Any:
-            if flaky:
-                raise flaky.pop(0)
-            return real_execute(*args, **kwargs)
+            def execute(*args: Any, **kwargs: Any) -> Any:
+                if flaky:
+                    raise flaky.pop(0)
+                return real_execute(*args, **kwargs)
 
-        with patch.object(session.session, "execute", side_effect=execute):
-            rows = session.execute(select(OrganizationEntity)).scalars().all()
+            with patch.object(session.session, "execute", side_effect=execute):
+                rows = session.execute(select(OrganizationEntity)).scalars().all()
 
-        assert rows == []
-        assert not flaky, "the read should have been retried after the rollback"
+            assert rows == []
+            assert not flaky, "the read should have been retried after the rollback"
+    finally:
+        database.engine.dispose()

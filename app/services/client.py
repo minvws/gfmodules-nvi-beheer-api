@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from app.db.db import Database
@@ -17,13 +17,23 @@ from app.db.repository.contexts.organization_context import (
     OrganizationSourceQueryContext,
 )
 from app.db.repository.organization import OrganizationRepository
-from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
+from app.models.client import (
+    Client,
+    ClientCreate,
+    ClientQueryParams,
+    ClientResolveRequest,
+    ClientResolveResponse,
+    ClientUpdate,
+)
+from app.models.scopes import AuthorizationScope
 from app.services.certificate import ClientCertificateService
-from app.services.exceptions import EntityHasActiveMembersError, RecordNotFoundError
+from app.services.exceptions import EntityHasActiveMembersError, RecordNotFoundError, ResolveError
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
 
 logger = logging.getLogger(__name__)
+
+SOURCE_INDEPENDENT_SCOPES = frozenset({AuthorizationScope.LOCALIZE})
 
 
 class ClientService:
@@ -42,8 +52,8 @@ class ClientService:
 
             target = ClientEntity(name=dto.name, description=dto.description, organization_id=organization_id)
             if dto.scopes:
-                ScopeService.assert_scopes_granted(org, dto.sanatized_scopes or [])
-                target_scope = ScopeService.make_client_scope_from_org(org, target, dto.sanatized_scopes or [])
+                ScopeService.assert_scopes_granted(org, dto.scopes)
+                target_scope = ScopeService.make_client_scope_from_org(org, target, dto.scopes)
                 target.scopes = target_scope
 
             if dto.certificates:
@@ -85,7 +95,7 @@ class ClientService:
             ctx = ClientQueryContext(
                 organization_id=organization_id,
                 name=params.name,
-                scopes=params.sanatized_scope,
+                scopes=params.scopes if params.scopes else None,
                 source_ctx=ClientSourceQueryContext(source_id=params.source_id, name=params.source_name),
                 certificate_ctx=ClientCertificateQueryContext(
                     organization_identifier=params.cert_organization_identifier, domain=params.cert_domain
@@ -127,9 +137,9 @@ class ClientService:
             if dto.description:
                 client.description = dto.description
 
-            if dto.sanatized_scopes:
-                ScopeService.assert_scopes_granted(org, dto.sanatized_scopes)
-                updated_scopes = ScopeService.make_client_scope_from_org(org, client, dto.sanatized_scopes)
+            if dto.scopes:
+                ScopeService.assert_scopes_granted(org, dto.scopes)
+                updated_scopes = ScopeService.make_client_scope_from_org(org, client, dto.scopes)
                 client.scopes = updated_scopes
             else:
                 client.scopes = []
@@ -164,7 +174,33 @@ class ClientService:
             if active_member:
                 raise EntityHasActiveMembersError("Client", active_member, id)
 
-            client.deleted_at = datetime.now()
+            client.deleted_at = datetime.now(UTC)
+
+    def resolve(self, request: ClientResolveRequest) -> ClientResolveResponse:
+        with self.db.get_db_session() as session:
+            client_repo = session.get_repository(ClientRepository)
+            client = client_repo.find_for_resolve(
+                request.client_id,
+                request.organization_external_id,
+                request.certificate_organization_identifier,
+                request.certificate_domains,
+                request.source_id,
+            )
+            if client is None or not client.certificates:
+                raise ResolveError
+
+            if request.source_id is not None and not client.sources:
+                raise ResolveError
+
+            scope_names = {s.name for s in client.scopes}
+            if request.source_id is None:
+                scope_names &= SOURCE_INDEPENDENT_SCOPES  # keeps only the elements present in both sets
+
+            return ClientResolveResponse(
+                scopes=" ".join(sorted(scope_names)),
+                organization_name=client.organization.name,
+                matched_domain=client.certificates[0].domain,
+            )
 
     @staticmethod
     def validate_for_delete(client: ClientEntity) -> str | None:

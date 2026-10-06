@@ -1,5 +1,7 @@
+from collections.abc import Generator
+from datetime import UTC
 from datetime import datetime as now
-from typing import Any, Generator
+from typing import Any
 from uuid import uuid4
 
 import inject
@@ -7,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
+from app.models.scopes import AuthorizationScope
 from tests.conftest import TEST_EXTERNAL_ID, TEST_ORG_NAME
 
 
@@ -25,8 +28,12 @@ def test_create_should_succeed() -> None:
 
 
 def test_create_with_scopes_should_succeed() -> None:
-    model = OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, scopes="read write")
-    assert model.scopes == "read write"
+    model = OrganizationCreate(
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        scopes=[AuthorizationScope("nvi:read"), AuthorizationScope("nvi:create")],
+    )
+    assert model.scopes == [AuthorizationScope("nvi:read"), AuthorizationScope("nvi:create")]
 
 
 def test_create_missing_external_id_should_raise() -> None:
@@ -59,23 +66,8 @@ def test_response_model_from_entity_with_none_scopes() -> None:
         external_id = TEST_EXTERNAL_ID
         name = TEST_ORG_NAME
         scopes = None
-        created_at = now.now()
+        created_at = now.now(UTC)
         deleted_at = None
 
     model = Organization.model_validate(_Entity())
     assert model.scopes is None
-
-
-def test_response_model_allows_scopes_no_longer_configured() -> None:
-    """Narrowing the configured allow-list must not make existing records unreadable."""
-
-    class _Entity:
-        id = uuid4()
-        external_id = TEST_EXTERNAL_ID
-        name = TEST_ORG_NAME
-        scopes = "admin"
-        created_at = now.now()
-        deleted_at = None
-
-    model = Organization.model_validate(_Entity())
-    assert model.scopes == "admin"

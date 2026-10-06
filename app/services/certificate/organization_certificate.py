@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from app.db.db import Database
@@ -137,7 +137,7 @@ class OrganizationCertificateService:
             if active_memebers is not None:
                 raise EntityHasActiveMembersError("Certificate", active_memebers, id)
 
-            target.deleted_at = datetime.now()
+            target.deleted_at = datetime.now(UTC)
             session.flush()
 
             return Certificate.from_entity(target)

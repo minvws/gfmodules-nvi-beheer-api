@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from app.models.certificates import CertificateCreate
 from app.models.client import ClientCreate
 from app.models.organization import OrganizationCreate
+from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.services.organization import OrganizationService
 from tests.conftest import (
@@ -58,7 +59,7 @@ def test_register_returns_201(
     org_create_dto_1.clients = None
     org = organization_service.create_one(org_create_dto_1)
 
-    response = api.post(f"/organizations/{str(org.id)}/clients", json=client_create_dto_1.model_dump())
+    response = api.post(f"/organizations/{org.id!s}/clients", json=client_create_dto_1.model_dump())
 
     assert response.status_code == 201
 
@@ -70,11 +71,11 @@ def test_register_ungranted_scope_returns_403(
     client_create_dto_1: ClientCreate,
 ) -> None:
     org_create_dto_1.clients = None
-    org_create_dto_1.scopes = "nvi:create nvi:read"
-    client_create_dto_1.scopes = "nvi:localize"
+    org_create_dto_1.scopes = [AuthorizationScope("nvi:create"), AuthorizationScope("nvi:read")]
+    client_create_dto_1.scopes = [AuthorizationScope("nvi:localize")]
     org = organization_service.create_one(org_create_dto_1)
 
-    response = api.post(f"/organizations/{str(org.id)}/clients", json=client_create_dto_1.model_dump())
+    response = api.post(f"/organizations/{org.id!s}/clients", json=client_create_dto_1.model_dump())
 
     assert response.status_code == 403
 
@@ -128,15 +129,15 @@ def test_register_ungranted_scope_returns_403(
         ),
     ],
 )
-def test_register_conflict_returns_409(
+def test_register_conflict_returns_403(
     api: TestClient,
     organization_service: OrganizationService,
     org_dto: OrganizationCreate,
     client_dto: ClientCreate,
 ) -> None:
     org = organization_service.create_one(org_dto)
-    response = api.post(f"/organizations/{str(org.id)}/clients", json=client_dto.model_dump())
-    assert response.status_code == 409
+    response = api.post(f"/organizations/{org.id!s}/clients", json=client_dto.model_dump())
+    assert response.status_code == 403
 
 
 @pytest.mark.parametrize(
@@ -162,7 +163,7 @@ def test_get_by_id_returns_200(
     assert org.clients is not None
     target = org.clients[0]
 
-    response = api.get(f"/organizations/{str(org.id)}/clients/{target.id}")
+    response = api.get(f"/organizations/{org.id!s}/clients/{target.id}")
 
     assert response.status_code == 200
     assert response.json()["id"] == str(target.id)
@@ -208,28 +209,28 @@ def test_update_returns_200(
     assert org.clients is not None
     target = org.clients[0]
     response = api.put(
-        f"/organizations/{str(org.id)}/clients/{str(target.id)}", json={"id": str(target.id), "name": "Updated"}
+        f"/organizations/{org.id!s}/clients/{target.id!s}", json={"id": str(target.id), "name": "Updated"}
     )
     assert response.status_code == 200
     assert response.json()["name"] == "Updated"
 
 
 def test_update_not_found_returns_404(api: TestClient) -> None:
-    response = api.put(f"/organizations/{str(uuid4())}/clients/{str(uuid4())}", json={"id": str(uuid4()), "name": "X"})
+    response = api.put(f"/organizations/{uuid4()!s}/clients/{uuid4()!s}", json={"id": str(uuid4()), "name": "X"})
     assert response.status_code == 404
 
 
 def test_update_ungranted_scope_returns_403(
     api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
-    org_create_dto_1.scopes = "nvi:create nvi:read"
+    org_create_dto_1.scopes = [AuthorizationScope("nvi:create"), AuthorizationScope("nvi:read")]
     org = organization_service.create_one(org_create_dto_1)
     assert org.clients is not None
     target = org.clients[0]
 
     response = api.put(
-        f"/organizations/{str(org.id)}/clients/{str(target.id)}",
-        json={"id": str(target.id), "name": "some name", "scopes": "nvi:delete"},
+        f"/organizations/{org.id!s}/clients/{target.id!s}",
+        json={"id": str(target.id), "name": "some name", "scopes": ["nvi:delete"]},
     )
 
     assert response.status_code == 403
@@ -246,12 +247,12 @@ def test_delete_returns_204(
     assert org.clients is not None
     client = org.clients[0]
 
-    response = api.delete(f"/organizations/{str(org.id)}/clients/{str(client.id)}")
+    response = api.delete(f"/organizations/{org.id!s}/clients/{client.id!s}")
     assert response.status_code == 204
 
 
 def test_delete_not_found_returns_404(api: TestClient) -> None:
-    response = api.delete(f"/organizations/{str(uuid4())}/clients/{str(uuid4())}")
+    response = api.delete(f"/organizations/{uuid4()!s}/clients/{uuid4()!s}")
     assert response.status_code == 404
 
 
@@ -262,7 +263,7 @@ def test_delete_return_403(
     assert org.clients is not None
     client = org.clients[0]
 
-    response = api.delete(f"/organizations/{str(org.id)}/clients/{str(client.id)}")
+    response = api.delete(f"/organizations/{org.id!s}/clients/{client.id!s}")
     assert response.status_code == 403
     assert client.sources is not None
     assert client.certificates is not None

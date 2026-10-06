@@ -8,11 +8,13 @@ from app.models.client import (
     ClientCreate,
     ClientQueryParams,
     ClientResolveRequest,
+    ClientResolveResponse,
     ClientUpdate,
 )
+from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.models.ura import UraNumber
-from tests.conftest import TEST_CLIENT_NAME, TEST_DOMAIN, TEST_EXTERNAL_ID, TEST_OIN
+from tests.conftest import TEST_CLIENT_NAME, TEST_DOMAIN, TEST_EXTERNAL_ID, TEST_OIN, TEST_ORG_NAME
 
 
 def test_create_should_succeed(cert_create_dto_1: CertificateCreate, source_create_dto_1: SourceCreate) -> None:
@@ -25,9 +27,8 @@ def test_create_should_succeed(cert_create_dto_1: CertificateCreate, source_crea
 
 
 def test_create_with_scopes_should_succeed() -> None:
-    model = ClientCreate(name="Test Client", scopes="nvi:read")
-    assert model.scopes == "nvi:read"
-    assert model.sanatized_scopes == ["nvi:read"]
+    model = ClientCreate(name="Test Client", scopes=[AuthorizationScope("nvi:read")])
+    assert model.scopes == [AuthorizationScope("nvi:read")]
 
 
 def test_create_missing_name_should_raise() -> None:
@@ -50,8 +51,8 @@ def test_update_only_tracks_supplied_fields() -> None:
 
 def test_query_params_all_optional_and_track_supplied_only() -> None:
     assert ClientQueryParams().model_dump(exclude_unset=True) == {}
-    params = ClientQueryParams(name="some name", scopes="nvi:read")
-    assert params.model_dump(exclude_unset=True) == {"name": "some name", "scopes": "nvi:read"}
+    params = ClientQueryParams(name="some name", scopes=[AuthorizationScope("nvi:read")])
+    assert params.model_dump(exclude_unset=True) == {"name": "some name", "scopes": ["nvi:read"]}
 
 
 def test_resolve_request_should_succeed() -> None:
@@ -59,14 +60,15 @@ def test_resolve_request_should_succeed() -> None:
     mock_client_id = uuid4()
     model = ClientResolveRequest(
         client_id=mock_client_id,
-        organization_id=TEST_EXTERNAL_ID,
-        sub=TEST_OIN,
-        common_name=TEST_DOMAIN,
+        organization_external_id=TEST_EXTERNAL_ID,
+        certificate_organization_identifier=TEST_OIN,
+        certificate_domains=[TEST_DOMAIN],
     )
     assert str(model.client_id) == str(mock_client_id)
-    assert str(model.sub) == str(TEST_OIN)
-    assert str(model.organization_id) == str(org_ura)
-    assert model.common_name == TEST_DOMAIN
+    assert str(model.certificate_organization_identifier) == str(TEST_OIN)
+    assert str(model.organization_external_id) == str(org_ura)
+    assert model.certificate_domains == [TEST_DOMAIN]
+    assert model.source_id is None
 
 
 def test_resolve_request_missing_org_id_should_raise() -> None:
@@ -75,3 +77,12 @@ def test_resolve_request_missing_org_id_should_raise() -> None:
             client_organization_id=TEST_OIN,
             client_common_name="Test Client",
         )
+
+
+def test_resolve_response_requires_scopes_and_matched_domain() -> None:
+    with pytest.raises(ValidationError):
+        ClientResolveResponse(organization_name=TEST_ORG_NAME)  # type: ignore[call-arg]
+
+    model = ClientResolveResponse(scopes="nvi:localize", organization_name=TEST_ORG_NAME, matched_domain=TEST_DOMAIN)
+    assert model.matched_domain == TEST_DOMAIN
+    assert model.scopes == "nvi:localize"

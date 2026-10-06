@@ -15,10 +15,3 @@ class CommonModel(BaseModel):
 
 class CommonQueryParams(BaseModel):
     include_deleted: bool = Field(default=False)
-
-
-def sanatize_model_scopes(scopes: str | None) -> list[str] | None:
-    if scopes is None:
-        return None
-
-    return scopes.split()

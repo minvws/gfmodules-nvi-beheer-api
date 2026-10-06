@@ -1,9 +1,10 @@
 import json
 import logging
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
 import gfmodules.logging as gflog
 import uvicorn
@@ -31,6 +32,7 @@ from app.routers.health import router as health_router
 from app.routers.organization import router as organization_router
 from app.routers.organization_certificate import router as organization_certificate_router
 from app.routers.organization_source import router as organization_source_router
+from app.routers.resolve import router as resolve_router
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +172,7 @@ def setup_fastapi() -> FastAPI:
         client_certificate_router,
         organization_source_router,
         client_source_router,
+        resolve_router,
     ]
 
     for router in routers:
