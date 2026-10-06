@@ -34,6 +34,7 @@ from app.models.source import SourceCreate
 from app.models.ura import UraNumber
 from app.routers.client import router as client_router
 from app.routers.organization import router as organization_router
+from app.routers.resolve import router as resolve_router
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
@@ -261,7 +262,7 @@ def api(
     mock_client_service: MagicMock, organization_service: OrganizationService, client_service: ClientService
 ) -> TestClient:
     app = FastAPI()
-    for router in (organization_router, client_router):
+    for router in (organization_router, client_router, resolve_router):
         app.include_router(router)
     app.dependency_overrides[get_client_service] = lambda: client_service
     app.dependency_overrides[get_organization_service] = lambda: organization_service
