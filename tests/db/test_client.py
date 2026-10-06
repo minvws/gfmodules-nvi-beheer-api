@@ -331,8 +331,8 @@ def test_find_for_resolve_excludes_deleted_certificates_and_sources(
     certificate_entity: CertificateEntity,
     source_entity: SourceEntity,
 ) -> None:
-    certificate_entity.deleted_at = datetime.now()
-    source_entity.deleted_at = datetime.now()
+    certificate_entity.deleted_at = datetime.now(UTC)
+    source_entity.deleted_at = datetime.now(UTC)
     with organization_repository.db_session:
         organization_entity.certificates.append(certificate_entity)
         organization_entity.sources.append(source_entity)
@@ -361,7 +361,7 @@ def test_find_for_resolve_excludes_deleted(
     client_entity: ClientEntity,
     organization_entity: OrganizationEntity,
 ) -> None:
-    client_entity.deleted_at = datetime.now()
+    client_entity.deleted_at = datetime.now(UTC)
     with organization_repository.db_session:
         organization_entity.clients.append(client_entity)
         org = organization_repository.add_one(organization_entity)
@@ -381,7 +381,7 @@ def test_find_for_resolve_excludes_deleted_organization(
     client_entity: ClientEntity,
     organization_entity: OrganizationEntity,
 ) -> None:
-    organization_entity.deleted_at = datetime.now()
+    organization_entity.deleted_at = datetime.now(UTC)
     with organization_repository.db_session:
         organization_entity.clients.append(client_entity)
         org = organization_repository.add_one(organization_entity)
