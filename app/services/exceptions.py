@@ -17,7 +17,7 @@ class EntityHasActiveMembersError(HTTPException):
 
 
 class RecordNotFoundError(HTTPException):
-    def __init__(self, record_id: object) -> None:
+    def __init__(self, record_id: object | str) -> None:
         super().__init__(status_code=404, detail=f"Record {record_id} not found")
 
 

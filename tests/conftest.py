@@ -39,6 +39,8 @@ from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
+from app.services.scopes.client_scopes import ClientScopesService
+from app.services.scopes.org_scopes import OrganizationScopesService
 from app.services.source.client_source import ClientSourceService
 from app.services.source.organization_source import OrganizationSourceService
 
@@ -155,6 +157,16 @@ def organization_source_service(database: Database) -> OrganizationSourceService
 @pytest.fixture()
 def client_source_service(database: Database) -> ClientSourceService:
     return ClientSourceService(database)
+
+
+@pytest.fixture
+def org_scopes_service(database: Database) -> OrganizationScopesService:
+    return OrganizationScopesService(database)
+
+
+@pytest.fixture
+def client_scopes_service(database: Database) -> ClientScopesService:
+    return ClientScopesService(database)
 
 
 @pytest.fixture()
