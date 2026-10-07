@@ -46,7 +46,6 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 P = ParamSpec("P")
-R = TypeVar("R", bound=tuple[Any, ...])
 
 
 class DbSession:
@@ -142,7 +141,7 @@ class DbSession:
         """
         self._retry(self.session.rollback)
 
-    def delete_stmt(self, stmt: Delete) -> Result[R]:
+    def delete_stmt(self, stmt: Delete) -> Result[*tuple[Any, ...]]:
         """
         Execute a statement in the current session
 
@@ -151,7 +150,7 @@ class DbSession:
         """
         return self._retry(self.session.execute, stmt)
 
-    def execute(self, stmt: TypedReturnsRows[R] | Insert) -> Result[R]:
+    def execute(self, stmt: TypedReturnsRows[*tuple[Any, ...]] | Insert) -> Result[*tuple[Any, ...]]:
         """
         Execute a statement in the current session
 
