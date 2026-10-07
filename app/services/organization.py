@@ -20,7 +20,7 @@ from app.exceptions import (
 )
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
 from app.services.certificate.client_certificate import ClientCertificateService
-from app.services.scopes import ScopeService
+from app.services.scopes.utils import ScopeUtils
 from app.services.source.client_source import ClientSourceService
 
 

@@ -28,7 +28,6 @@ from app.models.client import (
 )
 from app.models.scopes import AuthorizationScope
 from app.services.certificate import ClientCertificateService
-from app.services.exceptions import EntityHasActiveMembersError, RecordNotFoundError, ResolveError
 from app.services.scopes.utils import ScopeUtils
 from app.services.source.client_source import ClientSourceService
 

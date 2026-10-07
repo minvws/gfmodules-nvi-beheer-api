@@ -9,9 +9,9 @@ from app.db.repository.contexts.organization_context import (
     OrganizationSourceQueryContext,
 )
 from app.db.repository.organization import OrganizationRepository
+from app.exceptions import ConflictError, RecordNotFoundError
 from app.models.client import Client
 from app.models.scopes import AuthorizationScope
-from app.services.exceptions import ConflictError, RecordNotFoundError
 
 
 class ClientScopesService:
