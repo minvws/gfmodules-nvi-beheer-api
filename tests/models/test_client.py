@@ -29,6 +29,49 @@ def test_create_should_succeed(cert_create_dto_1: CertificateCreate, source_crea
 def test_create_with_scopes_should_succeed() -> None:
     model = ClientCreate(name="Test Client", scopes=[AuthorizationScope("nvi:read")])
     assert model.scopes == [AuthorizationScope("nvi:read")]
+    assert model.sources is None
+
+
+@pytest.mark.parametrize(
+    "sources",
+    [
+        None,
+        [],
+        [SourceCreate(source_id="source-1", name="Source 1")],
+        [
+            SourceCreate(source_id="source-1", name="Source 1"),
+            SourceCreate(source_id="source-2", name="Source 2"),
+        ],
+        [
+            SourceCreate(source_id="source-A", name="Source A"),
+            SourceCreate(source_id="source-a", name="Source a"),
+        ],
+    ],
+)
+def test_create_with_unique_sources_should_succeed(sources: list[SourceCreate] | None) -> None:
+    model = ClientCreate(name=TEST_CLIENT_NAME, sources=sources)
+
+    assert model.sources == sources
+
+
+@pytest.mark.parametrize(
+    "source_ids, duplicate_ids",
+    [
+        (["source-1", "source-1"], "source-1"),
+        (["source-2", "source-1", "source-2", "unique", "source-1", "source-2"], "source-2 source-1"),
+    ],
+)
+def test_create_with_duplicate_source_ids_should_raise(source_ids: list[str], duplicate_ids: str) -> None:
+    sources = [SourceCreate(source_id=source_id, name=f"Source {index}") for index, source_id in enumerate(source_ids)]
+
+    with pytest.raises(ValidationError) as exc:
+        ClientCreate(name=TEST_CLIENT_NAME, sources=sources)
+
+    errors = exc.value.errors()
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ("sources",)
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Duplicate source_id values: {duplicate_ids}"
 
 
 def test_create_missing_name_should_raise() -> None:

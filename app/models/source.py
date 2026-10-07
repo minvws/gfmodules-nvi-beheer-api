@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import Self
 from uuid import UUID
 
@@ -21,6 +22,16 @@ class SourceFields(BaseModel):
 
 class SourceCreate(SourceFields):
     pass
+
+
+def validate_unique_source_ids(sources: list[SourceCreate] | None) -> list[SourceCreate] | None:
+    if sources:
+        source_id_counts = Counter(source.source_id for source in sources)
+        duplicate_source_ids = [source_id for source_id, count in source_id_counts.items() if count > 1]
+        if duplicate_source_ids:
+            raise ValueError(f"Duplicate source_id values: {' '.join(duplicate_source_ids)}")
+
+    return sources
 
 
 class SourceUpdate(SourceFields):
