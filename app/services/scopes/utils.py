@@ -8,7 +8,7 @@ from app.models.scopes import AuthorizationScope
 from app.services.exceptions import ScopesNotGrantedError
 
 
-class ScopeService:
+class ScopeUtils:
     @staticmethod
     def make_client_scope_from_org(
         org: OrganizationEntity, client: ClientEntity, new_scopes: list[AuthorizationScope]

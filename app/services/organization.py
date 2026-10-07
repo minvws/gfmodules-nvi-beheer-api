@@ -22,7 +22,7 @@ from app.services.exceptions import (
     ForbidenOperationError,
     RecordNotFoundError,
 )
-from app.services.scopes import ScopeService
+from app.services.scopes.utils import ScopeUtils
 from app.services.source.client_source import ClientSourceService
 
 
@@ -70,10 +70,8 @@ class OrganizationService:
                 for client in dto.clients:
                     client_entitiy = ClientEntity(name=client.name, description=client.description)
                     if client.scopes:
-                        ScopeService.assert_scopes_granted(org_entity, client.scopes)
-                        client_scopes = ScopeService.make_client_scope_from_org(
-                            org_entity, client_entitiy, client.scopes
-                        )
+                        ScopeUtils.assert_scopes_granted(org_entity, client.scopes)
+                        client_scopes = ScopeUtils.make_client_scope_from_org(org_entity, client_entitiy, client.scopes)
                         client_entitiy.scopes = client_scopes
 
                     if client.certificates:
