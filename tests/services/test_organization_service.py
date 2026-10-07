@@ -13,7 +13,6 @@ from app.models.source import SourceCreate
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
 from app.services.exceptions import (
-    ConflictError,
     EntityHasActiveMembersError,
     ForbidenOperationError,
     RecordNotFoundError,
@@ -164,8 +163,9 @@ def test_create_one_should_succeed_with_different_variattions_of_complex_object(
             assert actual_client.sources == expected_client.sources
 
 
-def test_create_one_should_raise_when_source_id_exists(
+def test_create_one_should_allow_source_id_used_by_another_organization(
     organization_service: OrganizationService,
+    organization_source_service: OrganizationSourceService,
     org_create_dto_1: OrganizationCreate,
     org_create_dto_2: OrganizationCreate,
 ) -> None:
@@ -174,12 +174,21 @@ def test_create_one_should_raise_when_source_id_exists(
 
     assert org_create_dto_2.sources is not None
     org_create_dto_2.sources.append(existing_source)
-    _ = organization_service.create_one(org_create_dto_1)
+    org_1 = organization_service.create_one(org_create_dto_1)
+    org_2 = organization_service.create_one(org_create_dto_2)
 
-    with pytest.raises(ConflictError) as exc:
-        _ = organization_service.create_one(org_create_dto_2)
+    assert org_1.sources is not None
+    assert org_2.sources is not None
+    source_1 = org_1.sources[0]
+    source_2 = next(source for source in org_2.sources if source.source_id == existing_source.source_id)
 
-    assert f"Sources with source_id {existing_source.source_id} already exists" in exc.value.args
+    assert org_1.id != org_2.id
+    assert source_1.source_id == source_2.source_id == existing_source.source_id
+    assert source_1.id != source_2.id
+    assert source_1.organization_id == org_1.id
+    assert source_2.organization_id == org_2.id
+    assert organization_source_service.get_one(org_1.id, source_1.id) == source_1
+    assert organization_source_service.get_one(org_2.id, source_2.id) == source_2
 
 
 def test_create_one_should_raise_when_client_scope_does_not_match_org(
