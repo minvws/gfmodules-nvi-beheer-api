@@ -8,11 +8,21 @@ import inject
 import pytest
 from pydantic import ValidationError
 
+from app.models.certificates import CertificateCreate
 from app.models.client import ClientCreate
+from app.models.oin import Oin
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
-from tests.conftest import TEST_EXTERNAL_ID, TEST_ORG_NAME, TEST_SOURCE_ID
+from tests.conftest import (
+    SECOND_DOMAIN,
+    SECOND_OIN,
+    TEST_DOMAIN,
+    TEST_EXTERNAL_ID,
+    TEST_OIN,
+    TEST_ORG_NAME,
+    TEST_SOURCE_ID,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -28,6 +38,166 @@ def test_create_should_succeed() -> None:
     assert model.name == TEST_ORG_NAME
     assert model.scopes is None
     assert model.sources is None
+    assert model.certificates is None
+
+
+@pytest.mark.parametrize(
+    "certificates",
+    [
+        None,
+        [],
+        [CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+        [
+            CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN),
+            CertificateCreate(organization_identifier=TEST_OIN, domain=SECOND_DOMAIN),
+        ],
+        [
+            CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN),
+            CertificateCreate(organization_identifier=SECOND_OIN, domain=TEST_DOMAIN),
+        ],
+        [
+            CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN),
+            CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN.upper()),
+        ],
+    ],
+)
+def test_create_with_unique_certificates_should_succeed(certificates: list[CertificateCreate] | None) -> None:
+    model = OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, certificates=certificates)
+
+    assert model.certificates == certificates
+
+
+@pytest.mark.parametrize(
+    "certificate_pairs, duplicate_values",
+    [
+        ([(TEST_OIN, TEST_DOMAIN), (TEST_OIN, TEST_DOMAIN)], f"{TEST_OIN}/{TEST_DOMAIN}"),
+        (
+            [
+                (SECOND_OIN, SECOND_DOMAIN),
+                (TEST_OIN, TEST_DOMAIN),
+                (SECOND_OIN, SECOND_DOMAIN),
+                (TEST_OIN, "unique.example"),
+                (TEST_OIN, TEST_DOMAIN),
+                (SECOND_OIN, SECOND_DOMAIN),
+            ],
+            f"{SECOND_OIN}/{SECOND_DOMAIN} {TEST_OIN}/{TEST_DOMAIN}",
+        ),
+    ],
+)
+def test_create_with_duplicate_certificates_should_raise(
+    certificate_pairs: list[tuple[Oin, str]], duplicate_values: str
+) -> None:
+    certificates = [
+        CertificateCreate(organization_identifier=Oin(str(identifier)), domain=domain)
+        for identifier, domain in certificate_pairs
+    ]
+
+    with pytest.raises(ValidationError) as exc:
+        OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, certificates=certificates)
+
+    errors = exc.value.errors()
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ("certificates",)
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Duplicate certificate values: {duplicate_values}"
+
+
+@pytest.mark.parametrize(
+    "client_certificates",
+    [
+        None,
+        [],
+        [CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+        [
+            CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN),
+            CertificateCreate(organization_identifier=SECOND_OIN, domain=SECOND_DOMAIN),
+        ],
+    ],
+)
+def test_create_with_client_certificate_subset_should_succeed(
+    client_certificates: list[CertificateCreate] | None,
+) -> None:
+    client = ClientCreate(name="Client", certificates=client_certificates)
+    model = OrganizationCreate(
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        certificates=[
+            CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN),
+            CertificateCreate(organization_identifier=SECOND_OIN, domain=SECOND_DOMAIN),
+        ],
+        clients=[client],
+    )
+
+    assert model.clients == [client]
+
+
+def test_create_with_clients_sharing_a_certificate_should_succeed() -> None:
+    clients = [
+        ClientCreate(
+            name=f"Client {index}",
+            certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+        )
+        for index in range(2)
+    ]
+    model = OrganizationCreate(
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+        clients=clients,
+    )
+
+    assert model.clients == clients
+
+
+@pytest.mark.parametrize(
+    "organization_pairs, client_pairs, unknown_values",
+    [
+        (None, [(TEST_OIN, TEST_DOMAIN)], f"{TEST_OIN}/{TEST_DOMAIN}"),
+        ([], [(TEST_OIN, TEST_DOMAIN)], f"{TEST_OIN}/{TEST_DOMAIN}"),
+        ([(TEST_OIN, TEST_DOMAIN)], [(SECOND_OIN, SECOND_DOMAIN)], f"{SECOND_OIN}/{SECOND_DOMAIN}"),
+        (
+            [(TEST_OIN, TEST_DOMAIN), (SECOND_OIN, SECOND_DOMAIN)],
+            [(TEST_OIN, SECOND_DOMAIN)],
+            f"{TEST_OIN}/{SECOND_DOMAIN}",
+        ),
+        (
+            [(TEST_OIN, TEST_DOMAIN), (SECOND_OIN, SECOND_DOMAIN)],
+            [(TEST_OIN, TEST_DOMAIN), (TEST_OIN, SECOND_DOMAIN), (SECOND_OIN, TEST_DOMAIN)],
+            f"{TEST_OIN}/{SECOND_DOMAIN} {SECOND_OIN}/{TEST_DOMAIN}",
+        ),
+        ([(TEST_OIN, TEST_DOMAIN)], [(TEST_OIN, TEST_DOMAIN.upper())], f"{TEST_OIN}/{TEST_DOMAIN.upper()}"),
+    ],
+)
+def test_create_with_unknown_client_certificates_should_raise(
+    organization_pairs: list[tuple[Oin, str]] | None, client_pairs: list[tuple[Oin, str]], unknown_values: str
+) -> None:
+    certificates = (
+        [
+            CertificateCreate(organization_identifier=identifier, domain=domain)
+            for identifier, domain in organization_pairs
+        ]
+        if organization_pairs is not None
+        else None
+    )
+    clients = [
+        ClientCreate(name="First client"),
+        ClientCreate(
+            name="Second client",
+            certificates=[
+                CertificateCreate(organization_identifier=identifier, domain=domain)
+                for identifier, domain in client_pairs
+            ],
+        ),
+    ]
+
+    with pytest.raises(ValidationError) as exc:
+        OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, certificates=certificates, clients=clients)
+
+    errors = exc.value.errors()
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ()
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Client 1 has unknown certificate values: {unknown_values}"
 
 
 @pytest.mark.parametrize(

@@ -3,8 +3,8 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from app.models.certificates import CertificateCreate
 from app.models.client import ClientCreate
+from app.models.oin import Oin
 from app.models.organization import OrganizationCreate
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
@@ -44,18 +44,6 @@ def test_register_should_succeed(api: TestClient, org_create_dto_1: Organization
             scopes=[AuthorizationScope("nvi:create")],
             clients=[ClientCreate(name=TEST_CLIENT_NAME, scopes=[AuthorizationScope("nvi:read")])],
         ),
-        # mismatch in org client certs
-        OrganizationCreate(
-            external_id=TEST_EXTERNAL_ID,
-            name=TEST_ORG_NAME,
-            certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
-            clients=[
-                ClientCreate(
-                    name=TEST_CLIENT_NAME,
-                    certificates=[CertificateCreate(organization_identifier=SECOND_OIN, domain=SECOND_DOMAIN)],
-                )
-            ],
-        ),
     ],
 )
 def test_register_should_return_403(api: TestClient, body: OrganizationCreate) -> None:
@@ -89,6 +77,164 @@ def test_register_should_return_409(
 
     assert resp_1.status_code == 201
     assert resp_2.status_code == 409
+
+
+def test_register_should_allow_certificate_used_by_another_organization(api: TestClient) -> None:
+    first_body = {
+        "external_id": str(TEST_EXTERNAL_ID),
+        "name": TEST_ORG_NAME,
+        "certificates": [{"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN}],
+    }
+    second_body = {**first_body, "external_id": str(SECOND_EXTERNAL_ID), "name": SECOND_ORG_NAME}
+
+    first_response = api.post("/organizations", json=first_body)
+    second_response = api.post("/organizations", json=second_body)
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+    first = first_response.json()
+    second = second_response.json()
+    assert first["id"] != second["id"]
+    assert first["certificates"][0]["id"] != second["certificates"][0]["id"]
+    assert (
+        first["certificates"][0]["organization_identifier"]
+        == second["certificates"][0]["organization_identifier"]
+        == str(TEST_OIN)
+    )
+    assert first["certificates"][0]["domain"] == second["certificates"][0]["domain"] == TEST_DOMAIN
+
+
+def test_register_should_return_422_when_certificates_are_duplicated(api: TestClient) -> None:
+    body = {
+        "external_id": str(TEST_EXTERNAL_ID),
+        "name": TEST_ORG_NAME,
+        "certificates": [
+            {"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN},
+            {"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN},
+        ],
+    }
+
+    response = api.post("/organizations", json=body)
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ["body", "certificates"]
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Duplicate certificate values: {TEST_OIN}/{TEST_DOMAIN}"
+    assert api.get("/organizations").json() == []
+
+
+def test_register_should_return_422_when_client_certificates_are_duplicated(api: TestClient) -> None:
+    body = {
+        "external_id": str(TEST_EXTERNAL_ID),
+        "name": TEST_ORG_NAME,
+        "certificates": [{"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN}],
+        "clients": [
+            {"name": "First client"},
+            {
+                "name": "Second client",
+                "certificates": [
+                    {"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN},
+                    {"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN},
+                ],
+            },
+        ],
+    }
+
+    response = api.post("/organizations", json=body)
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ["body", "clients", 1, "certificates"]
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Duplicate certificate values: {TEST_OIN}/{TEST_DOMAIN}"
+    assert api.get("/organizations").json() == []
+
+
+@pytest.mark.parametrize(
+    "organization_pairs, client_pairs, unknown_values",
+    [
+        (None, [(TEST_OIN, TEST_DOMAIN)], f"{TEST_OIN}/{TEST_DOMAIN}"),
+        ([], [(TEST_OIN, TEST_DOMAIN)], f"{TEST_OIN}/{TEST_DOMAIN}"),
+        ([(TEST_OIN, TEST_DOMAIN)], [(SECOND_OIN, SECOND_DOMAIN)], f"{SECOND_OIN}/{SECOND_DOMAIN}"),
+        (
+            [(TEST_OIN, TEST_DOMAIN), (SECOND_OIN, SECOND_DOMAIN)],
+            [(TEST_OIN, SECOND_DOMAIN)],
+            f"{TEST_OIN}/{SECOND_DOMAIN}",
+        ),
+        (
+            [(TEST_OIN, TEST_DOMAIN), (SECOND_OIN, SECOND_DOMAIN)],
+            [(TEST_OIN, TEST_DOMAIN), (TEST_OIN, SECOND_DOMAIN)],
+            f"{TEST_OIN}/{SECOND_DOMAIN}",
+        ),
+    ],
+)
+def test_register_should_return_422_when_client_certificates_are_unknown(
+    api: TestClient,
+    organization_pairs: list[tuple[Oin, str]] | None,
+    client_pairs: list[tuple[Oin, str]],
+    unknown_values: str,
+) -> None:
+    body: dict[str, object] = {
+        "external_id": str(TEST_EXTERNAL_ID),
+        "name": TEST_ORG_NAME,
+        "clients": [
+            {"name": "First client"},
+            {
+                "name": "Second client",
+                "certificates": [
+                    {"organization_identifier": str(identifier), "domain": domain}
+                    for identifier, domain in client_pairs
+                ],
+            },
+        ],
+    }
+    if organization_pairs is not None:
+        body["certificates"] = [
+            {"organization_identifier": str(identifier), "domain": domain} for identifier, domain in organization_pairs
+        ]
+
+    response = api.post("/organizations", json=body)
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ["body"]
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Client 1 has unknown certificate values: {unknown_values}"
+    assert api.get("/organizations").json() == []
+
+
+@pytest.mark.parametrize("client_count", [1, 2])
+def test_register_should_allow_clients_to_select_an_organization_certificate_subset(
+    api: TestClient, client_count: int
+) -> None:
+    body = {
+        "external_id": str(TEST_EXTERNAL_ID),
+        "name": TEST_ORG_NAME,
+        "certificates": [
+            {"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN},
+            {"organization_identifier": str(SECOND_OIN), "domain": SECOND_DOMAIN},
+        ],
+        "clients": [
+            {
+                "name": f"Client {index}",
+                "certificates": [{"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN}],
+            }
+            for index in range(client_count)
+        ],
+    }
+
+    response = api.post("/organizations", json=body)
+
+    assert response.status_code == 201
+    result = response.json()
+    assert len(result["certificates"]) == 2
+    assert len(result["clients"]) == client_count
+    for client in result["clients"]:
+        assert client["certificates"] == [result["certificates"][0]]
 
 
 def test_register_should_allow_source_id_used_by_another_organization(api: TestClient) -> None:

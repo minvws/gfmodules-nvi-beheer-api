@@ -8,7 +8,7 @@ from app.models.base import (
     INCLUDE_DELETED_DESCRIPTION,
     CommonModel,
 )
-from app.models.certificates import Certificate, CertificateCreate, CertificateUpdate
+from app.models.certificates import Certificate, CertificateCreate, CertificateUpdate, validate_unique_certificates
 from app.models.oin import Oin
 from app.models.scopes import AuthorizationScope
 from app.models.source import Source, SourceCreate, SourceUpdate, validate_unique_source_ids
@@ -52,6 +52,13 @@ class ClientFields(BaseModel):
 class ClientCreate(ClientFields):
     certificates: list[CertificateCreate] | None = None
     sources: list[SourceCreate] | None = None
+
+    @field_validator("certificates")
+    @classmethod
+    def validate_unique_certificate_values(
+        cls, certificates: list[CertificateCreate] | None
+    ) -> list[CertificateCreate] | None:
+        return validate_unique_certificates(certificates)
 
     @field_validator("sources")
     @classmethod
