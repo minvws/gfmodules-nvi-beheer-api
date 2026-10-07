@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.db.decorator import repository
@@ -13,12 +13,6 @@ from app.db.repository.contexts.source_context import SourceQueryContext
 
 @repository(SourceEntity)
 class SourceRepository(RepositoryBase):
-    def find_many_by_external_ids(self, external_id: list[str]) -> Sequence[SourceEntity]:
-        stmt = select(SourceEntity).where(
-            and_(SourceEntity.deleted_at.is_(None), SourceEntity.source_id.in_(external_id))
-        )
-        return self.db_session.execute(stmt).scalars().all()
-
     def find_one(self, id: UUID, organization_id: UUID, include_deleted: bool = False) -> SourceEntity | None:
         stmt = select(SourceEntity).where(SourceEntity.id == id, SourceEntity.organization_id == organization_id)
         if include_deleted is False:
