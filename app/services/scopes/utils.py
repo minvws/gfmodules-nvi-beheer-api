@@ -11,7 +11,6 @@ class ScopeUtils:
     def make_client_scope_from_org(
         org: OrganizationEntity, client: ClientEntity, new_scopes: list[AuthorizationScope]
     ) -> list[ScopeEntity]:
-
         client_scope_map = {s.name: s for s in client.scopes} if client.scopes else {}
         org_scope_map = {s.name: s for s in org.scopes} if org.scopes else {}
         target = []

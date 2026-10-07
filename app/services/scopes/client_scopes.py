@@ -3,30 +3,27 @@ from uuid import UUID
 from app.db.db import Database
 from app.db.repository.client import ClientRepository
 from app.db.repository.contexts.organization_context import (
-    OrganizationCertificateQueryContext,
     OrganizationClientQueryContext,
     OrganizationQueryContext,
-    OrganizationSourceQueryContext,
 )
 from app.db.repository.organization import OrganizationRepository
-from app.models.client import Client
+from app.exceptions import ConflictError, RecordNotFoundError
+from app.models.client import ClientPlein
 from app.models.scopes import AuthorizationScope
-from app.services.exceptions import ConflictError, RecordNotFoundError
+from app.services.scopes.utils import ScopeUtils
 
 
 class ClientScopesService:
     def __init__(self, db: Database) -> None:
         self.db = db
 
-    def assigne_one(self, organization_id: UUID, id: UUID, scope: AuthorizationScope) -> Client:
+    def assigne_one(self, organization_id: UUID, id: UUID, scope: AuthorizationScope) -> ClientPlein:
         with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(
                 id=organization_id,
                 client_ctx=OrganizationClientQueryContext(
                     id=id,
-                    source_ctx=OrganizationSourceQueryContext.default(),
-                    certificate_ctx=OrganizationCertificateQueryContext.default(),
                 ),
             )
 
@@ -34,8 +31,7 @@ class ClientScopesService:
             if org is None:
                 raise RecordNotFoundError(organization_id)
 
-            if scope not in [s.name for s in org.scopes]:
-                raise RecordNotFoundError(f"Organization {organization_id} does not have a scope: {scope.value}")
+            ScopeUtils.assert_scopes_granted(org, [scope])
 
             if not org.clients:
                 raise RecordNotFoundError(id)
@@ -46,8 +42,7 @@ class ClientScopesService:
 
             target = next(s for s in org.scopes if s.name == scope)
             client.scopes.append(target)
-
-            return Client.from_entity(client)
+            return ClientPlein.from_entity(client)
 
     def unassing_one(self, organization_id: UUID, id: UUID, scope: AuthorizationScope) -> None:
         with self.db.get_db_session(commit=True) as session:
