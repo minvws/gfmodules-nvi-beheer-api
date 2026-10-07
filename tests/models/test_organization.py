@@ -8,6 +8,7 @@ import inject
 import pytest
 from pydantic import ValidationError
 
+from app.models.client import ClientCreate
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
@@ -65,6 +66,78 @@ def test_create_with_duplicate_source_ids_should_raise(source_ids: list[str], du
     assert errors[0]["loc"] == ("sources",)
     assert errors[0]["type"] == "value_error"
     assert errors[0]["msg"] == f"Value error, Duplicate source_id values: {duplicate_ids}"
+
+
+@pytest.mark.parametrize("client_source_ids", [None, [], ["source-1"], ["source-1", "source-2"]])
+def test_create_with_client_source_subset_should_succeed(client_source_ids: list[str] | None) -> None:
+    client = ClientCreate(
+        name="Client",
+        sources=[SourceCreate(source_id=source_id, name="Reference") for source_id in client_source_ids]
+        if client_source_ids is not None
+        else None,
+    )
+    model = OrganizationCreate(
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        sources=[
+            SourceCreate(source_id="source-1", name="Source 1"),
+            SourceCreate(source_id="source-2", name="Source 2"),
+        ],
+        clients=[client],
+    )
+
+    assert model.clients == [client]
+
+
+def test_create_with_clients_sharing_a_source_should_succeed() -> None:
+    clients = [
+        ClientCreate(name=f"Client {index}", sources=[SourceCreate(source_id="source-1", name="Reference")])
+        for index in range(2)
+    ]
+    model = OrganizationCreate(
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        sources=[SourceCreate(source_id="source-1", name="Source 1")],
+        clients=clients,
+    )
+
+    assert model.clients == clients
+
+
+@pytest.mark.parametrize(
+    "organization_source_ids, client_source_ids, unknown_ids",
+    [
+        (None, ["unknown"], "unknown"),
+        ([], ["unknown"], "unknown"),
+        (["source-1"], ["unknown"], "unknown"),
+        (["source-1", "source-2"], ["source-1", "unknown-2", "unknown-1"], "unknown-2 unknown-1"),
+        (["source-A"], ["source-a"], "source-a"),
+    ],
+)
+def test_create_with_unknown_client_sources_should_raise(
+    organization_source_ids: list[str] | None, client_source_ids: list[str], unknown_ids: str
+) -> None:
+    sources = (
+        [SourceCreate(source_id=source_id, name="Organization source") for source_id in organization_source_ids]
+        if organization_source_ids is not None
+        else None
+    )
+    clients = [
+        ClientCreate(name="First client"),
+        ClientCreate(
+            name="Second client",
+            sources=[SourceCreate(source_id=source_id, name="Reference") for source_id in client_source_ids],
+        ),
+    ]
+
+    with pytest.raises(ValidationError) as exc:
+        OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, sources=sources, clients=clients)
+
+    errors = exc.value.errors()
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ()
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Client 1 has unknown source_id values: {unknown_ids}"
 
 
 def test_create_with_scopes_should_succeed() -> None:

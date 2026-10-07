@@ -223,22 +223,31 @@ def test_create_one_should_raise_when_client_scope_does_not_match_org(
                 )
             ],
         ),
-        OrganizationCreate(
-            external_id=TEST_EXTERNAL_ID,
-            name=TEST_ORG_NAME,
-            certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
-            sources=[SourceCreate(source_id="source-1", name="test source")],
-            clients=[
-                ClientCreate(name=TEST_CLIENT_NAME, sources=[SourceCreate(source_id="source-2", name="test source 2")])
-            ],
-        ),
     ],
 )
-def test_create_one_should_raise_with_sources_and_certificate_are_not_subset_of_org(
+def test_create_one_should_raise_when_client_certificate_is_not_subset_of_org(
     organization_service: OrganizationService, dto: OrganizationCreate
 ) -> None:
     with pytest.raises(ForbidenOperationError):
         _ = organization_service.create_one(dto)
+
+
+def test_create_one_should_reject_unknown_client_sources_after_dto_mutation(
+    organization_service: OrganizationService,
+) -> None:
+    dto = OrganizationCreate(
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        sources=[SourceCreate(source_id="source-1", name="Source 1")],
+        clients=[ClientCreate(name=TEST_CLIENT_NAME)],
+    )
+    assert dto.clients is not None
+    dto.clients[0].sources = [SourceCreate(source_id="source-2", name="Source 2")]
+
+    with pytest.raises(ForbidenOperationError, match="Client sources are not allowed to be assigned"):
+        organization_service.create_one(dto)
+
+    assert organization_service.get_many(OrganizationQueryParams(external_id=TEST_EXTERNAL_ID)) == []
 
 
 def test_get_one_should_succeed(

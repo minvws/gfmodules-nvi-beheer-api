@@ -56,17 +56,6 @@ def test_register_should_succeed(api: TestClient, org_create_dto_1: Organization
                 )
             ],
         ),
-        # mismatch org client sources
-        OrganizationCreate(
-            external_id=TEST_EXTERNAL_ID,
-            name=TEST_ORG_NAME,
-            sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
-            clients=[
-                ClientCreate(
-                    name=TEST_CLIENT_NAME, sources=[SourceCreate(source_id=SECOND_SOURCE_ID, name=SECOND_SOURCE_NAME)]
-                )
-            ],
-        ),
     ],
 )
 def test_register_should_return_403(api: TestClient, body: OrganizationCreate) -> None:
@@ -150,6 +139,100 @@ def test_register_should_return_422_when_source_ids_are_duplicated_in_payload(ap
     assert errors[0]["type"] == "value_error"
     assert errors[0]["msg"] == f"Value error, Duplicate source_id values: {TEST_SOURCE_ID}"
     assert api.get("/organizations").json() == []
+
+
+def test_register_should_return_422_when_client_source_ids_are_duplicated(api: TestClient) -> None:
+    body = {
+        "external_id": str(TEST_EXTERNAL_ID),
+        "name": TEST_ORG_NAME,
+        "sources": [{"source_id": TEST_SOURCE_ID, "name": TEST_SOURCE_NAME}],
+        "clients": [
+            {"name": "First client"},
+            {
+                "name": "Second client",
+                "sources": [
+                    {"source_id": TEST_SOURCE_ID, "name": TEST_SOURCE_NAME},
+                    {"source_id": TEST_SOURCE_ID, "name": SECOND_SOURCE_NAME},
+                ],
+            },
+        ],
+    }
+
+    response = api.post("/organizations", json=body)
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ["body", "clients", 1, "sources"]
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Duplicate source_id values: {TEST_SOURCE_ID}"
+    assert api.get("/organizations").json() == []
+
+
+@pytest.mark.parametrize(
+    "organization_source_ids, client_source_ids, unknown_ids",
+    [
+        (None, ["unknown"], "unknown"),
+        ([], ["unknown"], "unknown"),
+        ([TEST_SOURCE_ID], ["unknown"], "unknown"),
+        ([TEST_SOURCE_ID, SECOND_SOURCE_ID], [TEST_SOURCE_ID, "unknown-2", "unknown-1"], "unknown-2 unknown-1"),
+    ],
+)
+def test_register_should_return_422_when_client_sources_are_unknown(
+    api: TestClient, organization_source_ids: list[str] | None, client_source_ids: list[str], unknown_ids: str
+) -> None:
+    body: dict[str, object] = {
+        "external_id": str(TEST_EXTERNAL_ID),
+        "name": TEST_ORG_NAME,
+        "clients": [
+            {"name": "First client"},
+            {
+                "name": "Second client",
+                "sources": [{"source_id": source_id, "name": "Reference"} for source_id in client_source_ids],
+            },
+        ],
+    }
+    if organization_source_ids is not None:
+        body["sources"] = [
+            {"source_id": source_id, "name": "Organization source"} for source_id in organization_source_ids
+        ]
+
+    response = api.post("/organizations", json=body)
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ["body"]
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Client 1 has unknown source_id values: {unknown_ids}"
+    assert api.get("/organizations").json() == []
+
+
+@pytest.mark.parametrize("client_count", [1, 2])
+def test_register_should_allow_clients_to_select_an_organization_source_subset(
+    api: TestClient, client_count: int
+) -> None:
+    body = {
+        "external_id": str(TEST_EXTERNAL_ID),
+        "name": TEST_ORG_NAME,
+        "sources": [
+            {"source_id": TEST_SOURCE_ID, "name": TEST_SOURCE_NAME},
+            {"source_id": SECOND_SOURCE_ID, "name": SECOND_SOURCE_NAME},
+        ],
+        "clients": [
+            {"name": f"Client {index}", "sources": [{"source_id": TEST_SOURCE_ID, "name": "Reference"}]}
+            for index in range(client_count)
+        ],
+    }
+
+    response = api.post("/organizations", json=body)
+
+    assert response.status_code == 201
+    result = response.json()
+    assert len(result["sources"]) == 2
+    assert len(result["clients"]) == client_count
+    for client in result["clients"]:
+        assert client["sources"] == [result["sources"][0]]
 
 
 @pytest.mark.parametrize(

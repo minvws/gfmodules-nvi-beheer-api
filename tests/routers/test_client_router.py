@@ -64,6 +64,50 @@ def test_register_returns_201(
     assert response.status_code == 201
 
 
+def test_register_duplicate_source_ids_returns_422(
+    api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org_create_dto_1.clients = None
+    org = organization_service.create_one(org_create_dto_1)
+    body = {
+        "name": TEST_CLIENT_NAME,
+        "sources": [
+            {"source_id": TEST_SOURCE_ID, "name": TEST_SOURCE_NAME},
+            {"source_id": TEST_SOURCE_ID, "name": SECOND_SOURCE_NAME},
+        ],
+    }
+
+    response = api.post(f"/organizations/{org.id}/clients", json=body)
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ["body", "sources"]
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Duplicate source_id values: {TEST_SOURCE_ID}"
+    assert api.get(f"/organizations/{org.id}/clients").json() == []
+
+
+def test_register_allows_an_organization_source_subset(
+    api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org_create_dto_1.clients = None
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.sources is not None
+    assert len(org.sources) == 2
+
+    response = api.post(
+        f"/organizations/{org.id}/clients",
+        json={"name": TEST_CLIENT_NAME, "sources": [{"source_id": TEST_SOURCE_ID, "name": "Reference"}]},
+    )
+
+    assert response.status_code == 201
+    sources = response.json()["sources"]
+    assert len(sources) == 1
+    assert sources[0]["id"] == str(org.sources[0].id)
+    assert sources[0]["organization_id"] == str(org.id)
+
+
 def test_register_ungranted_scope_returns_403(
     api: TestClient,
     organization_service: OrganizationService,

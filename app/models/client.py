@@ -1,7 +1,7 @@
 from typing import Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.db.models.client import ClientEntity
 from app.models.base import (
@@ -11,7 +11,7 @@ from app.models.base import (
 from app.models.certificates import Certificate, CertificateCreate, CertificateUpdate
 from app.models.oin import Oin
 from app.models.scopes import AuthorizationScope
-from app.models.source import Source, SourceCreate, SourceUpdate
+from app.models.source import Source, SourceCreate, SourceUpdate, validate_unique_source_ids
 from app.models.ura import UraNumber
 
 ORG_URA_DESCRIPTION = "The URA (external_id) of the organization the client acts on behalf of"
@@ -52,6 +52,11 @@ class ClientFields(BaseModel):
 class ClientCreate(ClientFields):
     certificates: list[CertificateCreate] | None = None
     sources: list[SourceCreate] | None = None
+
+    @field_validator("sources")
+    @classmethod
+    def validate_unique_sources(cls, sources: list[SourceCreate] | None) -> list[SourceCreate] | None:
+        return validate_unique_source_ids(sources)
 
 
 class ClientOptionalFields(BaseModel):
