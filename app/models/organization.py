@@ -14,7 +14,7 @@ from app.models.base import (
     INCLUDE_DELETED_DESCRIPTION,
     CommonModel,
 )
-from app.models.certificates import Certificate, CertificateCreate
+from app.models.certificates import Certificate, CertificateCreate, validate_unique_certificates
 from app.models.client import Client, ClientCreate
 from app.models.oin import Oin
 from app.models.scopes import AuthorizationScope
@@ -47,6 +47,13 @@ class OrganizationCreate(OrganizationFields):
     sources: list[SourceCreate] | None = Field(default=None)
     clients: list[ClientCreate] | None = Field(default=None)
 
+    @field_validator("certificates")
+    @classmethod
+    def validate_unique_certificate_values(
+        cls, certificates: list[CertificateCreate] | None
+    ) -> list[CertificateCreate] | None:
+        return validate_unique_certificates(certificates)
+
     @field_validator("sources")
     @classmethod
     def validate_unique_sources(cls, sources: list[SourceCreate] | None) -> list[SourceCreate] | None:
@@ -61,6 +68,22 @@ class OrganizationCreate(OrganizationFields):
             ]
             if unknown_source_ids:
                 raise ValueError(f"Client {index} has unknown source_id values: {' '.join(unknown_source_ids)}")
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_client_certificates(self) -> Self:
+        organization_certificate_keys = {
+            (certificate.organization_identifier.value, certificate.domain) for certificate in self.certificates or []
+        }
+        for index, client in enumerate(self.clients or []):
+            unknown_certificates = [
+                f"{certificate.organization_identifier.value}/{certificate.domain}"
+                for certificate in client.certificates or []
+                if (certificate.organization_identifier.value, certificate.domain) not in organization_certificate_keys
+            ]
+            if unknown_certificates:
+                raise ValueError(f"Client {index} has unknown certificate values: {' '.join(unknown_certificates)}")
 
         return self
 

@@ -206,30 +206,24 @@ def test_create_one_should_raise_when_client_scope_does_not_match_org(
         _ = organization_service.create_one(dto)
 
 
-@pytest.mark.parametrize(
-    "dto",
-    [
-        OrganizationCreate(
-            external_id=TEST_EXTERNAL_ID,
-            name=TEST_ORG_NAME,
-            certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
-            sources=[SourceCreate(source_id="source-1", name="test source")],
-            clients=[
-                ClientCreate(
-                    name=TEST_CLIENT_NAME,
-                    certificates=[
-                        CertificateCreate(organization_identifier=Oin("00000099000000002000"), domain="other-domain")
-                    ],
-                )
-            ],
-        ),
-    ],
-)
-def test_create_one_should_raise_when_client_certificate_is_not_subset_of_org(
-    organization_service: OrganizationService, dto: OrganizationCreate
+def test_create_one_should_reject_unknown_client_certificates_after_dto_mutation(
+    organization_service: OrganizationService,
 ) -> None:
-    with pytest.raises(ForbidenOperationError):
-        _ = organization_service.create_one(dto)
+    dto = OrganizationCreate(
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        certificates=[CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)],
+        clients=[ClientCreate(name=TEST_CLIENT_NAME)],
+    )
+    assert dto.clients is not None
+    dto.clients[0].certificates = [
+        CertificateCreate(organization_identifier=Oin("00000099000000002000"), domain="other-domain")
+    ]
+
+    with pytest.raises(ForbidenOperationError, match="Client certs are not allowed to be assigned"):
+        organization_service.create_one(dto)
+
+    assert organization_service.get_many(OrganizationQueryParams(external_id=TEST_EXTERNAL_ID)) == []
 
 
 def test_create_one_should_reject_unknown_client_sources_after_dto_mutation(

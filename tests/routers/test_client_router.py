@@ -64,6 +64,52 @@ def test_register_returns_201(
     assert response.status_code == 201
 
 
+def test_register_duplicate_certificates_returns_422(
+    api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org_create_dto_1.clients = None
+    org = organization_service.create_one(org_create_dto_1)
+    body = {
+        "name": TEST_CLIENT_NAME,
+        "certificates": [
+            {"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN},
+            {"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN},
+        ],
+    }
+
+    response = api.post(f"/organizations/{org.id}/clients", json=body)
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ["body", "certificates"]
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Duplicate certificate values: {TEST_OIN}/{TEST_DOMAIN}"
+    assert api.get(f"/organizations/{org.id}/clients").json() == []
+
+
+def test_register_allows_an_organization_certificate_subset(
+    api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
+) -> None:
+    org_create_dto_1.clients = None
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.certificates is not None
+    assert len(org.certificates) == 2
+
+    response = api.post(
+        f"/organizations/{org.id}/clients",
+        json={
+            "name": TEST_CLIENT_NAME,
+            "certificates": [{"organization_identifier": str(TEST_OIN), "domain": TEST_DOMAIN}],
+        },
+    )
+
+    assert response.status_code == 201
+    certificates = response.json()["certificates"]
+    assert len(certificates) == 1
+    assert certificates[0]["id"] == str(org.certificates[0].id)
+
+
 def test_register_duplicate_source_ids_returns_422(
     api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
