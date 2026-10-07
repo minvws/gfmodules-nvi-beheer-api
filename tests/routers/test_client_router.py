@@ -256,7 +256,7 @@ def test_delete_not_found_returns_404(api: TestClient) -> None:
     assert response.status_code == 404
 
 
-def test_delete_return_403(
+def test_delete_return_409(
     api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
     org = organization_service.create_one(org_create_dto_1)
@@ -264,6 +264,6 @@ def test_delete_return_403(
     client = org.clients[0]
 
     response = api.delete(f"/organizations/{org.id!s}/clients/{client.id!s}")
-    assert response.status_code == 403
+    assert response.status_code == 409
     assert client.sources is not None
     assert client.certificates is not None

@@ -238,12 +238,12 @@ def test_delete_returns_204(
     assert response.status_code == 204
 
 
-def test_delete_returns_403(
+def test_delete_returns_409(
     api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
     org = organization_service.create_one(org_create_dto_1)
     response = api.delete(f"/organizations/{org.id!s}")
-    assert response.status_code == 403
+    assert response.status_code == 409
 
 
 def test_delete_not_found_returns_404(api: TestClient) -> None:
@@ -251,12 +251,12 @@ def test_delete_not_found_returns_404(api: TestClient) -> None:
     assert response.status_code == 404
 
 
-def test_delete_with_active_clients_returns_403(
+def test_delete_with_active_clients_returns_409(
     api: TestClient, organization_service: OrganizationService, org_create_dto_1: OrganizationCreate
 ) -> None:
     org = organization_service.create_one(org_create_dto_1)
     response = api.delete(f"/organizations/{org.id!s}")
-    assert response.status_code == 403
+    assert response.status_code == 409
 
 
 def test_delete_invalid_uuid_returns_422(api: TestClient) -> None:
