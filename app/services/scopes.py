@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 from app import utils
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
@@ -28,13 +26,6 @@ class ScopeService:
                 target.append(new_client_scope)
 
         return target
-
-    @staticmethod
-    def validate_requested_scopes(existing: Sequence[ScopeEntity], incoming: list[AuthorizationScope]) -> bool:
-        existing_set = {s.name for s in existing}
-        incoming_set = {s.value for s in incoming}
-
-        return incoming_set.issubset(existing_set)
 
     @staticmethod
     def assert_scopes_granted(organization: OrganizationEntity, requested: list[AuthorizationScope]) -> None:
