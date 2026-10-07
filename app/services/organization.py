@@ -174,9 +174,6 @@ class OrganizationService:
 
             org.deleted_at = datetime.now(UTC)
 
-            if org.scopes:
-                org.scopes.clear()
-
     @staticmethod
     def validate_org_for_delete(org: OrganizationEntity) -> str | None:
         valid_for_delete = True
