@@ -13,7 +13,6 @@ from app.db.repository.contexts.organization_context import (
 )
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.scope import ScopeRepository
-from app.db.repository.source import SourceRepository
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.exceptions import (
@@ -57,13 +56,6 @@ class OrganizationService:
                 ]
 
             if dto.sources:
-                src_repo = session.get_repository(SourceRepository)
-                existing_sources = src_repo.find_many_by_external_ids(dto.source_ids)
-                if len(existing_sources) > 0:
-                    raise ConflictError(
-                        f"Sources with source_id {' '.join([s.source_id for s in existing_sources])} already exists"
-                    )
-
                 org_entity.sources = [s.into_entity() for s in dto.sources]
 
             if dto.clients:

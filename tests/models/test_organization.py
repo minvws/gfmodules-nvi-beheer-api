@@ -10,7 +10,8 @@ from pydantic import ValidationError
 
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from app.models.scopes import AuthorizationScope
-from tests.conftest import TEST_EXTERNAL_ID, TEST_ORG_NAME
+from app.models.source import SourceCreate
+from tests.conftest import TEST_EXTERNAL_ID, TEST_ORG_NAME, TEST_SOURCE_ID
 
 
 @pytest.fixture(autouse=True)
@@ -25,6 +26,45 @@ def test_create_should_succeed() -> None:
     assert str(model.external_id) == str(TEST_EXTERNAL_ID)
     assert model.name == TEST_ORG_NAME
     assert model.scopes is None
+    assert model.sources is None
+
+
+@pytest.mark.parametrize(
+    "sources",
+    [
+        None,
+        [],
+        [SourceCreate(source_id="source-1", name="Source 1")],
+        [
+            SourceCreate(source_id="source-1", name="Source 1"),
+            SourceCreate(source_id="source-2", name="Source 2"),
+        ],
+    ],
+)
+def test_create_with_unique_sources_should_succeed(sources: list[SourceCreate] | None) -> None:
+    model = OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, sources=sources)
+
+    assert model.sources == sources
+
+
+@pytest.mark.parametrize(
+    "source_ids, duplicate_ids",
+    [
+        ([TEST_SOURCE_ID, TEST_SOURCE_ID], TEST_SOURCE_ID),
+        (["source-2", "source-1", "source-2", "unique", "source-1", "source-2"], "source-2 source-1"),
+    ],
+)
+def test_create_with_duplicate_source_ids_should_raise(source_ids: list[str], duplicate_ids: str) -> None:
+    sources = [SourceCreate(source_id=source_id, name=f"Source {index}") for index, source_id in enumerate(source_ids)]
+
+    with pytest.raises(ValidationError) as exc:
+        OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME, sources=sources)
+
+    errors = exc.value.errors()
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ("sources",)
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Duplicate source_id values: {duplicate_ids}"
 
 
 def test_create_with_scopes_should_succeed() -> None:
