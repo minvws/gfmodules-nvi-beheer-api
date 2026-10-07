@@ -88,19 +88,6 @@ def test_register_should_return_403(api: TestClient, body: OrganizationCreate) -
                 name=SECOND_ORG_NAME,
             ),
         ),
-        # same source id
-        (
-            OrganizationCreate(
-                external_id=TEST_EXTERNAL_ID,
-                name=TEST_ORG_NAME,
-                sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
-            ),
-            OrganizationCreate(
-                external_id=SECOND_EXTERNAL_ID,
-                name=SECOND_ORG_NAME,
-                sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
-            ),
-        ),
     ],
 )
 def test_register_should_return_409(
@@ -113,6 +100,56 @@ def test_register_should_return_409(
 
     assert resp_1.status_code == 201
     assert resp_2.status_code == 409
+
+
+def test_register_should_allow_source_id_used_by_another_organization(api: TestClient) -> None:
+    org_1 = OrganizationCreate(
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)],
+    )
+    org_2 = OrganizationCreate(
+        external_id=SECOND_EXTERNAL_ID,
+        name=SECOND_ORG_NAME,
+        sources=[SourceCreate(source_id=TEST_SOURCE_ID, name=SECOND_SOURCE_NAME)],
+    )
+
+    resp_1 = api.post("/organizations", json=org_1.model_dump())
+    resp_2 = api.post("/organizations", json=org_2.model_dump())
+
+    assert resp_1.status_code == 201
+    assert resp_2.status_code == 201
+    result_1 = resp_1.json()
+    result_2 = resp_2.json()
+    source_1 = result_1["sources"][0]
+    source_2 = result_2["sources"][0]
+
+    assert result_1["id"] != result_2["id"]
+    assert source_1["source_id"] == source_2["source_id"] == TEST_SOURCE_ID
+    assert source_1["id"] != source_2["id"]
+    assert source_1["organization_id"] == result_1["id"]
+    assert source_2["organization_id"] == result_2["id"]
+
+
+def test_register_should_return_422_when_source_ids_are_duplicated_in_payload(api: TestClient) -> None:
+    body = {
+        "external_id": str(TEST_EXTERNAL_ID),
+        "name": TEST_ORG_NAME,
+        "sources": [
+            {"source_id": TEST_SOURCE_ID, "name": TEST_SOURCE_NAME},
+            {"source_id": TEST_SOURCE_ID, "name": SECOND_SOURCE_NAME},
+        ],
+    }
+
+    response = api.post("/organizations", json=body)
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ["body", "sources"]
+    assert errors[0]["type"] == "value_error"
+    assert errors[0]["msg"] == f"Value error, Duplicate source_id values: {TEST_SOURCE_ID}"
+    assert api.get("/organizations").json() == []
 
 
 @pytest.mark.parametrize(

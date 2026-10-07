@@ -1,7 +1,8 @@
+from collections import Counter
 from typing import Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.contexts.organization_context import (
@@ -46,6 +47,17 @@ class OrganizationCreate(OrganizationFields):
     certificates: list[CertificateCreate] | None = Field(default=None)
     sources: list[SourceCreate] | None = Field(default=None)
     clients: list[ClientCreate] | None = Field(default=None)
+
+    @field_validator("sources")
+    @classmethod
+    def validate_unique_sources(cls, sources: list[SourceCreate] | None) -> list[SourceCreate] | None:
+        if sources:
+            source_id_counts = Counter(source.source_id for source in sources)
+            duplicate_source_ids = [source_id for source_id, count in source_id_counts.items() if count > 1]
+            if duplicate_source_ids:
+                raise ValueError(f"Duplicate source_id values: {' '.join(duplicate_source_ids)}")
+
+        return sources
 
     @property
     def source_ids(self) -> list[str]:
