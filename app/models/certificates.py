@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import Self
 from uuid import UUID
 
@@ -35,6 +36,20 @@ class CertificateField(BaseModel):
 
 class CertificateCreate(CertificateField):
     pass
+
+
+def validate_unique_certificates(certificates: list[CertificateCreate] | None) -> list[CertificateCreate] | None:
+    if certificates:
+        certificate_counts = Counter(
+            (certificate.organization_identifier.value, certificate.domain) for certificate in certificates
+        )
+        duplicate_certificates = [
+            f"{identifier}/{domain}" for (identifier, domain), count in certificate_counts.items() if count > 1
+        ]
+        if duplicate_certificates:
+            raise ValueError(f"Duplicate certificate values: {' '.join(duplicate_certificates)}")
+
+    return certificates
 
 
 class CertificateUpdate(CertificateField):
