@@ -148,17 +148,14 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
 def setup_fastapi() -> FastAPI:
     config = get_config()
 
-    fastapi = (
-        FastAPI(
-            docs_url=config.uvicorn.docs_url,
-            redoc_url=config.uvicorn.redoc_url,
-            title="NVI Beheer API",
-            root_path=config.uvicorn.root_path,
-            lifespan=_lifespan,
-            dependencies=api_key_headers(config.uvicorn.document_gf_headers),
-        )
-        if config.uvicorn.swagger_enabled
-        else FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
+    swagger_enabled = config.uvicorn.swagger_enabled
+    fastapi = FastAPI(
+        docs_url=config.uvicorn.docs_url if swagger_enabled else None,
+        redoc_url=config.uvicorn.redoc_url if swagger_enabled else None,
+        title="NVI Beheer API",
+        root_path=config.uvicorn.root_path,
+        lifespan=_lifespan,
+        dependencies=api_key_headers(swagger_enabled and config.uvicorn.document_gf_headers),
     )
 
     container.configure()
