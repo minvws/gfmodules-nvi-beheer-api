@@ -168,20 +168,13 @@ class OrganizationService:
 
     @staticmethod
     def validate_org_for_delete(org: OrganizationEntity) -> str | None:
-        valid_for_delete = True
-        if org.clients:
-            valid_for_delete = any(c.deleted_at is not None for c in org.clients)
-            if valid_for_delete is False:
-                return "Clients"
+        if any(c.deleted_at is None for c in org.clients):
+            return "Clients"
 
-        if org.certificates:
-            valid_for_delete = any(c.deleted_at is not None for c in org.certificates)
-            if valid_for_delete is False:
-                return "Certificates"
+        if any(c.deleted_at is None for c in org.certificates):
+            return "Certificates"
 
-        if org.sources:
-            valid_for_delete = any(s.deleted_at is not None for s in org.sources)
-            if valid_for_delete is False:
-                return "Sources"
+        if any(s.deleted_at is None for s in org.sources):
+            return "Sources"
 
         return None
