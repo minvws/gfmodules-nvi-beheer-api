@@ -37,7 +37,7 @@ from app.routers.resolve import router as resolve_router
 logger = logging.getLogger(__name__)
 
 
-async def request_validation_exception_handler(
+def request_validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
