@@ -152,6 +152,7 @@ def setup_fastapi() -> FastAPI:
     fastapi = FastAPI(
         docs_url=config.uvicorn.docs_url if swagger_enabled else None,
         redoc_url=config.uvicorn.redoc_url if swagger_enabled else None,
+        openapi_url="/openapi.json" if swagger_enabled else None,
         title="NVI Beheer API",
         root_path=config.uvicorn.root_path,
         lifespan=_lifespan,
