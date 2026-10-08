@@ -1,7 +1,12 @@
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
 
+from app.db.models.certificate import CertificateEntity
+from app.db.models.client import ClientEntity
+from app.db.models.organization import OrganizationEntity
+from app.db.models.source import SourceEntity
 from app.db.repository.contexts.organization_context import OrganizationQueryContext
 from app.db.repository.organization import OrganizationRepository
 from app.models.certificates import CertificateCreate
@@ -378,6 +383,27 @@ def test_delete_one_rejects_when_active_members_exist(
 
     with pytest.raises(EntityHasActiveMembersError):
         organization_service.delete_one(org.id)
+
+
+@pytest.mark.parametrize(
+    "clients, certificates, sources, expected",
+    [
+        ([], [], [], None),
+        ([ClientEntity(deleted_at=datetime.now(UTC))], [], [], None),
+        ([ClientEntity(deleted_at=datetime.now(UTC)), ClientEntity()], [], [], "Clients"),
+        ([], [CertificateEntity(deleted_at=datetime.now(UTC)), CertificateEntity()], [], "Certificates"),
+        ([], [], [SourceEntity(deleted_at=datetime.now(UTC)), SourceEntity()], "Sources"),
+    ],
+)
+def test_validate_org_for_delete_should_block_when_any_member_is_active(
+    clients: list[ClientEntity],
+    certificates: list[CertificateEntity],
+    sources: list[SourceEntity],
+    expected: str | None,
+) -> None:
+    org = OrganizationEntity(clients=clients, certificates=certificates, sources=sources)
+
+    assert OrganizationService.validate_org_for_delete(org) == expected
 
 
 def test_get_many_should_return_all(

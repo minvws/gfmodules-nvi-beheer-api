@@ -204,15 +204,10 @@ class ClientService:
 
     @staticmethod
     def validate_for_delete(client: ClientEntity) -> str | None:
-        valid_for_delete = True
-        if client.certificates:
-            valid_for_delete = any(c.deleted_at is not None for c in client.certificates)
-            if valid_for_delete is False:
-                return "Certificates"
+        if any(c.deleted_at is None for c in client.certificates):
+            return "Certificates"
 
-        if client.sources:
-            valid_for_delete = any(s.deleted_at is not None for s in client.sources)
-            if valid_for_delete is False:
-                return "Sources"
+        if any(s.deleted_at is None for s in client.sources):
+            return "Sources"
 
         return None
