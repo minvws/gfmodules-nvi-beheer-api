@@ -145,8 +145,8 @@ class OrganizationService:
 
                 session.flush()
             except IntegrityError:
-                raise ForbidenOperationError(f"Organization {org.id} has Clients using scopes marked for change")
                 session.rollback()
+                raise ForbidenOperationError(f"Organization {id} has Clients using scopes marked for change")
             except DatabaseError:
                 session.rollback()
                 raise
