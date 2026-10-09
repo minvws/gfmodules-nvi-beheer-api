@@ -37,17 +37,17 @@ from app.routers.resolve import router as resolve_router
 logger = logging.getLogger(__name__)
 
 
-async def request_validation_exception_handler(
+def request_validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
-    body = (await request.body()).decode(errors="replace")
+    # Log only where and why validation failed; the rejected input values may contain request body data
+    errors = [{"loc": e.get("loc"), "type": e.get("type"), "msg": e.get("msg")} for e in exc.errors()]
     logger.warning(
-        "Request validation failed method=%s path=%s body=%s errors=%s",
+        "Request validation failed method=%s path=%s errors=%s",
         request.method,
         request.url.path,
-        body,
-        exc.errors(),
+        errors,
     )
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 
