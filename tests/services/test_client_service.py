@@ -2,12 +2,18 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
 
 from app import utils
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.source import SourceEntity
+from app.exceptions import (
+    EntityHasActiveMembersError,
+    ForbiddenOperationError,
+    RecordNotFoundError,
+    ResolveError,
+    ScopesNotGrantedError,
+)
 from app.models.certificates import CertificateCreate, CertificateQueryParams, CertificateUpdate
 from app.models.client import ClientCreate, ClientQueryParams, ClientResolveRequest, ClientUpdate
 from app.models.oin import Oin
@@ -16,12 +22,6 @@ from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate, SourceQueryParams, SourceUpdate
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
-from app.services.exceptions import (
-    EntityHasActiveMembersError,
-    ForbidenOperationError,
-    RecordNotFoundError,
-    ScopesNotGrantedError,
-)
 from app.services.organization import OrganizationService
 from app.services.source.organization_source import OrganizationSourceService
 from tests.conftest import (
@@ -205,7 +205,7 @@ def test_create_should_raise_on_cert_and_source_mismatch(
 ) -> None:
     org = organization_service.create_one(org_dto)
 
-    with pytest.raises(ForbidenOperationError):
+    with pytest.raises(ForbiddenOperationError):
         _ = client_service.create_one(org.id, client_dto)
 
 
@@ -450,7 +450,7 @@ def test_update_one_should_raise_when_source_not_in_org(
         id=new_client.id, name="new name", sources=[SourceUpdate(**source_create_dto_2.model_dump(), id=uuid4())]
     )
 
-    with pytest.raises(ForbidenOperationError):
+    with pytest.raises(ForbiddenOperationError):
         _ = client_service.update_one(new_client.id, org.id, update_dto)
 
 
@@ -496,7 +496,7 @@ def test_update_one_should_raise_when_adding_cert_not_in_org(
     cert_dto = CertificateUpdate(id=uuid4(), **cert_create_dto_2.model_dump())
     update_dto = ClientUpdate(id=new_client.id, name="new name", certificates=[cert_dto])
 
-    with pytest.raises(ForbidenOperationError):
+    with pytest.raises(ForbiddenOperationError):
         _ = client_service.update_one(new_client.id, org.id, update_dto)
 
 
@@ -709,9 +709,8 @@ def test_resolve_should_raise_404_when_client_not_found(
         certificate_domains=[TEST_DOMAIN],
     )
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ResolveError):
         client_service.resolve(request)
-    assert exc_info.value.status_code == 404
 
 
 def test_resolve_should_raise_404_when_organization_id_mismatch(
@@ -730,9 +729,8 @@ def test_resolve_should_raise_404_when_organization_id_mismatch(
         certificate_domains=[TEST_DOMAIN],
     )
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ResolveError):
         client_service.resolve(request)
-    assert exc_info.value.status_code == 404
 
 
 @pytest.mark.parametrize(
@@ -760,9 +758,8 @@ def test_resolve_should_raise_404_when_no_certificate_matches(
         certificate_domains=certificate_domains,
     )
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ResolveError):
         client_service.resolve(request)
-    assert exc_info.value.status_code == 404
 
 
 def test_resolve_should_raise_404_when_source_id_not_owned(
@@ -782,6 +779,5 @@ def test_resolve_should_raise_404_when_source_id_not_owned(
         source_id="unknown-source",
     )
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ResolveError):
         client_service.resolve(request)
-    assert exc_info.value.status_code == 404

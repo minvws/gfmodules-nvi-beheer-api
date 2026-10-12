@@ -2,9 +2,9 @@ from uuid import uuid4
 
 import pytest
 
+from app.exceptions import ConflictError, EntityHasActiveMembersError, RecordNotFoundError
 from app.models.organization import OrganizationCreate
 from app.models.source import SourceCreate, SourceQueryParams, SourceUpdate
-from app.services.exceptions import ConflictError, EntityHasActiveMembersError, RecordNotFoundError
 from app.services.organization import OrganizationService
 from app.services.source.organization_source import OrganizationSourceService
 from tests.conftest import TEST_SOURCE_ID, TEST_SOURCE_NAME

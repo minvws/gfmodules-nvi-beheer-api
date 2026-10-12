@@ -2,9 +2,9 @@ from uuid import uuid4
 
 import pytest
 
+from app.exceptions import ConflictError, RecordNotFoundError
 from app.models.organization import OrganizationCreate
 from app.models.source import SourceQueryParams
-from app.services.exceptions import ConflictError, RecordNotFoundError
 from app.services.organization import OrganizationService
 from app.services.source.client_source import ClientSourceService
 from tests.conftest import TEST_SOURCE_ID, TEST_SOURCE_NAME

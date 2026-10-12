@@ -2,11 +2,11 @@ from uuid import uuid4
 
 import pytest
 
+from app.exceptions import ConflictError, RecordNotFoundError
 from app.models.certificates import CertificateCreate, ClientCertificateQueryParams
 from app.models.organization import OrganizationCreate
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.client import ClientService
-from app.services.exceptions import ConflictError, RecordNotFoundError
 from app.services.organization import OrganizationService
 from tests.conftest import SECOND_DOMAIN, SECOND_OIN, TEST_DOMAIN, TEST_OIN
 

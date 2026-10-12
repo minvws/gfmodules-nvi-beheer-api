@@ -10,12 +10,12 @@ from app.db.repository.contexts.organization_context import (
 from app.db.repository.contexts.source_context import SourceClientQueryContext, SourceQueryContext
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.source import SourceRepository
-from app.models.source import Source, SourceCreate, SourceQueryParams, SourceUpdate
-from app.services.exceptions import (
+from app.exceptions import (
     ConflictError,
     EntityHasActiveMembersError,
     RecordNotFoundError,
 )
+from app.models.source import Source, SourceCreate, SourceQueryParams, SourceUpdate
 
 
 class OrganizationSourceService:

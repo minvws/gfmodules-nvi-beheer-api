@@ -2,10 +2,10 @@ from uuid import uuid4
 
 import pytest
 
+from app.exceptions import ConflictError, EntityHasActiveMembersError, RecordNotFoundError
 from app.models.certificates import CertificateCreate, CertificateQueryParams, CertificateUpdate
 from app.models.organization import OrganizationCreate
 from app.services.certificate.organization_certificate import OrganizationCertificateService
-from app.services.exceptions import ConflictError, EntityHasActiveMembersError, RecordNotFoundError
 from app.services.organization import OrganizationService
 from tests.conftest import SECOND_DOMAIN, SECOND_OIN, TEST_DOMAIN, TEST_OIN
 

@@ -17,6 +17,7 @@ from app.db.repository.contexts.organization_context import (
     OrganizationSourceQueryContext,
 )
 from app.db.repository.organization import OrganizationRepository
+from app.exceptions import EntityHasActiveMembersError, RecordNotFoundError, ResolveError
 from app.models.client import (
     Client,
     ClientCreate,
@@ -27,7 +28,6 @@ from app.models.client import (
 )
 from app.models.scopes import AuthorizationScope
 from app.services.certificate import ClientCertificateService
-from app.services.exceptions import EntityHasActiveMembersError, RecordNotFoundError, ResolveError
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
 
