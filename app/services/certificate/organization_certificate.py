@@ -144,10 +144,7 @@ class OrganizationCertificateService:
 
     @staticmethod
     def validated_for_delete(cert: CertificateEntity) -> str | None:
-        valid_for_delete = True
-        if cert.clients:
-            valid_for_delete = any(c.deleted_at is not None for c in cert.clients)
-            if valid_for_delete is False:
-                return "Clients"
+        if any(c.deleted_at is None for c in cert.clients):
+            return "Clients"
 
         return None

@@ -116,10 +116,7 @@ class OrganizationSourceService:
 
     @staticmethod
     def validate_for_delete(source: SourceEntity) -> str | None:
-        valid_for_delete = True
-        if source.clients:
-            valid_for_delete = any(c.deleted_at is not None for c in source.clients)
-            if valid_for_delete is False:
-                return "Clients"
+        if any(c.deleted_at is None for c in source.clients):
+            return "Clients"
 
         return None

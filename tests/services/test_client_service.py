@@ -1,9 +1,13 @@
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
 
 from app import utils
+from app.db.models.certificate import CertificateEntity
+from app.db.models.client import ClientEntity
+from app.db.models.source import SourceEntity
 from app.models.certificates import CertificateCreate, CertificateQueryParams, CertificateUpdate
 from app.models.client import ClientCreate, ClientQueryParams, ClientResolveRequest, ClientUpdate
 from app.models.oin import Oin
@@ -586,6 +590,23 @@ def test_delete_one_should_raise_when_client_has_active_memebers(
 
     with pytest.raises(EntityHasActiveMembersError):
         client_service.delete_one(new_client.id, org.id)
+
+
+@pytest.mark.parametrize(
+    "certificates, sources, expected",
+    [
+        ([], [], None),
+        ([CertificateEntity(deleted_at=datetime.now(UTC))], [SourceEntity(deleted_at=datetime.now(UTC))], None),
+        ([CertificateEntity(deleted_at=datetime.now(UTC)), CertificateEntity()], [], "Certificates"),
+        ([], [SourceEntity(deleted_at=datetime.now(UTC)), SourceEntity()], "Sources"),
+    ],
+)
+def test_validate_for_delete_should_block_when_any_member_is_active(
+    certificates: list[CertificateEntity], sources: list[SourceEntity], expected: str | None
+) -> None:
+    client = ClientEntity(certificates=certificates, sources=sources)
+
+    assert ClientService.validate_for_delete(client) == expected
 
 
 def test_resolve_should_strip_crd_scopes_when_no_source_id(
