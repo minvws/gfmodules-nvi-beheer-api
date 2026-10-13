@@ -6,15 +6,18 @@ from unittest.mock import MagicMock
 import gfmodules.logging as gflog
 import pytest
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from gfmodules.logging import LoggingStreams
 from gfmodules.logging.middleware import RequestContextMiddleware
 from gfmodules.logging.testing import capture_records, capture_stream, recorded_shutdown_reason
+from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
 from app import application
 from app.config import Config, set_config
 from app.logging.events import Log
+from app.models.oin import Oin
 from tests.test_config import get_test_config
 
 
@@ -161,3 +164,49 @@ class TestUserAgent:
             TestClient(self._app()).get("/ping", headers={"User-Agent": "kube-probe/1.31"})
 
         assert access_stream[0]["user_agent"] == "kube-probe/1.31"
+
+
+class TestRequestValidationExceptionHandler:
+    SECRET = "do-not-log-me"
+
+    @staticmethod
+    def _app() -> FastAPI:
+        fastapi = FastAPI()
+
+        class Payload(BaseModel):
+            name: str
+            count: int | None = None
+            oin: Oin | None = None
+
+        @fastapi.post("/items")
+        def create(payload: Payload) -> None:
+            pass
+
+        fastapi.exception_handler(RequestValidationError)(application.request_validation_exception_handler)
+        return fastapi
+
+    def test_logs_where_validation_failed_without_the_request_body(self) -> None:
+        with capture_records(application.logger.name) as captured:
+            response = TestClient(self._app()).post("/items", json={"name": "x", "count": self.SECRET})
+
+        assert response.status_code == 422
+        assert response.json()["detail"][0]["input"] == self.SECRET
+
+        messages = [entry.record.getMessage() for entry in captured.entries]
+        assert len(messages) == 1
+        assert "Request validation failed" in messages[0]
+        assert "count" in messages[0]
+        assert self.SECRET not in messages[0]
+
+    def test_does_not_log_input_echoed_by_a_custom_validator_message(self) -> None:
+        with capture_records(application.logger.name) as captured:
+            response = TestClient(self._app()).post("/items", json={"name": "x", "oin": self.SECRET})
+
+        assert response.status_code == 422
+        assert self.SECRET in response.json()["detail"][0]["msg"]
+
+        messages = [entry.record.getMessage() for entry in captured.entries]
+        assert len(messages) == 1
+        assert "oin" in messages[0]
+        assert "value_error" in messages[0]
+        assert self.SECRET not in messages[0]
