@@ -41,8 +41,9 @@ def request_validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
-    # Log only where and why validation failed; the rejected input values may contain request body data
-    errors = [{"loc": e.get("loc"), "type": e.get("type"), "msg": e.get("msg")} for e in exc.errors()]
+    # Log only where and why validation failed. Both the rejected input and the message may contain request body
+    # data: custom validators (e.g. Oin) echo the offending value in their error message.
+    errors = [{"loc": e.get("loc"), "type": e.get("type")} for e in exc.errors()]
     logger.warning(
         "Request validation failed method=%s path=%s errors=%s",
         request.method,
