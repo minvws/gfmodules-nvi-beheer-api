@@ -2,8 +2,8 @@ from app import utils
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.models.scope import ScopeEntity
+from app.exceptions import ScopesNotGrantedError
 from app.models.scopes import AuthorizationScope
-from app.services.exceptions import ScopesNotGrantedError
 
 
 class ScopeService:

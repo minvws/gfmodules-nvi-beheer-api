@@ -13,16 +13,16 @@ from app.db.repository.contexts.organization_context import (
     OrganizationQueryContext,
 )
 from app.db.repository.organization import OrganizationRepository
+from app.exceptions import (
+    ConflictError,
+    EntityHasActiveMembersError,
+    RecordNotFoundError,
+)
 from app.models.certificates import (
     Certificate,
     CertificateCreate,
     CertificateQueryParams,
     CertificateUpdate,
-)
-from app.services.exceptions import (
-    ConflictError,
-    EntityHasActiveMembersError,
-    RecordNotFoundError,
 )
 
 

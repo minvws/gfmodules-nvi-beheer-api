@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import HTTPException
 from sqlalchemy.exc import DatabaseError, IntegrityError
 
 from app.db.db import Database
@@ -13,14 +12,14 @@ from app.db.repository.contexts.organization_context import (
 )
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.scope import ScopeRepository
-from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
-from app.services.certificate.client_certificate import ClientCertificateService
-from app.services.exceptions import (
+from app.exceptions import (
     ConflictError,
     EntityHasActiveMembersError,
-    ForbidenOperationError,
+    ForbiddenOperationError,
     RecordNotFoundError,
 )
+from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
+from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
 
@@ -121,7 +120,7 @@ class OrganizationService:
             ctx = OrganizationQueryContext(id=id)
             org = org_repo.find(ctx)
             if not org:
-                raise HTTPException(status_code=404)
+                raise RecordNotFoundError(id)
 
             change_happened = OrganizationUpdate.from_entity(org) != dto
             if change_happened is False:
@@ -146,7 +145,7 @@ class OrganizationService:
                 session.flush()
             except IntegrityError:
                 session.rollback()
-                raise ForbidenOperationError(f"Organization {id} has Clients using scopes marked for change")
+                raise ForbiddenOperationError(f"Organization {id} has Clients using scopes marked for change")
             except DatabaseError:
                 session.rollback()
                 raise

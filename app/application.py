@@ -28,6 +28,7 @@ from app.routers.client import router as client_router
 from app.routers.client_certificate import router as client_certificate_router
 from app.routers.client_source import router as client_source_router
 from app.routers.default import router as default_router
+from app.routers.errors import install_domain_error_handler
 from app.routers.health import router as health_router
 from app.routers.organization import router as organization_router
 from app.routers.organization_certificate import router as organization_certificate_router
@@ -179,6 +180,7 @@ def setup_fastapi() -> FastAPI:
 
     fastapi.add_exception_handler(Exception, _unhandled_exception_handler)
     fastapi.exception_handler(RequestValidationError)(request_validation_exception_handler)
+    install_domain_error_handler(fastapi)
 
     if config.stats.enabled:
         fastapi.add_middleware(StatsdMiddleware, module_name=config.stats.module_name or "default")

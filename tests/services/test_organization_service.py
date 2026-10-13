@@ -9,6 +9,12 @@ from app.db.models.organization import OrganizationEntity
 from app.db.models.source import SourceEntity
 from app.db.repository.contexts.organization_context import OrganizationQueryContext
 from app.db.repository.organization import OrganizationRepository
+from app.exceptions import (
+    EntityHasActiveMembersError,
+    ForbiddenOperationError,
+    RecordNotFoundError,
+    ScopesNotGrantedError,
+)
 from app.models.certificates import CertificateCreate
 from app.models.client import ClientCreate
 from app.models.oin import Oin
@@ -17,12 +23,6 @@ from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
-from app.services.exceptions import (
-    EntityHasActiveMembersError,
-    ForbidenOperationError,
-    RecordNotFoundError,
-    ScopesNotGrantedError,
-)
 from app.services.organization import OrganizationService
 from app.services.source.organization_source import OrganizationSourceService
 from tests.conftest import (
@@ -225,7 +225,7 @@ def test_create_one_should_reject_unknown_client_certificates_after_dto_mutation
         CertificateCreate(organization_identifier=Oin("00000099000000002000"), domain="other-domain")
     ]
 
-    with pytest.raises(ForbidenOperationError, match="Client certs are not allowed to be assigned"):
+    with pytest.raises(ForbiddenOperationError, match="Client certs are not allowed to be assigned"):
         organization_service.create_one(dto)
 
     assert organization_service.get_many(OrganizationQueryParams(external_id=TEST_EXTERNAL_ID)) == []
@@ -243,7 +243,7 @@ def test_create_one_should_reject_unknown_client_sources_after_dto_mutation(
     assert dto.clients is not None
     dto.clients[0].sources = [SourceCreate(source_id="source-2", name="Source 2")]
 
-    with pytest.raises(ForbidenOperationError, match="Client sources are not allowed to be assigned"):
+    with pytest.raises(ForbiddenOperationError, match="Client sources are not allowed to be assigned"):
         organization_service.create_one(dto)
 
     assert organization_service.get_many(OrganizationQueryParams(external_id=TEST_EXTERNAL_ID)) == []
@@ -269,7 +269,7 @@ def test_get_one_should_raise_when_not_found(
     with pytest.raises(RecordNotFoundError) as exc:
         _ = organization_service.get_one(dummy_id)
 
-    assert f"Record {dummy_id} not found" in exc.value.detail
+    assert f"Record {dummy_id} not found" in exc.value.message
 
 
 def test_delete_one_should_succeed_and_perform_soft_delete(
@@ -556,5 +556,5 @@ def test_update_should_raise_when_org_has_clients_with_scopes(
     assert client.scopes is not None
     update_dto = OrganizationUpdate(external_id=SECOND_EXTERNAL_ID, name=org.name)
 
-    with pytest.raises(ForbidenOperationError):
+    with pytest.raises(ForbiddenOperationError):
         _ = organization_service.update_one(org.id, update_dto)

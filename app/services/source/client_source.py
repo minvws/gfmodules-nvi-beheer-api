@@ -12,8 +12,8 @@ from app.db.repository.contexts.organization_context import (
     OrganizationSourceQueryContext,
 )
 from app.db.repository.organization import OrganizationRepository
+from app.exceptions import ConflictError, ForbiddenOperationError, RecordNotFoundError
 from app.models.source import Source, SourceCreate, SourceQueryParams, SourceUpdate
-from app.services.exceptions import ConflictError, ForbidenOperationError, RecordNotFoundError
 
 
 class ClientSourceService:
@@ -124,6 +124,6 @@ class ClientSourceService:
         client_source_keys = [s.source_id for s in sources]
 
         if not utils.is_subset(org_source_keys, client_source_keys):
-            raise ForbidenOperationError("Client sources are not allowed to be assigned")
+            raise ForbiddenOperationError("Client sources are not allowed to be assigned")
 
         return [s for s in org.sources if s.source_id in client_source_keys] if org.sources else []
