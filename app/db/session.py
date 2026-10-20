@@ -1,17 +1,20 @@
 import logging
 import random
+import re
 from collections.abc import Callable
 from time import sleep
 from types import TracebackType
-from typing import Any, ParamSpec, Self, TypeVar
+from typing import Any, NoReturn, ParamSpec, Self, TypeVar
 
+import gfmodules.logging as gflog
 from sqlalchemy import Delete, Engine, Insert, Result
-from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
+from sqlalchemy.exc import DatabaseError, DataError, OperationalError, PendingRollbackError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.selectable import TypedReturnsRows
 
 from app.db.models.base import Base
 from app.db.repository import base
+from app.logging.events import Log
 
 """
 This module contains the DbSession class, which is a context manager that provides a session to interact with
@@ -46,6 +49,45 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 P = ParamSpec("P")
+
+_VARCHAR_LIMIT = re.compile(r"character varying\((\d+)\)")
+
+
+def _longest_value(params: Any) -> int | None:
+    if isinstance(params, dict):
+        params = params.values()
+    elif not isinstance(params, (list, tuple)):
+        params = (params,)
+    return max((len(value) for value in params if isinstance(value, (str, bytes))), default=None)
+
+
+def _present(fields: dict[str, Any]) -> dict[str, Any]:
+    return {name: value for name, value in fields.items() if value is not None}
+
+
+def _schema_error_fields(exc: DataError) -> dict[str, Any]:
+    diag = getattr(exc.orig, "diag", None)
+    limit = _VARCHAR_LIMIT.search(str(exc.orig))
+    return _present(
+        {
+            "exception_type": type(exc.orig).__name__,
+            "table": getattr(diag, "table_name", None),
+            "column": getattr(diag, "column_name", None),
+            "value_length": _longest_value(exc.params),
+            "column_limit": int(limit.group(1)) if limit else None,
+        }
+    )
+
+
+def _operation_error_fields(exc: DatabaseError) -> dict[str, Any]:
+    diag = getattr(exc.orig, "diag", None)
+    return _present(
+        {
+            "exception_type": type(exc.orig).__name__,
+            "table": getattr(diag, "table_name", None),
+            "constraint": getattr(diag, "constraint_name", None),
+        }
+    )
 
 
 class DbSession:
@@ -177,14 +219,46 @@ class DbSession:
         """
         try:
             return f(*args, **kwargs)
-        except (OperationalError, PendingRollbackError) as e:
+        except OperationalError as e:
+            gflog.emit(
+                logger,
+                Log.DB_CONNECTION_FAILED,
+                "Database connection failed, discarding the pending work",
+                fields={"error_type": type(e).__name__},
+            )
+            self._discard(e)
+        except PendingRollbackError as e:
             logger.error("Transaction failed, discarding its pending work: %s", e)
+            self._discard(e)
+        except DatabaseError as e:
+            self._log_database_error(e)
             self.session.rollback()
-            raise DatabaseError("Transaction failed, nothing was committed", None, e) from e
+            raise
         except Exception:
             logger.exception("Unexpected error during transaction, discarding its pending work")
             self.session.rollback()
             raise
+
+    def _discard(self, cause: Exception) -> NoReturn:
+        self.session.rollback()
+        raise DatabaseError("Transaction failed, nothing was committed", None, cause) from cause
+
+    @staticmethod
+    def _log_database_error(exc: DatabaseError) -> None:
+        if isinstance(exc, DataError):
+            gflog.emit(
+                logger,
+                Log.DB_SCHEMA_ERROR,
+                "Database rejected the data for its schema",
+                fields=_schema_error_fields(exc),
+            )
+        else:
+            gflog.emit(
+                logger,
+                Log.DB_OPERATION_FAILED,
+                "Database rejected the operation",
+                fields=_operation_error_fields(exc),
+            )
 
     def _retry(self, f: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
         """
@@ -195,6 +269,7 @@ class DbSession:
         on pending session state.
         """
         backoff = self._retry_backoff
+        attempt = 0
 
         while True:
             try:
@@ -203,9 +278,19 @@ class DbSession:
                 logger.warning("Retrying operation due to PendingRollbackError: %s", e)
                 self.session.rollback()
             except OperationalError as e:
-                logger.warning("Retrying operation due to OperationalError: %s", e)
+                attempt += 1
+                gflog.emit(
+                    logger,
+                    Log.DB_CONNECTION_FAILED,
+                    "Database connection failed, retrying" if backoff else "Database connection failed, out of retries",
+                    fields={
+                        "error_type": type(e).__name__,
+                        "retry_attempt": attempt,
+                        "backoff_seconds": backoff[0] if backoff else 0,
+                    },
+                )
             except DatabaseError as e:
-                logger.warning("Retrying operation due to DatabaseError: %s", e)
+                self._log_database_error(e)
                 raise
             except Exception as e:
                 logger.warning("Generic Exception during operation: %s", e)

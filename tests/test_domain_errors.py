@@ -3,11 +3,14 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from gfmodules.logging import LoggingStreams
+from gfmodules.logging.testing import assert_event_emitted, capture_records, capture_stream
 from pytest_mock import MockerFixture
 
 from app import application, exceptions
 from app.config import set_config
 from app.exceptions import DomainError, ScopesNotGrantedError
+from app.logging.events import Log
 from app.models.scopes import AuthorizationScope
 from app.routers.errors import STATUS_CODES, domain_error_handler, install_domain_error_handler, status_code_for
 from tests.test_config import get_test_config
@@ -84,6 +87,23 @@ def test_handler_uses_the_message_given_at_raise_time(client: TestClient) -> Non
 
     assert response.status_code == 409
     assert response.json() == {"detail": "Organization external_id 1234 already exists"}
+
+
+@pytest.mark.parametrize("stream", [LoggingStreams.APP, LoggingStreams.SIEM])
+def test_a_refusal_reaches_the_stream_with_its_type_and_status(client: TestClient, stream: LoggingStreams) -> None:
+    with capture_stream(stream, "app") as messages:
+        client.get("/custom-message")
+
+    refused = [message for message in messages if "error_type" in message]
+    assert refused == [{"error_type": "ConflictError", "status_code": 409}]
+
+
+def test_a_refusal_does_not_log_the_message_it_answers_with(client: TestClient) -> None:
+    with capture_records("app") as records:
+        client.get("/custom-message")
+
+    entry = assert_event_emitted(records, Log.REQUEST_REFUSED)
+    assert "already exists" not in str(entry.payload)
 
 
 def test_application_registers_the_domain_error_handler(mocker: MockerFixture) -> None:

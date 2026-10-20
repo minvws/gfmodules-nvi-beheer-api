@@ -10,7 +10,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from gfmodules.logging import LoggingStreams
 from gfmodules.logging.middleware import RequestContextMiddleware
-from gfmodules.logging.testing import capture_records, capture_stream, recorded_shutdown_reason
+from gfmodules.logging.testing import (
+    assert_event_emitted,
+    capture_records,
+    capture_stream,
+    recorded_shutdown_reason,
+)
 from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
@@ -192,11 +197,12 @@ class TestRequestValidationExceptionHandler:
         assert response.status_code == 422
         assert response.json()["detail"][0]["input"] == self.SECRET
 
-        messages = [entry.record.getMessage() for entry in captured.entries]
-        assert len(messages) == 1
-        assert "Request validation failed" in messages[0]
-        assert "count" in messages[0]
-        assert self.SECRET not in messages[0]
+        assert len(captured) == 1
+        entry = assert_event_emitted(
+            captured, Log.REQUEST_REFUSED, error_type="RequestValidationError", status_code=422
+        )
+        assert entry.message["validation_errors"] == [{"loc": ["body", "count"], "type": "int_parsing"}]
+        assert self.SECRET not in json.dumps(entry.payload)
 
     def test_does_not_log_input_echoed_by_a_custom_validator_message(self) -> None:
         with capture_records(application.logger.name) as captured:
@@ -205,8 +211,7 @@ class TestRequestValidationExceptionHandler:
         assert response.status_code == 422
         assert self.SECRET in response.json()["detail"][0]["msg"]
 
-        messages = [entry.record.getMessage() for entry in captured.entries]
-        assert len(messages) == 1
-        assert "oin" in messages[0]
-        assert "value_error" in messages[0]
-        assert self.SECRET not in messages[0]
+        assert len(captured) == 1
+        entry = assert_event_emitted(captured, Log.REQUEST_REFUSED, error_type="RequestValidationError")
+        assert entry.message["validation_errors"] == [{"loc": ["body", "oin"], "type": "value_error"}]
+        assert self.SECRET not in json.dumps(entry.payload)

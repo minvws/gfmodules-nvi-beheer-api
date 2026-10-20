@@ -45,11 +45,11 @@ def request_validation_exception_handler(
     # Log only where and why validation failed. Both the rejected input and the message may contain request body
     # data: custom validators (e.g. Oin) echo the offending value in their error message.
     errors = [{"loc": e.get("loc"), "type": e.get("type")} for e in exc.errors()]
-    logger.warning(
-        "Request validation failed method=%s path=%s errors=%s",
-        request.method,
-        request.url.path,
-        errors,
+    gflog.emit(
+        logger,
+        Log.REQUEST_REFUSED,
+        "Request validation failed",
+        fields={"error_type": type(exc).__name__, "status_code": 422, "validation_errors": errors},
     )
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 

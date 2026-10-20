@@ -9,6 +9,7 @@ turns them into the same ``{"detail": ...}`` body FastAPI uses for
 
 import logging
 
+import gfmodules.logging as gflog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -21,6 +22,7 @@ from app.exceptions import (
     ResolveError,
     ScopesNotGrantedError,
 )
+from app.logging.events import Log
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +47,11 @@ def status_code_for(exc: DomainError) -> int:
 def domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, DomainError)
     status_code = status_code_for(exc)
-    logger.warning(
-        "%s %s refused with %d: %s",
-        request.method,
-        request.url.path,
-        status_code,
-        exc.message,
+    gflog.emit(
+        logger,
+        Log.REQUEST_REFUSED,
+        "Request refused",
+        fields={"error_type": type(exc).__name__, "status_code": status_code},
     )
     return JSONResponse(status_code=status_code, content={"detail": exc.message})
 
