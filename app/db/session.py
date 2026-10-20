@@ -260,6 +260,19 @@ class DbSession:
                 fields=_operation_error_fields(exc),
             )
 
+    @staticmethod
+    def _log_connection_failure(exc: OperationalError, attempt: int, backoff: list[float]) -> None:
+        gflog.emit(
+            logger,
+            Log.DB_CONNECTION_FAILED,
+            "Database connection failed, retrying" if backoff else "Database connection failed, out of retries",
+            fields={
+                "error_type": type(exc).__name__,
+                "retry_attempt": attempt,
+                "backoff_seconds": backoff[0] if backoff else 0,
+            },
+        )
+
     def _retry(self, f: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
         """
         Retry a function call in case of database errors.
@@ -279,16 +292,7 @@ class DbSession:
                 self.session.rollback()
             except OperationalError as e:
                 attempt += 1
-                gflog.emit(
-                    logger,
-                    Log.DB_CONNECTION_FAILED,
-                    "Database connection failed, retrying" if backoff else "Database connection failed, out of retries",
-                    fields={
-                        "error_type": type(e).__name__,
-                        "retry_attempt": attempt,
-                        "backoff_seconds": backoff[0] if backoff else 0,
-                    },
-                )
+                self._log_connection_failure(e, attempt, backoff)
             except DatabaseError as e:
                 self._log_database_error(e)
                 raise
