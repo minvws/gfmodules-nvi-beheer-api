@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
@@ -8,8 +9,17 @@ from app.models.source import Source
 from app.models.ura import UraNumber
 
 
-def scope_names(scopes: list[AuthorizationScope] | None) -> str:
-    return " ".join(sorted(scopes or []))
+def scope_names(scopes: list[AuthorizationScope] | None) -> list[str]:
+    return sorted(str(scope) for scope in scopes or [])
+
+
+def with_changes(before: Mapping[str, Any], after: Mapping[str, Any], *names: str) -> dict[str, Any]:
+    changes = dict(after)
+    for name in names:
+        old, new = set(before[name]), set(after[name])
+        changes[f"{name}_added"] = sorted(new - old)
+        changes[f"{name}_removed"] = sorted(old - new)
+    return changes
 
 
 def organization_fields(id: UUID, ura_number: UraNumber, scopes: list[AuthorizationScope] | None) -> dict[str, Any]:

@@ -2,15 +2,21 @@ from collections.abc import Iterator
 from uuid import uuid4
 
 import pytest
-from gfmodules.logging.testing import CapturedRecords, assert_event_emitted, capture_records
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from gfmodules.logging import LoggingStreams
+from gfmodules.logging.middleware import RequestContextMiddleware
+from gfmodules.logging.testing import CapturedRecords, assert_event_emitted, capture_records, capture_stream
 
+from app.container import get_organization_service
 from app.exceptions import EntityHasActiveMembersError, ResolveError
-from app.logging.events import Log
+from app.logging.events import ACTOR, Log
 from app.models.certificates import CertificateCreate, CertificateUpdate
 from app.models.client import ClientCreate, ClientResolveRequest, ClientUpdate
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate, SourceUpdate
+from app.routers.organization import router as organization_router
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
@@ -56,7 +62,7 @@ class TestOrganizationEvents:
             Log.ORGANIZATION_CREATED,
             organization_id=str(organization.id),
             ura_number=str(TEST_EXTERNAL_ID),
-            scopes="nvi:read",
+            scopes=["nvi:read"],
         )
 
     def test_creating_an_organization_logs_everything_created_with_it(
@@ -76,12 +82,12 @@ class TestOrganizationEvents:
             Log.CLIENT_CREATED,
             organization_id=str(populated_organization.id),
             client_id=str(client.id),
-            scopes="nvi:create nvi:read",
+            scopes=["nvi:create", "nvi:read"],
             certificate_ids=[str(c.id) for c in client.certificates],
             source_ids=[s.source_id for s in client.sources],
         )
 
-    def test_updating_an_organization_logs_the_new_scopes(
+    def test_updating_an_organization_logs_the_new_scopes_and_what_changed(
         self, records: CapturedRecords, organization_service: OrganizationService, organization: Organization
     ) -> None:
         organization_service.update_one(
@@ -98,7 +104,9 @@ class TestOrganizationEvents:
             Log.ORGANIZATION_UPDATED,
             organization_id=str(organization.id),
             ura_number=str(TEST_EXTERNAL_ID),
-            scopes="nvi:create nvi:read",
+            scopes=["nvi:create", "nvi:read"],
+            scopes_added=["nvi:create"],
+            scopes_removed=[],
         )
 
     def test_an_update_that_changes_nothing_is_not_logged(
@@ -148,7 +156,7 @@ class TestClientEvents:
             Log.CLIENT_CREATED,
             organization_id=str(organization.id),
             client_id=str(client.id),
-            scopes="nvi:read",
+            scopes=["nvi:read"],
             certificate_ids=[],
             source_ids=[],
         )
@@ -169,7 +177,36 @@ class TestClientEvents:
             Log.CLIENT_UPDATED,
             organization_id=str(organization.id),
             client_id=str(client.id),
-            scopes="nvi:read",
+            scopes=["nvi:read"],
+            scopes_added=["nvi:read"],
+            scopes_removed=[],
+        )
+
+    def test_updating_a_client_logs_the_couplings_it_changed(
+        self, records: CapturedRecords, client_service: ClientService, populated_organization: Organization
+    ) -> None:
+        assert populated_organization.clients is not None
+        client = populated_organization.clients[0]
+        assert client.certificates is not None
+        assert client.sources is not None
+
+        client_service.update_one(
+            client.id,
+            populated_organization.id,
+            ClientUpdate(id=client.id, name=client.name, scopes=client.scopes),
+        )
+
+        assert_event_emitted(
+            records,
+            Log.CLIENT_UPDATED,
+            certificate_ids=[],
+            source_ids=[],
+            scopes_added=[],
+            scopes_removed=[],
+            certificate_ids_added=[],
+            certificate_ids_removed=sorted(str(c.id) for c in client.certificates),
+            source_ids_added=[],
+            source_ids_removed=sorted(s.source_id for s in client.sources),
         )
 
     def test_deleting_a_client_logs_it(
@@ -353,7 +390,7 @@ class TestResolveEvents:
             certificate_organization_identifier=str(TEST_OIN),
             matched_domain=TEST_DOMAIN,
             source_id=TEST_SOURCE_ID,
-            scopes=response.scopes,
+            scopes=response.scopes.split(),
         )
 
     @pytest.mark.parametrize(
@@ -388,3 +425,20 @@ class TestResolveEvents:
             error_reason=reason,
         )
         assert records.for_event(Log.CLIENT_RESOLVED) == []
+
+
+class TestActor:
+    def test_siem_learns_who_made_a_change(self, organization_service: OrganizationService) -> None:
+        app = FastAPI()
+        app.include_router(organization_router)
+        app.dependency_overrides[get_organization_service] = lambda: organization_service
+        app.add_middleware(RequestContextMiddleware)
+        body = OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME)
+
+        with capture_stream(LoggingStreams.SIEM, "app") as messages:
+            response = TestClient(app).post(
+                "/organizations", json=body.model_dump(), headers={"x-gf-act-cn": "beheer.example.nl"}
+            )
+
+        assert response.status_code == 201
+        assert [message[ACTOR.name] for message in messages if "organization_id" in message] == ["beheer.example.nl"]

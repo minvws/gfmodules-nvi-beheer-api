@@ -20,7 +20,7 @@ from app.exceptions import (
     ForbiddenOperationError,
     RecordNotFoundError,
 )
-from app.logging.audit import certificate_fields, client_fields, organization_fields, source_fields
+from app.logging.audit import certificate_fields, client_fields, organization_fields, source_fields, with_changes
 from app.logging.events import Log
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
 from app.services.certificate.client_certificate import ClientCertificateService
@@ -131,9 +131,9 @@ class OrganizationService:
             if not org:
                 raise RecordNotFoundError(id)
 
-            change_happened = OrganizationUpdate.from_entity(org) != dto
-            if change_happened is False:
-                return OrganizationUpdate.from_entity(org)
+            current = OrganizationUpdate.from_entity(org)
+            if current == dto:
+                return current
 
             if org.external_id != dto.external_id:
                 org.external_id = dto.external_id
@@ -165,7 +165,11 @@ class OrganizationService:
             logger,
             Log.ORGANIZATION_UPDATED,
             "Organization updated",
-            fields=organization_fields(id, updated.external_id, updated.scopes),
+            fields=with_changes(
+                organization_fields(id, current.external_id, current.scopes),
+                organization_fields(id, updated.external_id, updated.scopes),
+                "scopes",
+            ),
         )
         return updated
 

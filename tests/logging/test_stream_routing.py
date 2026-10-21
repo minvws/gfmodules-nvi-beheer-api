@@ -13,6 +13,7 @@ from app.logging.events import Log
 _LOGGER_NAME = "app.test_stream_routing"
 _OIN = "00000001000000000001"
 _URA = "12345678"
+_ACTOR = "beheer.example.nl"
 
 Routed = dict[LoggingStreams, list[dict[str, Any]]]
 
@@ -36,6 +37,7 @@ def route() -> Iterator[Any]:
             "endpoint": "/organizations",
             "method": "POST",
             "correlation_id": "corr-1",
+            "actor_cn": _ACTOR,
         }
     ):
         yield _route
@@ -50,7 +52,7 @@ class TestClientCreated:
                 "created",
                 organization_id="org-1",
                 client_id="client-1",
-                scopes="nvi:localize nvi:read",
+                scopes=["nvi:localize", "nvi:read"],
                 certificate_ids=["cert-1"],
                 source_ids=["src-1"],
             )
@@ -60,16 +62,21 @@ class TestClientCreated:
         message = routed[LoggingStreams.APP][0]
         assert message["organization_id"] == "org-1"
         assert message["client_id"] == "client-1"
-        assert message["scopes"] == "nvi:localize nvi:read"
+        assert message["scopes"] == ["nvi:localize", "nvi:read"]
         assert message["certificate_ids"] == ["cert-1"]
         assert message["source_ids"] == ["src-1"]
 
-    def test_siem_receives_the_client_and_its_scopes_but_not_the_couplings(self, routed: Routed) -> None:
+    def test_siem_receives_the_client_its_scopes_and_its_couplings(self, routed: Routed) -> None:
         message = routed[LoggingStreams.SIEM][0]
         assert message["organization_id"] == "org-1"
         assert message["client_id"] == "client-1"
-        assert message["scopes"] == "nvi:localize nvi:read"
-        assert_fields_absent(routed[LoggingStreams.SIEM], "certificate_ids", "source_ids")
+        assert message["scopes"] == ["nvi:localize", "nvi:read"]
+        assert message["certificate_ids"] == ["cert-1"]
+        assert message["source_ids"] == ["src-1"]
+
+    def test_every_routed_stream_learns_who_made_the_change(self, routed: Routed) -> None:
+        for stream in (LoggingStreams.APP, LoggingStreams.SIEM):
+            assert routed[stream][0]["actor_cn"] == _ACTOR
 
     def test_public_inspect_receives_nothing(self, routed: Routed) -> None:
         assert routed[LoggingStreams.PUBLIC_INSPECT] == []
@@ -101,7 +108,7 @@ class TestCertificateAssigned:
 
 
 class TestClientResolved:
-    def test_the_matched_domain_and_source_never_reach_siem(self, route: Any) -> None:
+    def test_a_successful_resolve_never_reaches_siem(self, route: Any) -> None:
         routed: Routed = route(
             Log.CLIENT_RESOLVED,
             "resolved",
@@ -110,14 +117,12 @@ class TestClientResolved:
             certificate_organization_identifier=_OIN,
             matched_domain="example.com",
             source_id="src-1",
-            scopes="nvi:read",
+            scopes=["nvi:read"],
         )
 
         assert routed[LoggingStreams.APP][0]["matched_domain"] == "example.com"
-        assert routed[LoggingStreams.APP][0]["source_id"] == "src-1"
-        assert routed[LoggingStreams.SIEM][0]["ura_number"] == _URA
-        assert routed[LoggingStreams.SIEM][0]["scopes"] == "nvi:read"
-        assert_fields_absent(routed[LoggingStreams.SIEM], "matched_domain", "source_id")
+        assert routed[LoggingStreams.APP][0]["scopes"] == ["nvi:read"]
+        assert routed[LoggingStreams.SIEM] == []
 
 
 class TestClientResolveDenied:
@@ -144,12 +149,26 @@ class TestClientResolveDenied:
 
 
 class TestRequestRefused:
-    def test_reaches_app_and_siem_with_the_error_type_and_status(self, route: Any) -> None:
-        routed: Routed = route(Log.REQUEST_REFUSED, "refused", error_type="ConflictError", status_code=409)
+    def test_reaches_the_app_stream_only_with_the_reason_and_status(self, route: Any) -> None:
+        routed: Routed = route(Log.REQUEST_REFUSED, "refused", error_reason="conflict", status_code=409)
+
+        assert routed[LoggingStreams.APP][0]["error_reason"] == "conflict"
+        assert routed[LoggingStreams.APP][0]["status_code"] == 409
+        assert routed[LoggingStreams.SIEM] == []
+        assert routed[LoggingStreams.PUBLIC_INSPECT] == []
+
+
+class TestRequestForbidden:
+    def test_reaches_app_and_siem_with_the_reason_status_and_actor(self, route: Any) -> None:
+        routed: Routed = route(Log.REQUEST_FORBIDDEN, "refused", error_reason="scopes_not_granted", status_code=403)
 
         for stream in (LoggingStreams.APP, LoggingStreams.SIEM):
-            assert routed[stream][0]["error_type"] == "ConflictError"
-            assert routed[stream][0]["status_code"] == 409
+            message = routed[stream][0]
+            assert (message["error_reason"], message["status_code"], message["actor_cn"]) == (
+                "scopes_not_granted",
+                403,
+                _ACTOR,
+            )
         assert routed[LoggingStreams.PUBLIC_INSPECT] == []
 
 

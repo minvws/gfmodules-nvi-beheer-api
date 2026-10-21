@@ -22,7 +22,7 @@ from app.config import (
     _PATH,
     get_config,
 )
-from app.logging.events import Log
+from app.logging.events import ACTOR, Log
 from app.middleware.stats import StatsdMiddleware
 from app.routers.client import router as client_router
 from app.routers.client_certificate import router as client_certificate_router
@@ -49,7 +49,7 @@ def request_validation_exception_handler(
         logger,
         Log.REQUEST_REFUSED,
         "Request validation failed",
-        fields={"error_type": type(exc).__name__, "status_code": 422, "validation_errors": errors},
+        fields={"error_reason": "validation_failed", "status_code": 422, "validation_errors": errors},
     )
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 
@@ -118,6 +118,7 @@ def setup_logging() -> None:
         config=config.logging,
         loglevel=config.app.loglevel,
         catalogue=Log,
+        extra_context_fields=(ACTOR,),
     )
 
 

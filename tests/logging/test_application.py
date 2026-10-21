@@ -21,7 +21,7 @@ from pytest_mock import MockerFixture
 
 from app import application
 from app.config import Config, set_config
-from app.logging.events import Log
+from app.logging.events import ACTOR, Log
 from app.models.oin import Oin
 from tests.test_config import get_test_config
 
@@ -105,6 +105,7 @@ class TestApplicationInit:
             config=use_config.logging,
             loglevel=use_config.app.loglevel,
             catalogue=Log,
+            extra_context_fields=(ACTOR,),
         )
 
 
@@ -150,6 +151,18 @@ class TestUnhandledExceptionHandler:
         assert app_stream[0]["exception_type"] == "RuntimeError"
         assert app_stream[0]["endpoint"] == "/boom"
         assert siem_stream[0]["exception_type"] == "RuntimeError"
+
+    def test_every_routed_stream_learns_who_triggered_the_exception(self) -> None:
+        with (
+            capture_stream(LoggingStreams.APP, application.logger.name) as app_stream,
+            capture_stream(LoggingStreams.SIEM, application.logger.name) as siem_stream,
+        ):
+            TestClient(self._app(), raise_server_exceptions=False).get(
+                "/boom", headers={"x-gf-act-cn": "beheer.example.nl"}
+            )
+
+        assert app_stream[0][ACTOR.name] == "beheer.example.nl"
+        assert siem_stream[0][ACTOR.name] == "beheer.example.nl"
 
 
 class TestUserAgent:
@@ -198,9 +211,7 @@ class TestRequestValidationExceptionHandler:
         assert response.json()["detail"][0]["input"] == self.SECRET
 
         assert len(captured) == 1
-        entry = assert_event_emitted(
-            captured, Log.REQUEST_REFUSED, error_type="RequestValidationError", status_code=422
-        )
+        entry = assert_event_emitted(captured, Log.REQUEST_REFUSED, error_reason="validation_failed", status_code=422)
         assert entry.message["validation_errors"] == [{"loc": ["body", "count"], "type": "int_parsing"}]
         assert self.SECRET not in json.dumps(entry.payload)
 
@@ -212,6 +223,6 @@ class TestRequestValidationExceptionHandler:
         assert self.SECRET in response.json()["detail"][0]["msg"]
 
         assert len(captured) == 1
-        entry = assert_event_emitted(captured, Log.REQUEST_REFUSED, error_type="RequestValidationError")
+        entry = assert_event_emitted(captured, Log.REQUEST_REFUSED, error_reason="validation_failed")
         assert entry.message["validation_errors"] == [{"loc": ["body", "oin"], "type": "value_error"}]
         assert self.SECRET not in json.dumps(entry.payload)

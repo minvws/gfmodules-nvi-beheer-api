@@ -29,6 +29,12 @@ def test_every_domain_error_has_a_status_code() -> None:
     assert unmapped == []
 
 
+def test_every_domain_error_has_a_reason_of_its_own() -> None:
+    reasons = [cls.reason for cls in _all_domain_errors()]
+    assert DomainError.reason not in reasons
+    assert len(reasons) == len(set(reasons))
+
+
 def test_every_mapped_status_code_is_a_client_error() -> None:
     assert all(400 <= code < 500 for code in STATUS_CODES.values())
 
@@ -89,13 +95,25 @@ def test_handler_uses_the_message_given_at_raise_time(client: TestClient) -> Non
     assert response.json() == {"detail": "Organization external_id 1234 already exists"}
 
 
-@pytest.mark.parametrize("stream", [LoggingStreams.APP, LoggingStreams.SIEM])
-def test_a_refusal_reaches_the_stream_with_its_type_and_status(client: TestClient, stream: LoggingStreams) -> None:
-    with capture_stream(stream, "app") as messages:
+def test_a_refusal_reaches_the_app_stream_only_with_its_reason_and_status(client: TestClient) -> None:
+    with capture_stream(LoggingStreams.APP, "app") as app, capture_stream(LoggingStreams.SIEM, "app") as siem:
         client.get("/custom-message")
 
-    refused = [message for message in messages if "error_type" in message]
-    assert refused == [{"error_type": "ConflictError", "status_code": 409}]
+    assert [message for message in app if "error_reason" in message] == [
+        {"error_reason": "conflict", "status_code": 409}
+    ]
+    assert siem == []
+
+
+@pytest.mark.parametrize("stream", [LoggingStreams.APP, LoggingStreams.SIEM])
+def test_a_forbidden_request_reaches_the_stream_with_its_reason_and_status(
+    client: TestClient, stream: LoggingStreams
+) -> None:
+    with capture_stream(stream, "app") as messages:
+        client.get("/refuse")
+
+    forbidden = [message for message in messages if "error_reason" in message]
+    assert forbidden == [{"error_reason": "forbidden_operation", "status_code": 403}]
 
 
 def test_a_refusal_does_not_log_the_message_it_answers_with(client: TestClient) -> None:

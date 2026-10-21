@@ -146,20 +146,18 @@ def test_a_retried_connection_failure_is_logged_per_attempt(retrying_database: D
         for entry in records.for_event(Log.DB_CONNECTION_FAILED)
     ]
     assert attempts == [("OperationalError", 1, 0.01), ("OperationalError", 2, 0.01)]
+    assert len(records) == len(attempts)
 
 
-def test_the_last_connection_failure_is_logged_as_out_of_retries(retrying_database: Database) -> None:
+def test_the_last_connection_failure_is_logged_without_a_backoff(retrying_database: Database) -> None:
     with retrying_database.get_db_session() as session, capture_records("app") as records:
         failures = [OperationalError("stmt", {}, Exception("connection refused")) for _ in range(3)]
         stmt = select(OrganizationEntity)
         with patch.object(session.session, "execute", side_effect=_failing(*failures)), pytest.raises(DatabaseError):
             session.execute(stmt)
 
-    assert [entry.description for entry in records.for_event(Log.DB_CONNECTION_FAILED)] == [
-        "Database connection failed, retrying",
-        "Database connection failed, retrying",
-        "Database connection failed, out of retries",
-    ]
+    backoffs = [entry.message["backoff_seconds"] for entry in records.for_event(Log.DB_CONNECTION_FAILED)]
+    assert backoffs == [0.01, 0.01, 0]
 
 
 def test_a_connection_failure_during_commit_is_logged(retrying_database: Database) -> None:

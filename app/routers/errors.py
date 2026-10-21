@@ -49,9 +49,9 @@ def domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
     status_code = status_code_for(exc)
     gflog.emit(
         logger,
-        Log.REQUEST_REFUSED,
+        Log.REQUEST_FORBIDDEN if status_code == 403 else Log.REQUEST_REFUSED,
         "Request refused",
-        fields={"error_type": type(exc).__name__, "status_code": status_code},
+        fields={"error_reason": exc.reason, "status_code": status_code},
     )
     return JSONResponse(status_code=status_code, content={"detail": exc.message})
 

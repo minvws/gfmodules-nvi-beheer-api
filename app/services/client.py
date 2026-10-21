@@ -21,7 +21,7 @@ from app.db.repository.contexts.organization_context import (
 )
 from app.db.repository.organization import OrganizationRepository
 from app.exceptions import EntityHasActiveMembersError, RecordNotFoundError, ResolveError
-from app.logging.audit import client_fields, resolve_request_fields
+from app.logging.audit import client_fields, resolve_request_fields, with_changes
 from app.logging.events import Log
 from app.models.client import (
     Client,
@@ -138,6 +138,7 @@ class ClientService:
             client = org.clients[0] if org.clients else None
             if client is None:
                 raise RecordNotFoundError(id)
+            before = Client.from_entity(client)
 
             if dto.name:
                 client.name = dto.name
@@ -166,7 +167,14 @@ class ClientService:
 
             updated = Client.from_entity(client)
 
-        gflog.emit(logger, Log.CLIENT_UPDATED, "Client updated", fields=client_fields(updated))
+        gflog.emit(
+            logger,
+            Log.CLIENT_UPDATED,
+            "Client updated",
+            fields=with_changes(
+                client_fields(before), client_fields(updated), "scopes", "certificate_ids", "source_ids"
+            ),
+        )
         return updated
 
     def delete_one(self, id: UUID, organization_id: UUID) -> None:
@@ -223,7 +231,7 @@ class ClientService:
             fields={
                 **resolve_request_fields(request),
                 "matched_domain": response.matched_domain,
-                "scopes": response.scopes,
+                "scopes": sorted(scope_names),
             },
         )
         return response
