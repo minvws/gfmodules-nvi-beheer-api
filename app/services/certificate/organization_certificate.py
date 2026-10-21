@@ -1,5 +1,8 @@
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
+
+import gfmodules.logging as gflog
 
 from app.db.db import Database
 from app.db.models.certificate import CertificateEntity
@@ -18,12 +21,16 @@ from app.exceptions import (
     EntityHasActiveMembersError,
     RecordNotFoundError,
 )
+from app.logging.audit import certificate_fields
+from app.logging.events import Log
 from app.models.certificates import (
     Certificate,
     CertificateCreate,
     CertificateQueryParams,
     CertificateUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class OrganizationCertificateService:
@@ -84,8 +91,15 @@ class OrganizationCertificateService:
                 org.certificates = [new_cert]
 
             session.flush()
+            certificate = Certificate.from_entity(new_cert)
 
-            return Certificate.from_entity(new_cert)
+        gflog.emit(
+            logger,
+            Log.CERTIFICATE_CREATED,
+            "Certificate created",
+            fields=certificate_fields(organization_id, certificate),
+        )
+        return certificate
 
     def update_one(self, id: UUID, organization_id: UUID, dto: CertificateUpdate) -> Certificate:
         with self.db.get_db_session(commit=True) as session:
@@ -116,8 +130,15 @@ class OrganizationCertificateService:
                 target.domain = target.domain
 
             session.flush()
+            updated = Certificate.from_entity(target)
 
-            return Certificate.from_entity(target)
+        gflog.emit(
+            logger,
+            Log.CERTIFICATE_UPDATED,
+            "Certificate updated",
+            fields=certificate_fields(organization_id, updated),
+        )
+        return updated
 
     def delete_one(self, organization_id: UUID, id: UUID) -> Certificate:
         with self.db.get_db_session(commit=True) as session:
@@ -139,8 +160,15 @@ class OrganizationCertificateService:
 
             target.deleted_at = datetime.now(UTC)
             session.flush()
+            deleted = Certificate.from_entity(target)
 
-            return Certificate.from_entity(target)
+        gflog.emit(
+            logger,
+            Log.CERTIFICATE_DELETED,
+            "Certificate deleted",
+            fields=certificate_fields(organization_id, deleted),
+        )
+        return deleted
 
     @staticmethod
     def validated_for_delete(cert: CertificateEntity) -> str | None:

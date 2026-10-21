@@ -1,5 +1,8 @@
 import datetime
+import logging
 from uuid import UUID
+
+import gfmodules.logging as gflog
 
 from app.db.db import Database
 from app.db.models.source import SourceEntity
@@ -15,7 +18,11 @@ from app.exceptions import (
     EntityHasActiveMembersError,
     RecordNotFoundError,
 )
+from app.logging.audit import source_fields
+from app.logging.events import Log
 from app.models.source import Source, SourceCreate, SourceQueryParams, SourceUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class OrganizationSourceService:
@@ -65,7 +72,10 @@ class OrganizationSourceService:
             org.sources.append(new_source)
 
             session.session.flush()
-            return Source.from_entity(new_source)
+            source = Source.from_entity(new_source)
+
+        gflog.emit(logger, Log.SOURCE_CREATED, "Source created", fields=source_fields(source))
+        return source
 
     def update_one(self, organization_id: UUID, id: UUID, dto: SourceUpdate) -> Source:
         with self.db.get_db_session(commit=True) as session:
@@ -90,7 +100,10 @@ class OrganizationSourceService:
                 target.name = dto.name
 
             session.flush()
-            return Source.from_entity(target)
+            updated = Source.from_entity(target)
+
+        gflog.emit(logger, Log.SOURCE_UPDATED, "Source updated", fields=source_fields(updated))
+        return updated
 
     def delete_one(self, organization_id: UUID, id: UUID) -> Source:
         with self.db.get_db_session(commit=True) as session:
@@ -111,8 +124,10 @@ class OrganizationSourceService:
                 raise EntityHasActiveMembersError("Source", active_members, target.id)
 
             target.deleted_at = datetime.datetime.now(datetime.UTC)
+            deleted = Source.from_entity(target)
 
-            return Source.from_entity(target)
+        gflog.emit(logger, Log.SOURCE_DELETED, "Source deleted", fields=source_fields(deleted))
+        return deleted
 
     @staticmethod
     def validate_for_delete(source: SourceEntity) -> str | None:

@@ -10,13 +10,18 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from gfmodules.logging import LoggingStreams
 from gfmodules.logging.middleware import RequestContextMiddleware
-from gfmodules.logging.testing import capture_records, capture_stream, recorded_shutdown_reason
+from gfmodules.logging.testing import (
+    assert_event_emitted,
+    capture_records,
+    capture_stream,
+    recorded_shutdown_reason,
+)
 from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
 from app import application
 from app.config import Config, set_config
-from app.logging.events import Log
+from app.logging.events import ACTOR, Log
 from app.models.oin import Oin
 from tests.test_config import get_test_config
 
@@ -100,6 +105,7 @@ class TestApplicationInit:
             config=use_config.logging,
             loglevel=use_config.app.loglevel,
             catalogue=Log,
+            extra_context_fields=(ACTOR,),
         )
 
 
@@ -145,6 +151,18 @@ class TestUnhandledExceptionHandler:
         assert app_stream[0]["exception_type"] == "RuntimeError"
         assert app_stream[0]["endpoint"] == "/boom"
         assert siem_stream[0]["exception_type"] == "RuntimeError"
+
+    def test_every_routed_stream_learns_who_triggered_the_exception(self) -> None:
+        with (
+            capture_stream(LoggingStreams.APP, application.logger.name) as app_stream,
+            capture_stream(LoggingStreams.SIEM, application.logger.name) as siem_stream,
+        ):
+            TestClient(self._app(), raise_server_exceptions=False).get(
+                "/boom", headers={"x-gf-act-cn": "beheer.example.nl"}
+            )
+
+        assert app_stream[0][ACTOR.name] == "beheer.example.nl"
+        assert siem_stream[0][ACTOR.name] == "beheer.example.nl"
 
 
 class TestUserAgent:
@@ -192,11 +210,10 @@ class TestRequestValidationExceptionHandler:
         assert response.status_code == 422
         assert response.json()["detail"][0]["input"] == self.SECRET
 
-        messages = [entry.record.getMessage() for entry in captured.entries]
-        assert len(messages) == 1
-        assert "Request validation failed" in messages[0]
-        assert "count" in messages[0]
-        assert self.SECRET not in messages[0]
+        assert len(captured) == 1
+        entry = assert_event_emitted(captured, Log.REQUEST_REFUSED, error_reason="validation_failed", status_code=422)
+        assert entry.message["validation_errors"] == [{"loc": ["body", "count"], "type": "int_parsing"}]
+        assert self.SECRET not in json.dumps(entry.payload)
 
     def test_does_not_log_input_echoed_by_a_custom_validator_message(self) -> None:
         with capture_records(application.logger.name) as captured:
@@ -205,8 +222,7 @@ class TestRequestValidationExceptionHandler:
         assert response.status_code == 422
         assert self.SECRET in response.json()["detail"][0]["msg"]
 
-        messages = [entry.record.getMessage() for entry in captured.entries]
-        assert len(messages) == 1
-        assert "oin" in messages[0]
-        assert "value_error" in messages[0]
-        assert self.SECRET not in messages[0]
+        assert len(captured) == 1
+        entry = assert_event_emitted(captured, Log.REQUEST_REFUSED, error_reason="validation_failed")
+        assert entry.message["validation_errors"] == [{"loc": ["body", "oin"], "type": "value_error"}]
+        assert self.SECRET not in json.dumps(entry.payload)

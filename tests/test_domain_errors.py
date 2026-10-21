@@ -3,11 +3,14 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from gfmodules.logging import LoggingStreams
+from gfmodules.logging.testing import assert_event_emitted, capture_records, capture_stream
 from pytest_mock import MockerFixture
 
 from app import application, exceptions
 from app.config import set_config
 from app.exceptions import DomainError, ScopesNotGrantedError
+from app.logging.events import Log
 from app.models.scopes import AuthorizationScope
 from app.routers.errors import STATUS_CODES, domain_error_handler, install_domain_error_handler, status_code_for
 from tests.test_config import get_test_config
@@ -24,6 +27,12 @@ def _all_domain_errors() -> list[type[DomainError]]:
 def test_every_domain_error_has_a_status_code() -> None:
     unmapped = [cls.__name__ for cls in _all_domain_errors() if cls not in STATUS_CODES]
     assert unmapped == []
+
+
+def test_every_domain_error_has_a_reason_of_its_own() -> None:
+    reasons = [cls.reason for cls in _all_domain_errors()]
+    assert DomainError.reason not in reasons
+    assert len(reasons) == len(set(reasons))
 
 
 def test_every_mapped_status_code_is_a_client_error() -> None:
@@ -84,6 +93,35 @@ def test_handler_uses_the_message_given_at_raise_time(client: TestClient) -> Non
 
     assert response.status_code == 409
     assert response.json() == {"detail": "Organization external_id 1234 already exists"}
+
+
+def test_a_refusal_reaches_the_app_stream_only_with_its_reason_and_status(client: TestClient) -> None:
+    with capture_stream(LoggingStreams.APP, "app") as app, capture_stream(LoggingStreams.SIEM, "app") as siem:
+        client.get("/custom-message")
+
+    assert [message for message in app if "error_reason" in message] == [
+        {"error_reason": "conflict", "status_code": 409}
+    ]
+    assert siem == []
+
+
+@pytest.mark.parametrize("stream", [LoggingStreams.APP, LoggingStreams.SIEM])
+def test_a_forbidden_request_reaches_the_stream_with_its_reason_and_status(
+    client: TestClient, stream: LoggingStreams
+) -> None:
+    with capture_stream(stream, "app") as messages:
+        client.get("/refuse")
+
+    forbidden = [message for message in messages if "error_reason" in message]
+    assert forbidden == [{"error_reason": "forbidden_operation", "status_code": 403}]
+
+
+def test_a_refusal_does_not_log_the_message_it_answers_with(client: TestClient) -> None:
+    with capture_records("app") as records:
+        client.get("/custom-message")
+
+    entry = assert_event_emitted(records, Log.REQUEST_REFUSED)
+    assert "already exists" not in str(entry.payload)
 
 
 def test_application_registers_the_domain_error_handler(mocker: MockerFixture) -> None:
