@@ -1,6 +1,8 @@
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
+import gfmodules.logging as gflog
 from sqlalchemy.exc import DatabaseError, IntegrityError
 
 from app.db.db import Database
@@ -18,10 +20,14 @@ from app.exceptions import (
     ForbiddenOperationError,
     RecordNotFoundError,
 )
+from app.logging.audit import certificate_fields, client_fields, organization_fields, source_fields, with_changes
+from app.logging.events import Log
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.scopes import ScopeService
 from app.services.source.client_source import ClientSourceService
+
+logger = logging.getLogger(__name__)
 
 
 class OrganizationService:
@@ -86,7 +92,10 @@ class OrganizationService:
             if new_org is None:
                 raise RuntimeError("Something went wrong")
 
-            return Organization.from_entity(new_org)
+            organization = Organization.from_entity(new_org)
+
+        self._log_created(organization)
+        return organization
 
     def get_one(self, id: UUID) -> Organization:
         with self.db.get_db_session() as session:
@@ -122,9 +131,9 @@ class OrganizationService:
             if not org:
                 raise RecordNotFoundError(id)
 
-            change_happened = OrganizationUpdate.from_entity(org) != dto
-            if change_happened is False:
-                return OrganizationUpdate.from_entity(org)
+            current = OrganizationUpdate.from_entity(org)
+            if current == dto:
+                return current
 
             if org.external_id != dto.external_id:
                 org.external_id = dto.external_id
@@ -150,7 +159,19 @@ class OrganizationService:
                 session.rollback()
                 raise
 
-            return OrganizationUpdate.from_entity(org)
+            updated = OrganizationUpdate.from_entity(org)
+
+        gflog.emit(
+            logger,
+            Log.ORGANIZATION_UPDATED,
+            "Organization updated",
+            fields=with_changes(
+                organization_fields(id, current.external_id, current.scopes),
+                organization_fields(id, updated.external_id, updated.scopes),
+                "scopes",
+            ),
+        )
+        return updated
 
     def delete_one(self, id: UUID) -> None:
         with self.db.get_db_session(commit=True) as session:
@@ -164,6 +185,33 @@ class OrganizationService:
                 raise EntityHasActiveMembersError("Organization", active_member, id)
 
             org.deleted_at = datetime.now(UTC)
+
+        gflog.emit(
+            logger,
+            Log.ORGANIZATION_DELETED,
+            "Organization deleted",
+            fields=organization_fields(org.id, org.external_id, [s.name for s in org.scopes]),
+        )
+
+    @staticmethod
+    def _log_created(organization: Organization) -> None:
+        gflog.emit(
+            logger,
+            Log.ORGANIZATION_CREATED,
+            "Organization created",
+            fields=organization_fields(organization.id, organization.external_id, organization.scopes),
+        )
+        for certificate in organization.certificates or []:
+            gflog.emit(
+                logger,
+                Log.CERTIFICATE_CREATED,
+                "Certificate created",
+                fields=certificate_fields(organization.id, certificate),
+            )
+        for source in organization.sources or []:
+            gflog.emit(logger, Log.SOURCE_CREATED, "Source created", fields=source_fields(source))
+        for client in organization.clients or []:
+            gflog.emit(logger, Log.CLIENT_CREATED, "Client created", fields=client_fields(client))
 
     @staticmethod
     def validate_org_for_delete(org: OrganizationEntity) -> str | None:

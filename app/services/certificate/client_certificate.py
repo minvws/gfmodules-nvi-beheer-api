@@ -1,4 +1,7 @@
+import logging
 from uuid import UUID
+
+import gfmodules.logging as gflog
 
 from app import utils
 from app.db.db import Database
@@ -13,12 +16,16 @@ from app.db.repository.contexts.organization_context import (
 )
 from app.db.repository.organization import OrganizationRepository
 from app.exceptions import ConflictError, ForbiddenOperationError, RecordNotFoundError
+from app.logging.audit import certificate_fields
+from app.logging.events import Log
 from app.models.certificates import (
     Certificate,
     CertificateCreate,
     CertificateUpdate,
     ClientCertificateQueryParams,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ClientCertificateService:
@@ -95,8 +102,15 @@ class ClientCertificateService:
 
             client.certificates.append(target_cert)
             session.flush()
+            assigned = Certificate.from_entity(target_cert)
 
-            return Certificate.from_entity(target_cert)
+        gflog.emit(
+            logger,
+            Log.CLIENT_CERTIFICATE_ASSIGNED,
+            "Certificate assigned to client",
+            fields={**certificate_fields(organization_id, assigned), "client_id": str(client_id)},
+        )
+        return assigned
 
     def unassign_one(self, organization_id: UUID, client_id: UUID, id: UUID) -> Certificate:
         with self.db.get_db_session(commit=True) as session:
@@ -124,8 +138,15 @@ class ClientCertificateService:
 
             target = client.certificates.pop(0)
             session.flush()
+            unassigned = Certificate.from_entity(target)
 
-            return Certificate.from_entity(target)
+        gflog.emit(
+            logger,
+            Log.CLIENT_CERTIFICATE_UNASSIGNED,
+            "Certificate unassigned from client",
+            fields={**certificate_fields(organization_id, unassigned), "client_id": str(client_id)},
+        )
+        return unassigned
 
     @staticmethod
     def get_client_certs_from_org(

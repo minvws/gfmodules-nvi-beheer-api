@@ -1,6 +1,9 @@
 import logging
 from datetime import UTC, datetime
+from typing import NoReturn
 from uuid import UUID
+
+import gfmodules.logging as gflog
 
 from app.db.db import Database
 from app.db.models.client import ClientEntity
@@ -18,6 +21,8 @@ from app.db.repository.contexts.organization_context import (
 )
 from app.db.repository.organization import OrganizationRepository
 from app.exceptions import EntityHasActiveMembersError, RecordNotFoundError, ResolveError
+from app.logging.audit import client_fields, resolve_request_fields, with_changes
+from app.logging.events import Log
 from app.models.client import (
     Client,
     ClientCreate,
@@ -66,8 +71,10 @@ class ClientService:
 
             client_repo = session.get_repository(ClientRepository)
             new_client = client_repo.add_one(target)
+            client = Client.from_entity(new_client)
 
-            return Client.from_entity(new_client)
+        gflog.emit(logger, Log.CLIENT_CREATED, "Client created", fields=client_fields(client))
+        return client
 
     def get_one(self, id: UUID, organization_id: UUID) -> Client:
         with self.db.get_db_session() as session:
@@ -131,6 +138,7 @@ class ClientService:
             client = org.clients[0] if org.clients else None
             if client is None:
                 raise RecordNotFoundError(id)
+            before = Client.from_entity(client)
 
             if dto.name:
                 client.name = dto.name
@@ -157,7 +165,17 @@ class ClientService:
                 client.certificates = []
             session.flush()
 
-            return Client.from_entity(client)
+            updated = Client.from_entity(client)
+
+        gflog.emit(
+            logger,
+            Log.CLIENT_UPDATED,
+            "Client updated",
+            fields=with_changes(
+                client_fields(before), client_fields(updated), "scopes", "certificate_ids", "source_ids"
+            ),
+        )
+        return updated
 
     def delete_one(self, id: UUID, organization_id: UUID) -> None:
         with self.db.get_db_session(commit=True) as session:
@@ -175,6 +193,9 @@ class ClientService:
                 raise EntityHasActiveMembersError("Client", active_member, id)
 
             client.deleted_at = datetime.now(UTC)
+            deleted = Client.from_entity(client)
+
+        gflog.emit(logger, Log.CLIENT_DELETED, "Client deleted", fields=client_fields(deleted))
 
     def resolve(self, request: ClientResolveRequest) -> ClientResolveResponse:
         with self.db.get_db_session() as session:
@@ -186,21 +207,49 @@ class ClientService:
                 request.certificate_domains,
                 request.source_id,
             )
-            if client is None or not client.certificates:
-                raise ResolveError
-
+            if client is None:
+                self._deny(request, "client_not_found")
+            if not client.certificates:
+                self._deny(request, "certificate_mismatch")
             if request.source_id is not None and not client.sources:
-                raise ResolveError
+                self._deny(request, "source_not_linked")
 
             scope_names = {s.name for s in client.scopes}
             if request.source_id is None:
                 scope_names &= SOURCE_INDEPENDENT_SCOPES  # keeps only the elements present in both sets
 
-            return ClientResolveResponse(
+            response = ClientResolveResponse(
                 scopes=" ".join(sorted(scope_names)),
                 organization_name=client.organization.name,
                 matched_domain=client.certificates[0].domain,
             )
+
+        gflog.emit(
+            logger,
+            Log.CLIENT_RESOLVED,
+            "Client resolved",
+            fields={
+                **resolve_request_fields(request),
+                "matched_domain": response.matched_domain,
+                "scopes": sorted(scope_names),
+            },
+        )
+        return response
+
+    @staticmethod
+    def _deny(request: ClientResolveRequest, reason: str) -> NoReturn:
+        gflog.emit(
+            logger,
+            Log.CLIENT_RESOLVE_DENIED,
+            "Client resolve denied",
+            fields={
+                **resolve_request_fields(request),
+                "certificate_domains": request.certificate_domains,
+                "error_reason": reason,
+            },
+            stacklevel=2,
+        )
+        raise ResolveError
 
     @staticmethod
     def validate_for_delete(client: ClientEntity) -> str | None:

@@ -22,7 +22,7 @@ from app.config import (
     _PATH,
     get_config,
 )
-from app.logging.events import Log
+from app.logging.events import ACTOR, Log
 from app.middleware.stats import StatsdMiddleware
 from app.routers.client import router as client_router
 from app.routers.client_certificate import router as client_certificate_router
@@ -45,11 +45,11 @@ def request_validation_exception_handler(
     # Log only where and why validation failed. Both the rejected input and the message may contain request body
     # data: custom validators (e.g. Oin) echo the offending value in their error message.
     errors = [{"loc": e.get("loc"), "type": e.get("type")} for e in exc.errors()]
-    logger.warning(
-        "Request validation failed method=%s path=%s errors=%s",
-        request.method,
-        request.url.path,
-        errors,
+    gflog.emit(
+        logger,
+        Log.REQUEST_REFUSED,
+        "Request validation failed",
+        fields={"error_reason": "validation_failed", "status_code": 422, "validation_errors": errors},
     )
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 
@@ -118,6 +118,7 @@ def setup_logging() -> None:
         config=config.logging,
         loglevel=config.app.loglevel,
         catalogue=Log,
+        extra_context_fields=(ACTOR,),
     )
 
 

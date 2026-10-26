@@ -1,4 +1,7 @@
+import logging
 from uuid import UUID
+
+import gfmodules.logging as gflog
 
 from app import utils
 from app.db.db import Database
@@ -13,7 +16,11 @@ from app.db.repository.contexts.organization_context import (
 )
 from app.db.repository.organization import OrganizationRepository
 from app.exceptions import ConflictError, ForbiddenOperationError, RecordNotFoundError
+from app.logging.audit import source_fields
+from app.logging.events import Log
 from app.models.source import Source, SourceCreate, SourceQueryParams, SourceUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class ClientSourceService:
@@ -85,8 +92,15 @@ class ClientSourceService:
             target_source = org.sources[0]
             client.sources.append(target_source)
             session.commit()
+            assigned = Source.from_entity(target_source)
 
-            return Source.from_entity(target_source)
+        gflog.emit(
+            logger,
+            Log.CLIENT_SOURCE_ASSIGNED,
+            "Source assigned to client",
+            fields={**source_fields(assigned), "client_id": str(client_id)},
+        )
+        return assigned
 
     def unassign_one(self, organization_id: UUID, client_id: UUID, id: UUID) -> Source:
         with self.db.get_db_session() as session:
@@ -114,7 +128,15 @@ class ClientSourceService:
 
             target = client.sources.pop(0)
             session.commit()
-            return Source.from_entity(target)
+            unassigned = Source.from_entity(target)
+
+        gflog.emit(
+            logger,
+            Log.CLIENT_SOURCE_UNASSIGNED,
+            "Source unassigned from client",
+            fields={**source_fields(unassigned), "client_id": str(client_id)},
+        )
+        return unassigned
 
     @staticmethod
     def get_client_sources_from_org(
