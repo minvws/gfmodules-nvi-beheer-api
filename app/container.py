@@ -7,7 +7,8 @@ from app.db.db import Database
 from app.services.certificate import ClientCertificateService, OrganizationCertificateService
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
-from app.services.scopes import ScopeService
+from app.services.scopes.client_scopes import ClientScopesService
+from app.services.scopes.org_scopes import OrganizationScopesService
 from app.services.source.client_source import ClientSourceService
 from app.services.source.organization_source import OrganizationSourceService
 
@@ -21,14 +22,17 @@ def container_config(binder: inject.Binder) -> None:
     db = Database(config_database=config.database)
     binder.bind(Database, db)
 
-    scope_service = ScopeService()
-    binder.bind(ScopeService, scope_service)
-
     organization_service = OrganizationService(db)
     binder.bind(OrganizationService, organization_service)
 
     client_service = ClientService(db)
     binder.bind(ClientService, client_service)
+
+    org_scopes_service = OrganizationScopesService(db)
+    binder.bind(OrganizationScopesService, org_scopes_service)
+
+    client_scopes_service = ClientScopesService(db)
+    binder.bind(ClientScopesService, client_scopes_service)
 
     org_certificate_service = OrganizationCertificateService(db)
     binder.bind(OrganizationCertificateService, org_certificate_service)
@@ -59,8 +63,12 @@ def get_client_service() -> ClientService:
     return inject.instance(ClientService)
 
 
-def get_scope_service() -> ScopeService:
-    return inject.instance(ScopeService)
+def get_org_scopes_service() -> OrganizationScopesService:
+    return inject.instance(OrganizationScopesService)
+
+
+def get_client_scopes_service() -> ClientScopesService:
+    return inject.instance(ClientScopesService)
 
 
 def get_org_certificate_service() -> OrganizationCertificateService:
