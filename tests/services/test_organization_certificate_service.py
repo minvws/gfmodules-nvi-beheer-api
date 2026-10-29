@@ -2,9 +2,10 @@ from uuid import uuid4
 
 import pytest
 
+from app.db.repository.certificate import CertificateRepository
 from app.exceptions import ConflictError, EntityHasActiveMembersError, RecordNotFoundError
 from app.models.certificates import CertificateCreate, CertificateQueryParams, CertificateUpdate
-from app.models.organization import OrganizationCreate
+from app.models.organization import Organization, OrganizationCreate
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.organization import OrganizationService
 from tests.conftest import SECOND_DOMAIN, SECOND_OIN, TEST_DOMAIN, TEST_OIN
@@ -249,3 +250,53 @@ def test_update_one_should_raise_on_id_missmatch(
 
     with pytest.raises(RecordNotFoundError):
         _ = organization_certificate_service.update_one(uuid4(), target.id, update_dto)
+
+
+@pytest.fixture
+def org_with_certificates_on_one_domain(
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+    cert_create_dto_1: CertificateCreate,
+) -> Organization:
+    org_create_dto_1.clients = None
+    org_create_dto_1.certificates = [
+        cert_create_dto_1,
+        CertificateCreate(organization_identifier=SECOND_OIN, domain=TEST_DOMAIN),
+    ]
+    return organization_service.create_one(org_create_dto_1)
+
+
+def test_update_one_should_raise_on_conflict(
+    organization_certificate_service: OrganizationCertificateService,
+    org_with_certificates_on_one_domain: Organization,
+) -> None:
+    org = org_with_certificates_on_one_domain
+    assert org.certificates is not None
+    existing, target = org.certificates
+    update_dto = CertificateUpdate(
+        id=target.id, organization_identifier=existing.organization_identifier, domain=existing.domain
+    )
+
+    with pytest.raises(ConflictError):
+        _ = organization_certificate_service.update_one(target.id, org.id, update_dto)
+
+    assert organization_certificate_service.get_one(target.id, org.id) == target
+
+
+def test_update_one_should_raise_on_conflict_caught_by_database(
+    organization_certificate_service: OrganizationCertificateService,
+    org_with_certificates_on_one_domain: Organization,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    org = org_with_certificates_on_one_domain
+    assert org.certificates is not None
+    existing, target = org.certificates
+    update_dto = CertificateUpdate(
+        id=target.id, organization_identifier=existing.organization_identifier, domain=existing.domain
+    )
+    monkeypatch.setattr(CertificateRepository, "find_many", lambda *_args, **_kwargs: [])
+
+    with pytest.raises(ConflictError):
+        _ = organization_certificate_service.update_one(target.id, org.id, update_dto)
+
+    assert organization_certificate_service.get_one(target.id, org.id) == target

@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import gfmodules.logging as gflog
+from sqlalchemy.exc import IntegrityError
 
 from app.db.db import Database
 from app.db.models.certificate import CertificateEntity
@@ -26,6 +27,7 @@ from app.logging.events import Log
 from app.models.certificates import (
     Certificate,
     CertificateCreate,
+    CertificateField,
     CertificateQueryParams,
     CertificateUpdate,
 )
@@ -81,9 +83,7 @@ class OrganizationCertificateService:
                 else False
             )
             if cert_exists:
-                raise ConflictError(
-                    f"Certificate with organization_identifier: {dto.organization_identifier}, domain: {dto.domain} already exists"
-                )
+                raise self._certificate_conflict(dto)
             new_cert = CertificateEntity(**dto.model_dump())
             if org.certificates:
                 org.certificates.append(new_cert)
@@ -123,13 +123,24 @@ class OrganizationCertificateService:
             if CertificateUpdate.from_entity(target) == dto:
                 return Certificate.from_entity(target)
 
+            if dto.make_unique_key(org.id) != target.unique_key:
+                cert_repo = session.get_repository(CertificateRepository)
+                duplicate_ctx = CertificateQueryContext(
+                    organization_id=org.id, organization_identifier=dto.organization_identifier, domain=dto.domain
+                )
+                if cert_repo.find_many(duplicate_ctx):
+                    raise self._certificate_conflict(dto)
+
             if target.organization_identifier != dto.organization_identifier:
                 target.organization_identifier = dto.organization_identifier
 
             if target.domain != target.domain:
                 target.domain = target.domain
 
-            session.flush()
+            try:
+                session.flush()
+            except IntegrityError:
+                raise self._certificate_conflict(dto)
             updated = Certificate.from_entity(target)
 
         gflog.emit(
@@ -169,6 +180,12 @@ class OrganizationCertificateService:
             fields=certificate_fields(organization_id, deleted),
         )
         return deleted
+
+    @staticmethod
+    def _certificate_conflict(certificate: CertificateField) -> ConflictError:
+        return ConflictError(
+            f"Certificate with organization_identifier: {certificate.organization_identifier}, domain: {certificate.domain} already exists"
+        )
 
     @staticmethod
     def validated_for_delete(cert: CertificateEntity) -> str | None:
