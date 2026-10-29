@@ -1,9 +1,11 @@
 import logging
+from pathlib import Path
 
 import pytest
 from gfmodules.logging import DefaultEventCatalogue, LoggingStreams, declared_events
 from gfmodules.logging.testing import assert_catalogue_complete
 from pytest_mock import MockerFixture
+from gfmodules.logging.testing import assert_catalogue_complete, assert_event_overview_current
 
 from app import application
 from app.config import set_config
@@ -18,6 +20,10 @@ _GIVEN_THE_ACTOR = ("ACCESS_REQUEST", "SYS_UNHANDLED_EXCEPTION")
 def test_the_catalogue_fills_every_required_slot() -> None:
     """A slot left unfilled is invisible to mypy, so this is what catches it."""
     assert_catalogue_complete(Log)
+
+
+def test_the_event_overview_is_current() -> None:
+    assert_event_overview_current(Log, Path(__file__).parents[2] / "app" / "logging" / "events.md")
 
 
 @pytest.mark.parametrize(
