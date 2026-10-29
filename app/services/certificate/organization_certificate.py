@@ -134,8 +134,8 @@ class OrganizationCertificateService:
             if target.organization_identifier != dto.organization_identifier:
                 target.organization_identifier = dto.organization_identifier
 
-            if target.domain != target.domain:
-                target.domain = target.domain
+            if target.domain != dto.domain:
+                target.domain = dto.domain
 
             try:
                 session.flush()

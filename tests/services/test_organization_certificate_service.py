@@ -300,3 +300,21 @@ def test_update_one_should_raise_on_conflict_caught_by_database(
         _ = organization_certificate_service.update_one(target.id, org.id, update_dto)
 
     assert organization_certificate_service.get_one(target.id, org.id) == target
+
+
+def test_update_one_should_update_domain(
+    organization_certificate_service: OrganizationCertificateService,
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.certificates is not None
+    target = org.certificates[0]
+    update_dto = CertificateUpdate(
+        id=target.id, organization_identifier=target.organization_identifier, domain="new.example"
+    )
+
+    updated = organization_certificate_service.update_one(target.id, org.id, update_dto)
+
+    assert updated.domain == "new.example"
+    assert organization_certificate_service.get_one(target.id, org.id) == updated
