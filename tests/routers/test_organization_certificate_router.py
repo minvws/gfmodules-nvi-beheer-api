@@ -54,3 +54,22 @@ def test_update_to_existing_identifier_and_domain_caught_by_database_returns_409
     monkeypatch.setattr(CertificateRepository, "find_many", lambda *_args, **_kwargs: [])
 
     assert_update_conflicts(api, org, target, existing)
+
+
+def test_update_domain_returns_200(api: TestClient, org: Organization) -> None:
+    assert org.certificates is not None
+    target = org.certificates[0]
+    url = f"/organizations/{org.id}/certificate/{target.id}"
+
+    response = api.put(
+        url,
+        json={
+            "id": str(target.id),
+            "organization_identifier": str(target.organization_identifier),
+            "domain": "new.example",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["domain"] == "new.example"
+    assert api.get(url).json()["domain"] == "new.example"
