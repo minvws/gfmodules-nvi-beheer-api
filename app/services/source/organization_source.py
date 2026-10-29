@@ -3,6 +3,7 @@ import logging
 from uuid import UUID
 
 import gfmodules.logging as gflog
+from sqlalchemy.exc import IntegrityError
 
 from app.db.db import Database
 from app.db.models.source import SourceEntity
@@ -66,7 +67,7 @@ class OrganizationSourceService:
                 raise RecordNotFoundError(organization_id)
 
             if org.sources:
-                raise ConflictError(f"Organization {org.id} already has a source {dto.source_id} assigned")
+                raise self._source_conflict(org.id, dto.source_id)
 
             new_source = dto.into_entity(org.id)
             org.sources.append(new_source)
@@ -94,12 +95,18 @@ class OrganizationSourceService:
                 return Source.from_entity(target)
 
             if target.source_id != dto.source_id:
+                source_repo = session.get_repository(SourceRepository)
+                if source_repo.find_many(SourceQueryContext(organization_id=org.id, source_id=dto.source_id)):
+                    raise self._source_conflict(org.id, dto.source_id)
                 target.source_id = dto.source_id
 
             if target.name != dto.name:
                 target.name = dto.name
 
-            session.flush()
+            try:
+                session.flush()
+            except IntegrityError:
+                raise self._source_conflict(org.id, dto.source_id)
             updated = Source.from_entity(target)
 
         gflog.emit(logger, Log.SOURCE_UPDATED, "Source updated", fields=source_fields(updated))
@@ -128,6 +135,10 @@ class OrganizationSourceService:
 
         gflog.emit(logger, Log.SOURCE_DELETED, "Source deleted", fields=source_fields(deleted))
         return deleted
+
+    @staticmethod
+    def _source_conflict(organization_id: UUID, source_id: str) -> ConflictError:
+        return ConflictError(f"Organization {organization_id} already has a source {source_id} assigned")
 
     @staticmethod
     def validate_for_delete(source: SourceEntity) -> str | None:

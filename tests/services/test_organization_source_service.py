@@ -2,6 +2,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.db.repository.source import SourceRepository
 from app.exceptions import ConflictError, EntityHasActiveMembersError, RecordNotFoundError
 from app.models.organization import OrganizationCreate
 from app.models.source import SourceCreate, SourceQueryParams, SourceUpdate
@@ -177,6 +178,40 @@ def test_update_one_should_raise_on_id_mismatch(
 
     with pytest.raises(RecordNotFoundError):
         _ = organization_source_service.update_one(uuid4(), target.id, dto)
+
+
+def test_update_one_should_raise_on_conflict(
+    organization_source_service: OrganizationSourceService,
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.sources is not None
+    existing, target = org.sources
+    dto = SourceUpdate(id=target.id, source_id=existing.source_id, name=target.name)
+
+    with pytest.raises(ConflictError):
+        _ = organization_source_service.update_one(org.id, target.id, dto)
+
+    assert organization_source_service.get_one(org.id, target.id) == target
+
+
+def test_update_one_should_raise_on_conflict_caught_by_database(
+    organization_source_service: OrganizationSourceService,
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    org = organization_service.create_one(org_create_dto_1)
+    assert org.sources is not None
+    existing, target = org.sources
+    dto = SourceUpdate(id=target.id, source_id=existing.source_id, name=target.name)
+    monkeypatch.setattr(SourceRepository, "find_many", lambda *_args, **_kwargs: [])
+
+    with pytest.raises(ConflictError):
+        _ = organization_source_service.update_one(org.id, target.id, dto)
+
+    assert organization_source_service.get_one(org.id, target.id) == target
 
 
 def test_delete_one_should_succeed(

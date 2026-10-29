@@ -13,7 +13,7 @@ from pydantic import SecretStr
 from sqlalchemy import text
 
 from app.config import ConfigDatabase
-from app.container import get_client_service, get_organization_service
+from app.container import get_client_service, get_organization_service, get_organization_source_service
 from app.db.db import Database
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
@@ -35,6 +35,7 @@ from app.models.ura import UraNumber
 from app.routers.client import router as client_router
 from app.routers.errors import install_domain_error_handler
 from app.routers.organization import router as organization_router
+from app.routers.organization_source import router as organization_source_router
 from app.routers.resolve import router as resolve_router
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.certificate.organization_certificate import OrganizationCertificateService
@@ -259,14 +260,18 @@ def mock_organization_service() -> MagicMock:
     return service
 
 
-@pytest.fixture()
+@pytest.fixture
 def api(
-    mock_client_service: MagicMock, organization_service: OrganizationService, client_service: ClientService
+    mock_client_service: MagicMock,
+    organization_service: OrganizationService,
+    client_service: ClientService,
+    organization_source_service: OrganizationSourceService,
 ) -> TestClient:
     app = FastAPI()
     install_domain_error_handler(app)
-    for router in (organization_router, client_router, resolve_router):
+    for router in (organization_router, client_router, organization_source_router, resolve_router):
         app.include_router(router)
     app.dependency_overrides[get_client_service] = lambda: client_service
     app.dependency_overrides[get_organization_service] = lambda: organization_service
+    app.dependency_overrides[get_organization_source_service] = lambda: organization_source_service
     return TestClient(app)
