@@ -33,7 +33,7 @@ from app.models.client import (
 )
 from app.models.scopes import AuthorizationScope
 from app.services.certificate import ClientCertificateService
-from app.services.scopes import ScopeService
+from app.services.scopes.utils import ScopeUtils
 from app.services.source.client_source import ClientSourceService
 
 logger = logging.getLogger(__name__)
@@ -57,8 +57,8 @@ class ClientService:
 
             target = ClientEntity(name=dto.name, description=dto.description, organization_id=organization_id)
             if dto.scopes:
-                ScopeService.assert_scopes_granted(org, dto.scopes)
-                target_scope = ScopeService.make_client_scope_from_org(org, target, dto.scopes)
+                ScopeUtils.assert_scopes_granted(org, dto.scopes)
+                target_scope = ScopeUtils.make_client_scope_from_org(org, target, dto.scopes)
                 target.scopes = target_scope
 
             if dto.certificates:
@@ -146,8 +146,8 @@ class ClientService:
                 client.description = dto.description
 
             if dto.scopes:
-                ScopeService.assert_scopes_granted(org, dto.scopes)
-                updated_scopes = ScopeService.make_client_scope_from_org(org, client, dto.scopes)
+                ScopeUtils.assert_scopes_granted(org, dto.scopes)
+                updated_scopes = ScopeUtils.make_client_scope_from_org(org, client, dto.scopes)
                 client.scopes = updated_scopes
             else:
                 client.scopes = []
@@ -216,7 +216,8 @@ class ClientService:
 
             scope_names = {s.name for s in client.scopes}
             if request.source_id is None:
-                scope_names &= SOURCE_INDEPENDENT_SCOPES  # keeps only the elements present in both sets
+                # keeps only the elements present in both sets
+                scope_names &= SOURCE_INDEPENDENT_SCOPES
 
             response = ClientResolveResponse(
                 scopes=" ".join(sorted(scope_names)),
