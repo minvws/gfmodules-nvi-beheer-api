@@ -6,6 +6,7 @@ from app.db.models.base import Base
 organizations_scopes_association = Table(
     "organizations_scopes",
     Base.metadata,
-    Column("organization_id", Uuid, ForeignKey("organizations.id"), primary_key=True),
-    Column("scope_id", Integer, ForeignKey("scopes.id"), primary_key=True),
+    Column("organization_id", Uuid, ForeignKey("admin.organizations.id"), primary_key=True),
+    Column("scope_id", Integer, ForeignKey("admin.scopes.id"), primary_key=True),
+    schema="admin",
 )

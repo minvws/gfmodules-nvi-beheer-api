@@ -27,11 +27,12 @@ class CertificateEntity(CommonColumns):
             sqlite_where=text("deleted_at IS NULL"),
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        {"schema": "admin"},
     )
 
     organization_identifier: Mapped[Oin] = mapped_column(OinType)
     domain: Mapped[str] = mapped_column(String)
-    organization_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("organizations.id"))
+    organization_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("admin.organizations.id"))
 
     organization: Mapped["OrganizationEntity"] = relationship(back_populates="certificates", lazy="raise")
     clients: Mapped[list["ClientEntity"]] = relationship(

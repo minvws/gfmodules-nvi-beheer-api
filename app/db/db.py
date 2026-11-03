@@ -27,6 +27,9 @@ class Database:
                     },  # This + static pool is needed for sqlite in-memory tables
                     poolclass=StaticPool,
                 )
+                with self.engine.connect() as conn:
+                    # Postgres schemas are emulated with attached databases
+                    conn.execute(text("ATTACH DATABASE ':memory:' AS admin"))
             else:
                 self.engine = create_engine(
                     dsn,

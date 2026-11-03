@@ -31,6 +31,7 @@ class OrganizationEntity(CommonColumns):
             sqlite_where=text("deleted_at IS NULL"),
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        {"schema": "admin"},
     )
     external_id: Mapped[UraNumber] = mapped_column("external_id", UraType)
     name: Mapped[str] = mapped_column("name", String)

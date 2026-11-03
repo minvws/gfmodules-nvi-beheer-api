@@ -97,7 +97,7 @@ def database() -> Generator[Database, Any, None]:
     db = Database(config_database=config_database)
     db.generate_tables()
     # setup system scopes
-    stmt = text("INSERT INTO scopes (name) VALUES ('CREATE'), ('DELETE'),('READ'),('LOCALIZE');")
+    stmt = text("INSERT INTO admin.scopes (name) VALUES ('CREATE'), ('DELETE'),('READ'),('LOCALIZE');")
     with db.get_db_session() as session:
         session.session.execute(stmt)
         session.commit()
