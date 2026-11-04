@@ -14,7 +14,9 @@ from sqlalchemy import text
 
 from app.config import ConfigDatabase
 from app.container import (
+    get_client_certificate_service,
     get_client_service,
+    get_client_source_service,
     get_org_certificate_service,
     get_organization_service,
     get_organization_source_service,
@@ -38,6 +40,8 @@ from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.models.ura import UraNumber
 from app.routers.client import router as client_router
+from app.routers.client_certificate import router as client_certificate_router
+from app.routers.client_source import router as client_source_router
 from app.routers.errors import install_domain_error_handler
 from app.routers.organization import router as organization_router
 from app.routers.organization_certificate import router as organization_certificate_router
@@ -273,6 +277,8 @@ def api(
     client_service: ClientService,
     organization_certificate_service: OrganizationCertificateService,
     organization_source_service: OrganizationSourceService,
+    client_certificate_service: ClientCertificateService,
+    client_source_service: ClientSourceService,
 ) -> TestClient:
     app = FastAPI()
     install_domain_error_handler(app)
@@ -281,6 +287,8 @@ def api(
         client_router,
         organization_certificate_router,
         organization_source_router,
+        client_certificate_router,
+        client_source_router,
         resolve_router,
     ):
         app.include_router(router)
@@ -288,4 +296,6 @@ def api(
     app.dependency_overrides[get_organization_service] = lambda: organization_service
     app.dependency_overrides[get_org_certificate_service] = lambda: organization_certificate_service
     app.dependency_overrides[get_organization_source_service] = lambda: organization_source_service
+    app.dependency_overrides[get_client_certificate_service] = lambda: client_certificate_service
+    app.dependency_overrides[get_client_source_service] = lambda: client_source_service
     return TestClient(app)
