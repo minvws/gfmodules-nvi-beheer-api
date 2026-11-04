@@ -95,7 +95,7 @@ def logging_catalogue() -> Generator[None, Any, None]:
         reset_for_tests()
 
 
-@pytest.fixture()
+@pytest.fixture
 def database() -> Generator[Database, Any, None]:
     config_database = ConfigDatabase(dsn=SecretStr("sqlite:///:memory:"), retry_backoff=[])
     db = Database(config_database=config_database)
@@ -113,104 +113,104 @@ def database() -> Generator[Database, Any, None]:
     db.engine.dispose()
 
 
-@pytest.fixture()
+@pytest.fixture
 def scope_repository(database: Database) -> ScopeRepository:
     return ScopeRepository(db_session=database.get_db_session())
 
 
-@pytest.fixture()
+@pytest.fixture
 def organization_repository(database: Database) -> OrganizationRepository:
     return OrganizationRepository(db_session=database.get_db_session())
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_repository(database: Database) -> ClientRepository:
     return ClientRepository(db_session=database.get_db_session())
 
 
-@pytest.fixture()
+@pytest.fixture
 def certificate_repository(database: Database) -> CertificateRepository:
     return CertificateRepository(db_session=database.get_db_session())
 
 
-@pytest.fixture()
+@pytest.fixture
 def source_repository(database: Database) -> SourceRepository:
     return SourceRepository(db_session=database.get_db_session())
 
 
-@pytest.fixture()
+@pytest.fixture
 def organization_service(database: Database) -> OrganizationService:
     return OrganizationService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_service(
     database: Database,
 ) -> ClientService:
     return ClientService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def organization_certificate_service(database: Database) -> OrganizationCertificateService:
     return OrganizationCertificateService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_certificate_service(database: Database) -> ClientCertificateService:
     return ClientCertificateService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def organization_source_service(database: Database) -> OrganizationSourceService:
     return OrganizationSourceService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_source_service(database: Database) -> ClientSourceService:
     return ClientSourceService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def organization_entity() -> OrganizationEntity:
     return OrganizationEntity(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_entity() -> ClientEntity:
     return ClientEntity(name=TEST_CLIENT_NAME, description="Test description")
 
 
-@pytest.fixture()
+@pytest.fixture
 def certificate_entity() -> CertificateEntity:
     return CertificateEntity(organization_identifier=TEST_OIN, domain="example.com")
 
 
-@pytest.fixture()
+@pytest.fixture
 def source_entity() -> SourceEntity:
     return SourceEntity(source_id=TEST_SOURCE_ID, name="Source Example")
 
 
-@pytest.fixture()
+@pytest.fixture
 def cert_create_dto_1() -> CertificateCreate:
     return CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)
 
 
-@pytest.fixture()
+@pytest.fixture
 def cert_create_dto_2() -> CertificateCreate:
     return CertificateCreate(organization_identifier=SECOND_OIN, domain=SECOND_DOMAIN)
 
 
-@pytest.fixture()
+@pytest.fixture
 def source_create_dto_1() -> SourceCreate:
     return SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)
 
 
-@pytest.fixture()
+@pytest.fixture
 def source_create_dto_2() -> SourceCreate:
     return SourceCreate(source_id=SECOND_SOURCE_ID, name=SECOND_SOURCE_NAME)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_create_dto_1(
     cert_create_dto_1: CertificateCreate, source_create_dto_1: SourceCreate, source_create_dto_2: SourceCreate
 ) -> ClientCreate:
@@ -222,7 +222,7 @@ def client_create_dto_1(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def org_create_dto_1(
     cert_create_dto_1: CertificateCreate,
     cert_create_dto_2: CertificateCreate,
@@ -240,7 +240,7 @@ def org_create_dto_1(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def org_create_dto_2() -> OrganizationCreate:
     return OrganizationCreate(
         external_id=SECOND_EXTERNAL_ID,
@@ -258,12 +258,12 @@ def org_create_dto_2() -> OrganizationCreate:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_client_service() -> MagicMock:
     return MagicMock(spec=ClientService)
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_organization_service() -> MagicMock:
     service = MagicMock(spec=OrganizationService)
     service.exists.return_value = True

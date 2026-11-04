@@ -36,8 +36,8 @@ class Database:
                     pool_size=config_database.pool_size,
                     max_overflow=config_database.max_overflow,
                 )
-        except BaseException as e:
-            logger.error("Error while connecting to database: %s", e)
+        except BaseException:
+            logger.exception("Error while connecting to database")
             raise
 
     def generate_tables(self) -> None:

@@ -14,7 +14,7 @@ from tests.test_config import get_test_config
 VERSION_JSON_CONTENT = '{"version": "v0.0.0", "git_ref": "0000000000000000000000000"}'
 
 
-@pytest.fixture()
+@pytest.fixture
 def client() -> TestClient:
     set_config(get_test_config())
     app = FastAPI()

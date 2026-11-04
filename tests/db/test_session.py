@@ -66,7 +66,7 @@ def _failing(*errors: Exception) -> Callable[..., Any]:
     return call
 
 
-@pytest.fixture()
+@pytest.fixture
 def retrying_database() -> Generator[Database, None, None]:
     """A database with a non-empty backoff, so the retry loop is actually exercised."""
     database = Database(config_database=ConfigDatabase(dsn=SecretStr("sqlite:///:memory:"), retry_backoff=[0.01, 0.01]))
