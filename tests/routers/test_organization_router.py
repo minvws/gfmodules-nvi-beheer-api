@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -5,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.models.client import ClientCreate
 from app.models.oin import Oin
-from app.models.organization import OrganizationCreate
+from app.models.organization import Organization, OrganizationCreate
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.services.organization import OrganizationService
@@ -453,14 +454,113 @@ def test_get_many_returns_list(
     assert len(response.json()) == 2
 
 
+@pytest.fixture
+def two_orgs(
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+    org_create_dto_2: OrganizationCreate,
+) -> tuple[Organization, Organization]:
+    """Two organizations that differ on every filterable field (see org_create_dto_1/2 in conftest).
+
+    first:  all scopes; certs (TEST_OIN, TEST_DOMAIN) + (SECOND_OIN, SECOND_DOMAIN); sources source-001/002;
+            client "Test Client" (nvi:create, nvi:read) with cert TEST_OIN and both sources
+    second: nvi:create + nvi:localize; cert (SECOND_OIN, SECOND_DOMAIN); source source-3;
+            client "Test Client 2" (nvi:localize) with source source-3 and no certificates
+    """
+    return organization_service.create_one(org_create_dto_1), organization_service.create_one(org_create_dto_2)
+
+
+def org_ids(response_json: list[dict[str, Any]]) -> list[str]:
+    return sorted(o["id"] for o in response_json)
+
+
 @pytest.mark.parametrize(
-    "query",
-    [f"external_id={TEST_EXTERNAL_ID!s}", "name=Acme", "scopes=nvi:read&scopes=nvi:create", "include_deleted=true"],
+    "query, expected",
+    [
+        ("", ["first", "second"]),
+        (f"external_id={TEST_EXTERNAL_ID!s}", ["first"]),
+        (f"external_id={SECOND_EXTERNAL_ID!s}", ["second"]),
+        (f"name={TEST_ORG_NAME}", ["first"]),
+        ("name=Unknown", []),
+        ("scopes=nvi:read", ["first"]),
+        ("scopes=nvi:localize", ["first", "second"]),
+        ("scopes=nvi:read&scopes=nvi:localize", ["first", "second"]),
+        (f"cert_identifier={TEST_OIN!s}", ["first"]),
+        (f"cert_identifier={SECOND_OIN!s}", ["first", "second"]),
+        (f"cert_domain={SECOND_DOMAIN}", ["first", "second"]),
+        # identifier and domain must match on the same certificate
+        (f"cert_identifier={TEST_OIN!s}&cert_domain={SECOND_DOMAIN}", []),
+        ("source_id=source-3", ["second"]),
+        (f"source_name={TEST_SOURCE_NAME}", ["first"]),
+        (f"client_name={TEST_CLIENT_NAME}", ["first"]),
+        ("client_name=Test Client 2", ["second"]),
+        ("client_scopes=nvi:read", ["first"]),
+        ("client_scopes=nvi:localize", ["second"]),
+        (f"client_cert_identifier={TEST_OIN!s}", ["first"]),
+        # SECOND_DOMAIN belongs to both organizations, but no client has it assigned
+        (f"client_cert_domain={SECOND_DOMAIN}", []),
+        ("client_source_id=source-3", ["second"]),
+        (f"client_source_name={SECOND_SOURCE_NAME}", ["first"]),
+        (f"name={TEST_ORG_NAME}&source_id=source-3", []),
+        (f"name={SECOND_ORG_NAME}&source_id=source-3", ["second"]),
+    ],
 )
-def test_get_many_passes_query_params(api: TestClient, query: str) -> None:
-    resp = api.get(f"/organizations?{query}")
-    assert resp.status_code == 200
-    assert resp.json() == []
+def test_get_many_applies_query_params(
+    api: TestClient, two_orgs: tuple[Organization, Organization], query: str, expected: list[str]
+) -> None:
+    first, second = two_orgs
+    by_label = {"first": str(first.id), "second": str(second.id)}
+
+    response = api.get(f"/organizations?{query}")
+
+    assert response.status_code == 200
+    assert org_ids(response.json()) == sorted(by_label[label] for label in expected)
+
+
+def test_get_many_filters_on_cert_id(api: TestClient, two_orgs: tuple[Organization, Organization]) -> None:
+    _, second = two_orgs
+    assert second.certificates is not None
+
+    response = api.get(f"/organizations?cert_id={second.certificates[0].id}")
+
+    assert response.status_code == 200
+    assert org_ids(response.json()) == [str(second.id)]
+
+
+def test_get_many_hides_soft_deleted_organizations(
+    api: TestClient, two_orgs: tuple[Organization, Organization]
+) -> None:
+    first, second = two_orgs
+    deleted = api.post("/organizations", json={"external_id": "11223344", "name": "Deleted Org"}).json()
+    assert api.delete(f"/organizations/{deleted['id']}").status_code == 204
+    active = sorted([str(first.id), str(second.id)])
+
+    assert org_ids(api.get("/organizations").json()) == active
+    assert org_ids(api.get("/organizations?include_deleted=false").json()) == active
+    assert org_ids(api.get("/organizations?include_deleted=true").json()) == sorted([*active, deleted["id"]])
+    assert api.get("/organizations?name=Deleted Org").json() == []
+    assert org_ids(api.get("/organizations?name=Deleted Org&include_deleted=true").json()) == [deleted["id"]]
+
+
+def test_get_many_ignores_soft_deleted_certificates_when_filtering(
+    api: TestClient, two_orgs: tuple[Organization, Organization]
+) -> None:
+    first, second = two_orgs
+    assert second.certificates is not None
+    cert = second.certificates[0]
+    assert api.delete(f"/organizations/{second.id}/certificate/{cert.id}").status_code == 200
+    query = f"/organizations?cert_identifier={SECOND_OIN!s}"
+
+    assert org_ids(api.get(query).json()) == [str(first.id)]
+    assert org_ids(api.get(f"{query}&include_deleted=true").json()) == sorted([str(first.id), str(second.id)])
+    listed_second = next(o for o in api.get("/organizations").json() if o["id"] == str(second.id))
+    assert "certificates" not in listed_second
+
+
+def test_get_many_unknown_query_param_returns_422(api: TestClient) -> None:
+    response = api.get("/organizations?unknown=value")
+
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize("value", ["maybe", "2", "-1"])
