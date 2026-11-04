@@ -13,8 +13,10 @@ from app.db.models.organization import OrganizationEntity
 from app.db.models.source import SourceEntity
 from app.db.repository.base import RepositoryBase
 from app.db.repository.contexts.organization_context import (
+    OrganizationClientQueryContext,
     OrganizationQueryContext,
 )
+from app.db.repository.filters import HasConditions, any_matching, conditions_of, narrowed, not_deleted
 from app.models.ura import UraNumber
 
 
@@ -79,82 +81,25 @@ class OrganizationRepository(RepositoryBase):
         """
         Will automatically load children once a parameter is present.
         """
-        stmt = select(OrganizationEntity)
-
         options = [selectinload(OrganizationEntity.scopes)]
-
-        root_filters = ctx.get_conditions()
-        if include_deleted is False:
-            root_filters.append(OrganizationEntity.deleted_at.is_(None))
-
-        if root_filters:
-            stmt = stmt.where(*root_filters)
-
         if ctx.certificate_ctx:
-            cert_attr: Any = OrganizationEntity.certificates
-            crt_ctx = ctx.certificate_ctx
-            crt_filters = crt_ctx.get_conditions()
-
-            if include_deleted is False:
-                crt_filters.append(CertificateEntity.deleted_at.is_(None))
-
-            if crt_filters:
-                cert_attr = cert_attr.and_(*crt_filters)
-
-            options.append(selectinload(cert_attr))
+            certificates = self._narrowed(
+                OrganizationEntity.certificates, ctx.certificate_ctx, CertificateEntity, include_deleted
+            )
+            options.append(selectinload(certificates))
 
         if ctx.source_ctx:
-            src_attr: Any = OrganizationEntity.sources
-            src_ctx = ctx.source_ctx
-
-            src_filters = src_ctx.get_conditions()
-            if include_deleted is False:
-                src_filters.append(SourceEntity.deleted_at.is_(None))
-
-            if src_filters:
-                src_attr = src_attr.and_(*src_filters)
-
-            options.append(selectinload(src_attr))
+            sources = self._narrowed(OrganizationEntity.sources, ctx.source_ctx, SourceEntity, include_deleted)
+            options.append(selectinload(sources))
 
         if ctx.client_ctx:
-            client_attr: Any = OrganizationEntity.clients
-            client_ctx = ctx.client_ctx
+            options.extend(self._client_loader_options(ctx.client_ctx, include_deleted))
 
-            client_filters = client_ctx.get_conditions()
-            if include_deleted is False:
-                client_filters.append(ClientEntity.deleted_at.is_(None))
-
-            if client_filters:
-                client_attr = client_attr.and_(*client_filters)
-
-            options.append(selectinload(client_attr).selectinload(ClientEntity.scopes))
-
-            if client_ctx.certificate_ctx:
-                client_crt_ctx = client_ctx.certificate_ctx
-                client_crt_attr: Any = ClientEntity.certificates
-
-                client_crt_filters = client_crt_ctx.get_conditions()
-                if include_deleted is False:
-                    client_crt_filters.append(CertificateEntity.deleted_at.is_(None))
-
-                if client_crt_filters:
-                    client_crt_attr = client_crt_attr.and_(*client_crt_filters)
-
-                options.append(selectinload(client_attr).selectinload(client_crt_attr))
-
-            if client_ctx.source_ctx:
-                client_src_ctx = client_ctx.source_ctx
-                client_src_attr: Any = ClientEntity.sources
-                client_src_filters = client_src_ctx.get_conditions()
-
-                if client_src_filters:
-                    if include_deleted is False:
-                        client_src_filters.append(SourceEntity.deleted_at.is_(None))
-                    client_src_attr = client_src_attr.and_(*client_src_filters)
-
-                options.append(selectinload(client_attr).selectinload(client_src_attr))
-
-        stmt = stmt.options(*options)
+        stmt = (
+            select(OrganizationEntity)
+            .where(*ctx.get_conditions(), *not_deleted(OrganizationEntity, include_deleted))
+            .options(*options)
+        )
         return self.db_session.execute(stmt).unique().scalar_one_or_none()
 
     def find_many(
@@ -162,86 +107,72 @@ class OrganizationRepository(RepositoryBase):
         ctx: OrganizationQueryContext,
         include_deleted: bool = False,
     ) -> Sequence[OrganizationEntity]:
-        stmt = select(OrganizationEntity)
-        crt_attr = (
-            OrganizationEntity.certificates
-            if include_deleted
-            else OrganizationEntity.certificates.and_(CertificateEntity.deleted_at.is_(None))
+        stmt = (
+            select(OrganizationEntity)
+            .options(*self._list_loader_options(include_deleted))
+            .where(
+                *ctx.get_conditions(),
+                *not_deleted(OrganizationEntity, include_deleted),
+                *any_matching(
+                    OrganizationEntity.certificates,
+                    conditions_of(ctx.certificate_ctx),
+                    CertificateEntity,
+                    include_deleted,
+                ),
+                *any_matching(OrganizationEntity.sources, conditions_of(ctx.source_ctx), SourceEntity, include_deleted),
+                *self._client_filter(ctx.client_ctx, include_deleted),
+            )
         )
-        src_attr = (
-            OrganizationEntity.sources
-            if include_deleted
-            else OrganizationEntity.sources.and_(SourceEntity.deleted_at.is_(None))
-        )
-        client_attr = (
-            OrganizationEntity.clients
-            if include_deleted
-            else OrganizationEntity.clients.and_(ClientEntity.deleted_at.is_(None))
-        )
-
-        stmt = stmt.options(
-            selectinload(OrganizationEntity.scopes),
-            selectinload(crt_attr),
-            selectinload(src_attr),
-            selectinload(client_attr).selectinload(ClientEntity.scopes),
-            selectinload(client_attr).selectinload(
-                ClientEntity.certificates.and_(CertificateEntity.deleted_at.is_(None))
-                if include_deleted is False
-                else ClientEntity.certificates
-            ),
-            selectinload(client_attr).selectinload(
-                ClientEntity.sources.and_(SourceEntity.deleted_at.is_(None))
-                if include_deleted is False
-                else ClientEntity.sources
-            ),
-        )
-
-        root_filter = ctx.get_conditions()
-        if include_deleted is False:
-            root_filter.append(OrganizationEntity.deleted_at.is_(None))
-
-        if root_filter:
-            stmt = stmt.where(*root_filter)
-
-        if ctx.certificate_ctx:
-            crt_ctx = ctx.certificate_ctx
-            crt_filters = crt_ctx.get_conditions()
-            if crt_filters:
-                if include_deleted is False:
-                    crt_filters.append(CertificateEntity.deleted_at.is_(None))
-                stmt = stmt.where(OrganizationEntity.certificates.any(and_(*crt_filters)))
-
-        if ctx.source_ctx:
-            src_ctx = ctx.source_ctx
-            src_filters = src_ctx.get_conditions()
-            if src_filters:
-                if include_deleted is False:
-                    src_filters.append(SourceEntity.deleted_at.is_(None))
-                stmt = stmt.where(OrganizationEntity.sources.any(and_(*src_filters)))
-
-        if ctx.client_ctx:
-            client_ctx = ctx.client_ctx
-            client_filters = client_ctx.get_conditions()
-
-            if client_ctx.certificate_ctx:
-                client_crt_ctx = client_ctx.certificate_ctx
-                client_crt_filters = client_crt_ctx.get_conditions()
-                if client_crt_filters:
-                    if include_deleted is False:
-                        client_crt_filters.append(CertificateEntity.deleted_at.is_(None))
-                    client_filters.append(ClientEntity.certificates.any(and_(*client_crt_filters)))
-
-            if client_ctx.source_ctx:
-                client_src_ctx = client_ctx.source_ctx
-                client_src_filters = client_src_ctx.get_conditions()
-                if client_src_filters:
-                    if include_deleted is False:
-                        client_src_filters.append(SourceEntity.deleted_at.is_(None))
-                    client_filters.append(ClientEntity.sources.any(and_(*client_src_filters)))
-
-            if client_filters:
-                if include_deleted is False:
-                    client_filters.append(ClientEntity.deleted_at.is_(None))
-                stmt = stmt.where(OrganizationEntity.clients.any(and_(*client_filters)))
-
         return self.db_session.execute(stmt).scalars().unique().all()
+
+    @staticmethod
+    def _narrowed(relationship: Any, ctx: HasConditions, entity: Any, include_deleted: bool) -> Any:
+        return narrowed(relationship, [*ctx.get_conditions(), *not_deleted(entity, include_deleted)])
+
+    def _client_loader_options(self, client_ctx: OrganizationClientQueryContext, include_deleted: bool) -> list[Any]:
+        clients = self._narrowed(OrganizationEntity.clients, client_ctx, ClientEntity, include_deleted)
+        options = [selectinload(clients).selectinload(ClientEntity.scopes)]
+
+        if client_ctx.certificate_ctx:
+            certificates = self._narrowed(
+                ClientEntity.certificates, client_ctx.certificate_ctx, CertificateEntity, include_deleted
+            )
+            options.append(selectinload(clients).selectinload(certificates))
+
+        if client_ctx.source_ctx:
+            sources = self._narrowed(ClientEntity.sources, client_ctx.source_ctx, SourceEntity, include_deleted)
+            options.append(selectinload(clients).selectinload(sources))
+
+        return options
+
+    @staticmethod
+    def _list_loader_options(include_deleted: bool) -> list[Any]:
+        clients = narrowed(OrganizationEntity.clients, not_deleted(ClientEntity, include_deleted))
+        return [
+            selectinload(OrganizationEntity.scopes),
+            selectinload(narrowed(OrganizationEntity.certificates, not_deleted(CertificateEntity, include_deleted))),
+            selectinload(narrowed(OrganizationEntity.sources, not_deleted(SourceEntity, include_deleted))),
+            selectinload(clients).selectinload(ClientEntity.scopes),
+            selectinload(clients).selectinload(
+                narrowed(ClientEntity.certificates, not_deleted(CertificateEntity, include_deleted))
+            ),
+            selectinload(clients).selectinload(
+                narrowed(ClientEntity.sources, not_deleted(SourceEntity, include_deleted))
+            ),
+        ]
+
+    @staticmethod
+    def _client_filter(client_ctx: OrganizationClientQueryContext | None, include_deleted: bool) -> list[Any]:
+        if client_ctx is None:
+            return []
+        client_conditions = [
+            *client_ctx.get_conditions(),
+            *any_matching(
+                ClientEntity.certificates,
+                conditions_of(client_ctx.certificate_ctx),
+                CertificateEntity,
+                include_deleted,
+            ),
+            *any_matching(ClientEntity.sources, conditions_of(client_ctx.source_ctx), SourceEntity, include_deleted),
+        ]
+        return any_matching(OrganizationEntity.clients, client_conditions, ClientEntity, include_deleted)
