@@ -73,15 +73,18 @@ def write_config(tmp_path: Path, database_section: str) -> str:
 
 
 def load_invalid_config(tmp_path: Path, database_section: str) -> ConfigError:
+    path = write_config(tmp_path, database_section)
     with pytest.raises(ConfigError) as exc_info:
-        get_config(write_config(tmp_path, database_section))
+        get_config(path)
     return exc_info.value
 
 
 def test_pydantic_error_for_misspelled_dsn_contains_the_secret(tmp_path: Path) -> None:
     """Precondition for the tests below: without sanitizing, the misspelled key's value (the DSN) is in the error."""
+    ini_data = read_ini_file(write_config(tmp_path, LEAKY_DATABASE_SECTION))
+
     with pytest.raises(ValidationError) as exc_info:
-        Config.model_validate(read_ini_file(write_config(tmp_path, LEAKY_DATABASE_SECTION)))
+        Config.model_validate(ini_data)
 
     assert SECRET in str(exc_info.value)
 
