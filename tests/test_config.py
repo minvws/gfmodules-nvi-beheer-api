@@ -1,14 +1,23 @@
-from pydantic import SecretStr
+import traceback
+from collections.abc import Generator
+from pathlib import Path
+
+import pytest
+from pydantic import SecretStr, ValidationError
 
 from app.config import (
     Config,
     ConfigApp,
     ConfigDatabase,
+    ConfigError,
     ConfigLogging,
     ConfigStats,
     ConfigTelemetry,
     ConfigUvicorn,
     LogLevel,
+    get_config,
+    read_ini_file,
+    reset_config,
 )
 
 
@@ -43,3 +52,59 @@ def get_test_config() -> Config:
             ssl_key_file="/file.key",
         ),
     )
+
+
+# Kept short: pydantic shortens long values in its messages, which would hide the leak these tests guard against.
+SECRET = "hunter2"
+LEAKY_DATABASE_SECTION = f"dns = postgresql://u:{SECRET}@db/n"
+
+
+@pytest.fixture
+def uncached_config() -> Generator[None, None, None]:
+    reset_config()
+    yield
+    reset_config()
+
+
+def write_config(tmp_path: Path, database_section: str) -> str:
+    path = tmp_path / "app.conf"
+    path.write_text(f"[database]\n{database_section}\n")
+    return str(path)
+
+
+def load_invalid_config(tmp_path: Path, database_section: str) -> ConfigError:
+    with pytest.raises(ConfigError) as exc_info:
+        get_config(write_config(tmp_path, database_section))
+    return exc_info.value
+
+
+def test_pydantic_error_for_misspelled_dsn_contains_the_secret(tmp_path: Path) -> None:
+    """Precondition for the tests below: without sanitizing, the misspelled key's value (the DSN) is in the error."""
+    with pytest.raises(ValidationError) as exc_info:
+        Config.model_validate(read_ini_file(write_config(tmp_path, LEAKY_DATABASE_SECTION)))
+
+    assert SECRET in str(exc_info.value)
+
+
+@pytest.mark.usefixtures("uncached_config")
+def test_invalid_config_error_never_contains_values(tmp_path: Path) -> None:
+    error = load_invalid_config(tmp_path, LEAKY_DATABASE_SECTION)
+
+    assert "database.dsn: Field required" in str(error)
+    assert SECRET not in "".join(traceback.format_exception(error))
+
+
+@pytest.mark.usefixtures("uncached_config")
+def test_invalid_config_error_names_field_and_reason(tmp_path: Path) -> None:
+    error = load_invalid_config(tmp_path, f"dsn = postgresql://u:{SECRET}@db/n\npool_size = lots")
+
+    assert "database.pool_size: Input should be a valid integer" in str(error)
+    assert "lots" not in str(error)
+
+
+@pytest.mark.usefixtures("uncached_config")
+def test_invalid_config_error_lists_every_failing_field(tmp_path: Path) -> None:
+    error = load_invalid_config(tmp_path, LEAKY_DATABASE_SECTION)
+
+    for field in ("app", "database.dsn", "telemetry", "stats", "uvicorn"):
+        assert f"{field}: Field required" in str(error)
