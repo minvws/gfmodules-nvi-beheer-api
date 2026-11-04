@@ -21,16 +21,17 @@ if TYPE_CHECKING:
 
 class ClientEntity(CommonColumns):
     __tablename__ = "clients"
+    __table_args__ = ({"schema": "admin"},)
 
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str | None] = mapped_column(String)
-    organization_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("organizations.id"))
+    organization_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("admin.organizations.id"))
 
     organization: Mapped[OrganizationEntity] = relationship(back_populates="clients", lazy="raise")
     scopes: Mapped[list[ScopeEntity]] = relationship(
         secondary=clients_scopes_association,
-        primaryjoin="and_(ClientEntity.id == clients_scopes.c.client_id, ClientEntity.organization_id == clients_scopes.c.organization_id)",
-        secondaryjoin="ScopeEntity.id == clients_scopes.c.scope_id",
+        primaryjoin="and_(ClientEntity.id == admin.clients_scopes.c.client_id, ClientEntity.organization_id == admin.clients_scopes.c.organization_id)",
+        secondaryjoin="ScopeEntity.id == admin.clients_scopes.c.scope_id",
     )
     certificates: Mapped[list[CertificateEntity]] = relationship(
         back_populates="clients", secondary=clients_certificates_association, lazy="raise"

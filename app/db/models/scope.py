@@ -9,6 +9,7 @@ from app.models.scopes import AuthorizationScope
 
 class ScopeEntity(Base):
     __tablename__ = "scopes"
+    __table_args__ = ({"schema": "admin"},)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[AuthorizationScope] = mapped_column(Enum(AuthorizationScope))

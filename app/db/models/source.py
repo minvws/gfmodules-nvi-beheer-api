@@ -24,11 +24,12 @@ class SourceEntity(CommonColumns):
             sqlite_where=text("deleted_at IS NULL"),
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        {"schema": "admin"},
     )
 
     source_id: Mapped[str] = mapped_column(String)
     name: Mapped[str] = mapped_column(String)
-    organization_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("organizations.id"))
+    organization_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("admin.organizations.id"))
 
     organization: Mapped["OrganizationEntity"] = relationship(back_populates="sources", lazy="raise")
     clients: Mapped[list["ClientEntity"]] = relationship(
