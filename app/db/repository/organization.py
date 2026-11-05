@@ -4,9 +4,10 @@ from uuid import UUID
 
 from sqlalchemy import and_, select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import QueryableAttribute, selectinload
 
 from app.db.decorator import repository
+from app.db.models.base import CommonColumns
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
@@ -126,7 +127,9 @@ class OrganizationRepository(RepositoryBase):
         return self.db_session.execute(stmt).scalars().unique().all()
 
     @staticmethod
-    def _narrowed(relationship: Any, ctx: HasConditions, entity: Any, include_deleted: bool) -> Any:
+    def _narrowed[E: CommonColumns](
+        relationship: QueryableAttribute[list[E]], ctx: HasConditions, entity: type[E], include_deleted: bool
+    ) -> QueryableAttribute[list[E]]:
         return narrowed(relationship, [*ctx.get_conditions(), *not_deleted(entity, include_deleted)])
 
     def _client_loader_options(self, client_ctx: OrganizationClientQueryContext, include_deleted: bool) -> list[Any]:
