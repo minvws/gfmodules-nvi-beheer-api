@@ -113,11 +113,14 @@ def test_get_many_should_raise_on_id_missmatch(
     client = org.clients[0]
     assert client.sources is not None
 
-    with pytest.raises(RecordNotFoundError):
-        _ = client_source_service.get_many(org.id, uuid4(), SourceQueryParams())
+    unknown_id = uuid4()
+    params = SourceQueryParams()
 
     with pytest.raises(RecordNotFoundError):
-        _ = client_source_service.get_many(uuid4(), client.id, SourceQueryParams())
+        client_source_service.get_many(org.id, unknown_id, params)
+
+    with pytest.raises(RecordNotFoundError):
+        client_source_service.get_many(unknown_id, client.id, params)
 
 
 def test_assigne_one_should_succeed(

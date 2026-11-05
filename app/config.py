@@ -1,5 +1,4 @@
 import configparser
-import logging
 import os
 from enum import Enum
 from typing import Any
@@ -7,9 +6,6 @@ from typing import Any
 from gfmodules.logging import ConfigLogging as GFConfigLogging
 from gfmodules.logging.ini import split_comma_separated
 from pydantic import BaseModel, Field, SecretStr, ValidationError, field_validator
-
-logger = logging.getLogger(__name__)
-
 
 _PATH = "app.conf"
 _ENVIRONMENT_CONFIG_PATH_NAME = "FASTAPI_CONFIG_PATH"
@@ -128,7 +124,19 @@ def get_config(path: str | None = None) -> Config:
     try:
         _CONFIG = Config.model_validate(ini_data)
     except ValidationError as e:
-        logger.error(f"Configuration validation error: {e}")
-        raise
+        # pydantic's message embeds the rejected input, which can be a whole config section including the DSN
+        # password. Re-raise without it, and without chaining, so the startup traceback cannot print it either.
+        raise ConfigError(f"Configuration validation error: {describe_validation_error(e)}") from None
 
     return _CONFIG
+
+
+class ConfigError(Exception):
+    """The configuration failed validation. The message names fields and reasons, never values."""
+
+
+def describe_validation_error(exc: ValidationError) -> str:
+    return "; ".join(
+        f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+        for error in exc.errors(include_input=False, include_url=False, include_context=False)
+    )

@@ -100,8 +100,11 @@ def test_get_many_should_raise_one_wrong_org_id(
 ) -> None:
     _ = organization_service.create_one(org_create_dto_1)
 
+    unknown_org_id = uuid4()
+    params = SourceQueryParams()
+
     with pytest.raises(RecordNotFoundError):
-        _ = organization_source_service.get_many(uuid4(), SourceQueryParams())
+        organization_source_service.get_many(unknown_org_id, params)
 
 
 def test_create_one_should_succeed(

@@ -14,7 +14,9 @@ from sqlalchemy import text
 
 from app.config import ConfigDatabase
 from app.container import (
+    get_client_certificate_service,
     get_client_service,
+    get_client_source_service,
     get_org_certificate_service,
     get_organization_service,
     get_organization_source_service,
@@ -38,6 +40,8 @@ from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.models.ura import UraNumber
 from app.routers.client import router as client_router
+from app.routers.client_certificate import router as client_certificate_router
+from app.routers.client_source import router as client_source_router
 from app.routers.errors import install_domain_error_handler
 from app.routers.organization import router as organization_router
 from app.routers.organization_certificate import router as organization_certificate_router
@@ -91,7 +95,7 @@ def logging_catalogue() -> Generator[None, Any, None]:
         reset_for_tests()
 
 
-@pytest.fixture()
+@pytest.fixture
 def database() -> Generator[Database, Any, None]:
     config_database = ConfigDatabase(dsn=SecretStr("sqlite:///:memory:"), retry_backoff=[])
     db = Database(config_database=config_database)
@@ -109,104 +113,104 @@ def database() -> Generator[Database, Any, None]:
     db.engine.dispose()
 
 
-@pytest.fixture()
+@pytest.fixture
 def scope_repository(database: Database) -> ScopeRepository:
     return ScopeRepository(db_session=database.get_db_session())
 
 
-@pytest.fixture()
+@pytest.fixture
 def organization_repository(database: Database) -> OrganizationRepository:
     return OrganizationRepository(db_session=database.get_db_session())
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_repository(database: Database) -> ClientRepository:
     return ClientRepository(db_session=database.get_db_session())
 
 
-@pytest.fixture()
+@pytest.fixture
 def certificate_repository(database: Database) -> CertificateRepository:
     return CertificateRepository(db_session=database.get_db_session())
 
 
-@pytest.fixture()
+@pytest.fixture
 def source_repository(database: Database) -> SourceRepository:
     return SourceRepository(db_session=database.get_db_session())
 
 
-@pytest.fixture()
+@pytest.fixture
 def organization_service(database: Database) -> OrganizationService:
     return OrganizationService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_service(
     database: Database,
 ) -> ClientService:
     return ClientService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def organization_certificate_service(database: Database) -> OrganizationCertificateService:
     return OrganizationCertificateService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_certificate_service(database: Database) -> ClientCertificateService:
     return ClientCertificateService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def organization_source_service(database: Database) -> OrganizationSourceService:
     return OrganizationSourceService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_source_service(database: Database) -> ClientSourceService:
     return ClientSourceService(database)
 
 
-@pytest.fixture()
+@pytest.fixture
 def organization_entity() -> OrganizationEntity:
     return OrganizationEntity(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_entity() -> ClientEntity:
     return ClientEntity(name=TEST_CLIENT_NAME, description="Test description")
 
 
-@pytest.fixture()
+@pytest.fixture
 def certificate_entity() -> CertificateEntity:
     return CertificateEntity(organization_identifier=TEST_OIN, domain="example.com")
 
 
-@pytest.fixture()
+@pytest.fixture
 def source_entity() -> SourceEntity:
     return SourceEntity(source_id=TEST_SOURCE_ID, name="Source Example")
 
 
-@pytest.fixture()
+@pytest.fixture
 def cert_create_dto_1() -> CertificateCreate:
     return CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)
 
 
-@pytest.fixture()
+@pytest.fixture
 def cert_create_dto_2() -> CertificateCreate:
     return CertificateCreate(organization_identifier=SECOND_OIN, domain=SECOND_DOMAIN)
 
 
-@pytest.fixture()
+@pytest.fixture
 def source_create_dto_1() -> SourceCreate:
     return SourceCreate(source_id=TEST_SOURCE_ID, name=TEST_SOURCE_NAME)
 
 
-@pytest.fixture()
+@pytest.fixture
 def source_create_dto_2() -> SourceCreate:
     return SourceCreate(source_id=SECOND_SOURCE_ID, name=SECOND_SOURCE_NAME)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_create_dto_1(
     cert_create_dto_1: CertificateCreate, source_create_dto_1: SourceCreate, source_create_dto_2: SourceCreate
 ) -> ClientCreate:
@@ -218,7 +222,7 @@ def client_create_dto_1(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def org_create_dto_1(
     cert_create_dto_1: CertificateCreate,
     cert_create_dto_2: CertificateCreate,
@@ -236,7 +240,7 @@ def org_create_dto_1(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def org_create_dto_2() -> OrganizationCreate:
     return OrganizationCreate(
         external_id=SECOND_EXTERNAL_ID,
@@ -254,12 +258,12 @@ def org_create_dto_2() -> OrganizationCreate:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_client_service() -> MagicMock:
     return MagicMock(spec=ClientService)
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_organization_service() -> MagicMock:
     service = MagicMock(spec=OrganizationService)
     service.exists.return_value = True
@@ -273,6 +277,8 @@ def api(
     client_service: ClientService,
     organization_certificate_service: OrganizationCertificateService,
     organization_source_service: OrganizationSourceService,
+    client_certificate_service: ClientCertificateService,
+    client_source_service: ClientSourceService,
 ) -> TestClient:
     app = FastAPI()
     install_domain_error_handler(app)
@@ -281,6 +287,8 @@ def api(
         client_router,
         organization_certificate_router,
         organization_source_router,
+        client_certificate_router,
+        client_source_router,
         resolve_router,
     ):
         app.include_router(router)
@@ -288,4 +296,6 @@ def api(
     app.dependency_overrides[get_organization_service] = lambda: organization_service
     app.dependency_overrides[get_org_certificate_service] = lambda: organization_certificate_service
     app.dependency_overrides[get_organization_source_service] = lambda: organization_source_service
+    app.dependency_overrides[get_client_certificate_service] = lambda: client_certificate_service
+    app.dependency_overrides[get_client_source_service] = lambda: client_source_service
     return TestClient(app)

@@ -15,6 +15,7 @@ from app.db.repository.base import RepositoryBase
 from app.db.repository.contexts.client_context import (
     ClientQueryContext,
 )
+from app.db.repository.filters import any_matching, conditions_of, narrowed, not_deleted
 from app.models.oin import Oin
 from app.models.ura import UraNumber
 
@@ -85,43 +86,22 @@ class ClientRepository(RepositoryBase):
         return self.db_session.execute(stmt).scalar()
 
     def find_many(self, ctx: ClientQueryContext, include_deleted: bool = False) -> Sequence[ClientEntity]:
-        stmt = select(ClientEntity)
-        crt_attr = (
-            ClientEntity.certificates
-            if include_deleted
-            else ClientEntity.certificates.and_(CertificateEntity.deleted_at.is_(None))
+        stmt = (
+            select(ClientEntity)
+            .options(
+                selectinload(ClientEntity.scopes),
+                selectinload(narrowed(ClientEntity.certificates, not_deleted(CertificateEntity, include_deleted))),
+                selectinload(narrowed(ClientEntity.sources, not_deleted(SourceEntity, include_deleted))),
+            )
+            .where(
+                *ctx.get_conditions(),
+                *not_deleted(ClientEntity, include_deleted),
+                *any_matching(
+                    ClientEntity.certificates, conditions_of(ctx.certificate_ctx), CertificateEntity, include_deleted
+                ),
+                *any_matching(ClientEntity.sources, conditions_of(ctx.source_ctx), SourceEntity, include_deleted),
+            )
         )
-        src_attr = (
-            ClientEntity.sources if include_deleted else ClientEntity.sources.and_(SourceEntity.deleted_at.is_(None))
-        )
-
-        stmt = stmt.options(selectinload(ClientEntity.scopes), selectinload(crt_attr), selectinload(src_attr))
-
-        root_filters = ctx.get_conditions()
-        if include_deleted is False:
-            root_filters.append(ClientEntity.deleted_at.is_(None))
-
-        if root_filters:
-            stmt = stmt.where(*root_filters)
-
-        if ctx.certificate_ctx:
-            cert_ctx = ctx.certificate_ctx
-            crt_filters = cert_ctx.get_conditions()
-
-            if crt_filters:
-                if include_deleted is False:
-                    crt_filters.append(CertificateEntity.deleted_at.is_(None))
-                stmt = stmt.where(ClientEntity.certificates.any(and_(*crt_filters)))
-
-        if ctx.source_ctx:
-            src_ctx = ctx.source_ctx
-            src_filters = src_ctx.get_conditions()
-
-            if src_filters:
-                if include_deleted is False:
-                    src_filters.append(SourceEntity.deleted_at.is_(None))
-                stmt = stmt.where(ClientEntity.sources.any(and_(*src_filters)))
-
         return self.db_session.execute(stmt).scalars().unique().all()
 
     def find(self, ctx: ClientQueryContext, include_deleted: bool = False) -> ClientEntity | None:

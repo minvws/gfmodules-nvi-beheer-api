@@ -24,7 +24,7 @@ def test_get_one_should_succeed(
 
     actual = client_certificate_service.get_one(org.id, client.id, expected.id)
 
-    assert expected == actual
+    assert actual == expected
 
 
 def test_get_one_should_raise_on_wrong_combination(
@@ -71,8 +71,8 @@ def test_get_many_should_succeed(
 
     actual = client_certificate_service.get_many(org.id, client.id, ClientCertificateQueryParams())
 
-    assert len(expected) == len(actual)
-    assert expected == actual
+    assert len(actual) == len(expected)
+    assert actual == expected
 
 
 @pytest.mark.parametrize(
@@ -100,7 +100,7 @@ def test_get_many_should_filter_on_params(
 
     actual = client_certificate_service.get_many(org.id, client.id, params)
 
-    assert [expected] == actual
+    assert actual == [expected]
     assert cert_not_in_result.id not in [c.id for c in actual]
 
 
@@ -138,11 +138,14 @@ def test_get_many_should_raise_on_wrong_combination(
     client = org.clients[0]
     assert client.certificates is not None
 
-    with pytest.raises(RecordNotFoundError):
-        _ = client_certificate_service.get_many(org.id, uuid4(), ClientCertificateQueryParams())
+    unknown_id = uuid4()
+    params = ClientCertificateQueryParams()
 
     with pytest.raises(RecordNotFoundError):
-        _ = client_certificate_service.get_many(uuid4(), client.id, ClientCertificateQueryParams())
+        client_certificate_service.get_many(org.id, unknown_id, params)
+
+    with pytest.raises(RecordNotFoundError):
+        client_certificate_service.get_many(unknown_id, client.id, params)
 
 
 def test_assign_one_should_succeed(

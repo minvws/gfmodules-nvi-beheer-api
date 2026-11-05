@@ -26,7 +26,7 @@ from app.models.oin import Oin
 from tests.test_config import get_test_config
 
 
-@pytest.fixture()
+@pytest.fixture
 def use_config() -> Config:
     cfg = get_test_config()
     set_config(cfg)

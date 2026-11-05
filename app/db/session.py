@@ -4,7 +4,7 @@ import re
 from collections.abc import Callable
 from time import sleep
 from types import TracebackType
-from typing import Any, NoReturn, ParamSpec, Self, TypeVar
+from typing import Any, NoReturn, Self
 
 import gfmodules.logging as gflog
 from sqlalchemy import Delete, Engine, Insert, Result
@@ -47,8 +47,6 @@ Usage:
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
-P = ParamSpec("P")
 
 _VARCHAR_LIMIT = re.compile(r"character varying\((\d+)\)")
 
@@ -209,7 +207,7 @@ class DbSession:
         """
         return self._retry(self.session.begin)
 
-    def _run_once(self, f: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+    def _run_once[**P, T](self, f: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
         """
         Run an operation that depends on the session's pending unit of work, without retrying.
 
@@ -228,7 +226,7 @@ class DbSession:
             )
             self._discard(e)
         except PendingRollbackError as e:
-            logger.error("Transaction failed, discarding its pending work: %s", e)
+            logger.exception("Transaction failed, discarding its pending work")
             self._discard(e)
         except DatabaseError as e:
             self._log_database_error(e)
@@ -260,7 +258,7 @@ class DbSession:
                 fields=_operation_error_fields(exc),
             )
 
-    def _retry(self, f: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+    def _retry[**P, T](self, f: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
         """
         Retry a function call in case of database errors.
 
