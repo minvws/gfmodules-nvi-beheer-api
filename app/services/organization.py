@@ -22,6 +22,7 @@ from app.exceptions import (
 )
 from app.logging.audit import certificate_fields, client_fields, organization_fields, source_fields, with_changes
 from app.logging.events import Log
+from app.models.client import ClientCreate
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.scopes import ScopeService
@@ -63,29 +64,8 @@ class OrganizationService:
             if dto.sources:
                 org_entity.sources = [s.into_entity() for s in dto.sources]
 
-            if dto.clients:
-                for client in dto.clients:
-                    client_entitiy = ClientEntity(name=client.name, description=client.description)
-                    if client.scopes:
-                        ScopeService.assert_scopes_granted(org_entity, client.scopes)
-                        client_scopes = ScopeService.make_client_scope_from_org(
-                            org_entity, client_entitiy, client.scopes
-                        )
-                        client_entitiy.scopes = client_scopes
-
-                    if client.certificates:
-                        client_certs = ClientCertificateService.get_client_certs_from_org(
-                            org_entity, client.certificates
-                        )
-                        client_entitiy.certificates = client_certs
-
-                    if client.sources:
-                        client_sources = ClientSourceService.get_client_sources_from_org(
-                            org_entity, client.sources or []
-                        )
-                        client_entitiy.sources = client_sources
-
-                    org_entity.clients.append(client_entitiy)
+            for client in dto.clients or []:
+                org_entity.clients.append(self._new_client_entity(org_entity, client))
 
             org_repo.add_one(org_entity)
             new_org = org_repo.find_one(org_entity.id)
@@ -105,6 +85,24 @@ class OrganizationService:
                 raise RecordNotFoundError(id)
 
             return Organization.from_entity(entity)
+
+    @staticmethod
+    def _new_client_entity(org_entity: OrganizationEntity, client: ClientCreate) -> ClientEntity:
+        """Build a client of a new organization; its scopes, certificates and sources must come from the org."""
+        client_entity = ClientEntity(name=client.name, description=client.description)
+        if client.scopes:
+            ScopeService.assert_scopes_granted(org_entity, client.scopes)
+            client_entity.scopes = ScopeService.make_client_scope_from_org(org_entity, client_entity, client.scopes)
+
+        if client.certificates:
+            client_entity.certificates = ClientCertificateService.get_client_certs_from_org(
+                org_entity, client.certificates
+            )
+
+        if client.sources:
+            client_entity.sources = ClientSourceService.get_client_sources_from_org(org_entity, client.sources)
+
+        return client_entity
 
     def exists(self, id: UUID) -> bool:
         with self.db.get_db_session() as session:

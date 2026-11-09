@@ -1,11 +1,13 @@
+from dataclasses import dataclass
+from typing import Any
 from unittest.mock import MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.models.certificates import CertificateCreate
-from app.models.client import ClientCreate
+from app.models.client import Client, ClientCreate
 from app.models.organization import OrganizationCreate
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
@@ -286,9 +288,108 @@ def test_get_many_returns_list(
     assert len(response.json()) == 1
 
 
-@pytest.mark.parametrize("query", ["oin=invalid-oin", "include_deleted=maybe"])
-def test_get_many_invalid_query_returns_422(api: TestClient, query: str) -> None:
-    response = api.get(f"/organizations/{uuid4()}/clients?{query}")
+@dataclass
+class ClientsSetup:
+    org_id: UUID
+    first: Client
+    second: Client
+
+    @property
+    def url(self) -> str:
+        return f"/organizations/{self.org_id}/clients"
+
+
+@pytest.fixture
+def clients_setup(
+    api: TestClient,
+    organization_service: OrganizationService,
+    org_create_dto_1: OrganizationCreate,
+    org_create_dto_2: OrganizationCreate,
+) -> ClientsSetup:
+    """Two clients in one organization that differ on every filterable field, plus a client in another organization.
+
+    first:  "Test Client" (nvi:create, nvi:read); cert (TEST_OIN, TEST_DOMAIN); sources source-001 + source-002
+    second: "Other Client" (nvi:localize); cert (SECOND_OIN, SECOND_DOMAIN); source source-002
+    the other organization has "Test Client 2" (nvi:localize) with source source-3
+    """
+    org = organization_service.create_one(org_create_dto_1)
+    organization_service.create_one(org_create_dto_2)
+    assert org.clients is not None
+    response = api.post(
+        f"/organizations/{org.id}/clients",
+        json={
+            "name": "Other Client",
+            "scopes": ["nvi:localize"],
+            "certificates": [{"organization_identifier": str(SECOND_OIN), "domain": SECOND_DOMAIN}],
+            "sources": [{"source_id": SECOND_SOURCE_ID, "name": SECOND_SOURCE_NAME}],
+        },
+    )
+    assert response.status_code == 201
+    return ClientsSetup(org_id=org.id, first=org.clients[0], second=Client.model_validate(response.json()))
+
+
+def client_ids(response_json: list[dict[str, Any]]) -> list[str]:
+    return sorted(c["id"] for c in response_json)
+
+
+@pytest.mark.parametrize(
+    "query, expected",
+    [
+        ("", ["first", "second"]),
+        (f"name={TEST_CLIENT_NAME}", ["first"]),
+        ("name=Other Client", ["second"]),
+        # a client of another organization is never returned
+        ("name=Test Client 2", []),
+        ("scopes=nvi:read", ["first"]),
+        ("scopes=nvi:localize", ["second"]),
+        ("scopes=nvi:read&scopes=nvi:localize", ["first", "second"]),
+        ("scopes=nvi:delete", []),
+        (f"cert_organization_identifier={TEST_OIN!s}", ["first"]),
+        (f"cert_organization_identifier={SECOND_OIN!s}", ["second"]),
+        (f"cert_domain={TEST_DOMAIN}", ["first"]),
+        (f"cert_domain={SECOND_DOMAIN}", ["second"]),
+        # identifier and domain must match on the same certificate
+        (f"cert_organization_identifier={TEST_OIN!s}&cert_domain={SECOND_DOMAIN}", []),
+        (f"source_id={TEST_SOURCE_ID}", ["first"]),
+        (f"source_id={SECOND_SOURCE_ID}", ["first", "second"]),
+        (f"source_name={SECOND_SOURCE_NAME}", ["first", "second"]),
+        # source_id and source_name must match on the same source
+        (f"source_id={TEST_SOURCE_ID}&source_name={SECOND_SOURCE_NAME}", []),
+        ("source_id=source-3", []),
+        (f"name=Other Client&source_id={SECOND_SOURCE_ID}", ["second"]),
+        (f"name=Other Client&source_id={TEST_SOURCE_ID}", []),
+    ],
+)
+def test_get_many_applies_query_params(
+    api: TestClient, clients_setup: ClientsSetup, query: str, expected: list[str]
+) -> None:
+    by_label = {"first": str(clients_setup.first.id), "second": str(clients_setup.second.id)}
+
+    response = api.get(f"{clients_setup.url}?{query}")
+
+    assert response.status_code == 200
+    assert client_ids(response.json()) == sorted(by_label[label] for label in expected)
+
+
+def test_get_many_hides_soft_deleted_clients(api: TestClient, clients_setup: ClientsSetup) -> None:
+    deleted = api.post(clients_setup.url, json={"name": "Deleted Client"}).json()
+    assert api.delete(f"{clients_setup.url}/{deleted['id']}").status_code == 204
+    active = sorted([str(clients_setup.first.id), str(clients_setup.second.id)])
+
+    assert client_ids(api.get(clients_setup.url).json()) == active
+    assert client_ids(api.get(f"{clients_setup.url}?include_deleted=false").json()) == active
+    including_deleted = api.get(f"{clients_setup.url}?include_deleted=true").json()
+    assert client_ids(including_deleted) == sorted([*active, deleted["id"]])
+    assert api.get(f"{clients_setup.url}?name=Deleted Client").json() == []
+    by_name = api.get(f"{clients_setup.url}?name=Deleted Client&include_deleted=true").json()
+    assert client_ids(by_name) == [deleted["id"]]
+
+
+@pytest.mark.parametrize(
+    "query", ["cert_organization_identifier=invalid-oin", "include_deleted=maybe", "scopes=nvi:unknown", "oin=x"]
+)
+def test_get_many_invalid_query_returns_422(api: TestClient, clients_setup: ClientsSetup, query: str) -> None:
+    response = api.get(f"{clients_setup.url}?{query}")
     assert response.status_code == 422
 
 

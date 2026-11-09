@@ -162,7 +162,7 @@ def test_create_one_should_succeed_with_different_variattions_of_complex_object(
             assert actual_client.id == expected_client.id
             if actual_client.scopes:
                 assert expected_client.scopes is not None
-                assert [s for s in expected_client.scopes].sort() == [s for s in expected_client.scopes].sort()
+                assert sorted(actual_client.scopes) == sorted(expected_client.scopes)
 
             assert actual_client.certificates == expected_client.certificates
             assert actual_client.sources == expected_client.sources
