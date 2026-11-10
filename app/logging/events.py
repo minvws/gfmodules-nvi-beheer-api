@@ -37,6 +37,8 @@ _REFUSAL = ("error_reason", "status_code")
 
 
 class Log(_Base):
+    context_fields = (ACTOR,)
+
     SYS_APP_STARTED = _Base.SYS_APP_STARTED.with_id("100601")
     SYS_APP_STOPPED = _Base.SYS_APP_STOPPED.with_id("100602")
     SYS_APP_CRASHED = _Base.SYS_APP_CRASHED.with_id("100602")
