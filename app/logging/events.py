@@ -33,7 +33,7 @@ _CERTIFICATE = ("organization_id", "certificate_id", "certificate_organization_i
 _CLIENT_CERTIFICATE = (*_CERTIFICATE, "client_id")
 _SOURCE = ("organization_id", "source_id")
 _CLIENT_SOURCE = (*_SOURCE, "client_id")
-_RESOLVE = ("client_id", "organization_identifier", "certificate_organization_identifier")
+_RESOLVE = ("client_id", "represented_organization_identifier", "certificate_organization_identifier")
 _REFUSAL = ("error_reason", "status_code")
 
 
