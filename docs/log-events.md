@@ -41,9 +41,9 @@ The request context also holds these, but an event carries them only on the stre
 | `DB_CONNECTION_FAILED` | 100603 | ERROR | `error_type`, `retry_attempt`, `backoff_seconds` |
 | `DB_SCHEMA_ERROR` | 100605 | ERROR | `exception_type`, `table`, `column`, `value_length`, `column_limit` |
 | `DB_OPERATION_FAILED` | 100626 | WARNING | `exception_type`, `table`, `constraint` |
-| `ORGANIZATION_CREATED` | 100607 | INFO | `actor_cn`, `organization_id`, `ura_number`, `scopes` |
-| `ORGANIZATION_UPDATED` | 100608 | INFO | `actor_cn`, `organization_id`, `ura_number`, `scopes`, `scopes_added`, `scopes_removed` |
-| `ORGANIZATION_DELETED` | 100609 | INFO | `actor_cn`, `organization_id`, `ura_number`, `scopes` |
+| `ORGANIZATION_CREATED` | 100607 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes` |
+| `ORGANIZATION_UPDATED` | 100608 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes`, `scopes_added`, `scopes_removed` |
+| `ORGANIZATION_DELETED` | 100609 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes` |
 | `CLIENT_CREATED` | 100610 | INFO | `actor_cn`, `organization_id`, `client_id`, `scopes`, `certificate_ids`, `source_ids` |
 | `CLIENT_UPDATED` | 100611 | INFO | `actor_cn`, `organization_id`, `client_id`, `scopes`, `certificate_ids`, `source_ids`, `scopes_added`, `scopes_removed`, `certificate_ids_added`, `certificate_ids_removed`, `source_ids_added`, `source_ids_removed` |
 | `CLIENT_DELETED` | 100612 | INFO | `actor_cn`, `organization_id`, `client_id`, `scopes`, `certificate_ids`, `source_ids` |
@@ -57,8 +57,8 @@ The request context also holds these, but an event carries them only on the stre
 | `SOURCE_DELETED` | 100620 | INFO | `actor_cn`, `organization_id`, `source_id` |
 | `CLIENT_SOURCE_ASSIGNED` | 100621 | INFO | `actor_cn`, `organization_id`, `source_id`, `client_id` |
 | `CLIENT_SOURCE_UNASSIGNED` | 100622 | INFO | `actor_cn`, `organization_id`, `source_id`, `client_id` |
-| `CLIENT_RESOLVED` | 100623 | INFO | `actor_cn`, `client_id`, `ura_number`, `certificate_organization_identifier`, `matched_domain`, `source_id`, `scopes` |
-| `CLIENT_RESOLVE_DENIED` | 100625 | WARNING | `actor_cn`, `client_id`, `ura_number`, `certificate_organization_identifier`, `error_reason`, `certificate_domains`, `source_id` |
+| `CLIENT_RESOLVED` | 100623 | INFO | `actor_cn`, `client_id`, `organization_identifier`, `certificate_organization_identifier`, `matched_domain`, `source_id`, `scopes` |
+| `CLIENT_RESOLVE_DENIED` | 100625 | WARNING | `actor_cn`, `client_id`, `organization_identifier`, `certificate_organization_identifier`, `error_reason`, `certificate_domains`, `source_id` |
 | `REQUEST_REFUSED` | 100624 | WARNING | `actor_cn`, `error_reason`, `status_code`, `validation_errors` |
 | `REQUEST_FORBIDDEN` | 100627 | WARNING | `actor_cn`, `error_reason`, `status_code` |
 
@@ -71,9 +71,9 @@ The request context also holds these, but an event carries them only on the stre
 | `SYS_UNHANDLED_EXCEPTION` | 100604 | ERROR | `exception_type`, `endpoint`, `method`, `actor_cn`, `organization_id` |
 | `HEALTH_UNHEALTHY` | 100600 | ERROR | `component`, `status` |
 | `DB_CONNECTION_FAILED` | 100603 | ERROR | `error_type` |
-| `ORGANIZATION_CREATED` | 100607 | INFO | `actor_cn`, `organization_id`, `ura_number`, `scopes` |
-| `ORGANIZATION_UPDATED` | 100608 | INFO | `actor_cn`, `organization_id`, `ura_number`, `scopes`, `scopes_added`, `scopes_removed` |
-| `ORGANIZATION_DELETED` | 100609 | INFO | `actor_cn`, `organization_id`, `ura_number`, `scopes` |
+| `ORGANIZATION_CREATED` | 100607 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes` |
+| `ORGANIZATION_UPDATED` | 100608 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes`, `scopes_added`, `scopes_removed` |
+| `ORGANIZATION_DELETED` | 100609 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes` |
 | `CLIENT_CREATED` | 100610 | INFO | `actor_cn`, `organization_id`, `client_id`, `scopes`, `certificate_ids`, `source_ids` |
 | `CLIENT_UPDATED` | 100611 | INFO | `actor_cn`, `organization_id`, `client_id`, `scopes`, `certificate_ids`, `source_ids`, `scopes_added`, `scopes_removed`, `certificate_ids_added`, `certificate_ids_removed`, `source_ids_added`, `source_ids_removed` |
 | `CLIENT_DELETED` | 100612 | INFO | `actor_cn`, `organization_id`, `client_id`, `scopes`, `certificate_ids`, `source_ids` |
@@ -87,7 +87,7 @@ The request context also holds these, but an event carries them only on the stre
 | `SOURCE_DELETED` | 100620 | INFO | `actor_cn`, `organization_id`, `source_id` |
 | `CLIENT_SOURCE_ASSIGNED` | 100621 | INFO | `actor_cn`, `organization_id`, `source_id`, `client_id` |
 | `CLIENT_SOURCE_UNASSIGNED` | 100622 | INFO | `actor_cn`, `organization_id`, `source_id`, `client_id` |
-| `CLIENT_RESOLVE_DENIED` | 100625 | WARNING | `actor_cn`, `client_id`, `ura_number`, `certificate_organization_identifier`, `error_reason` |
+| `CLIENT_RESOLVE_DENIED` | 100625 | WARNING | `actor_cn`, `client_id`, `organization_identifier`, `certificate_organization_identifier`, `error_reason` |
 | `REQUEST_FORBIDDEN` | 100627 | WARNING | `actor_cn`, `error_reason`, `status_code` |
 
 ## Access event ids per route

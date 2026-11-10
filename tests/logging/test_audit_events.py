@@ -69,7 +69,7 @@ class TestOrganizationEvents:
             records,
             Log.ORGANIZATION_CREATED,
             organization_id=str(organization.id),
-            ura_number=str(TEST_EXTERNAL_ID),
+            organization_identifier=str(TEST_EXTERNAL_ID),
             scopes=["nvi:read"],
         )
 
@@ -111,7 +111,7 @@ class TestOrganizationEvents:
             records,
             Log.ORGANIZATION_UPDATED,
             organization_id=str(organization.id),
-            ura_number=str(TEST_EXTERNAL_ID),
+            organization_identifier=str(TEST_EXTERNAL_ID),
             scopes=["nvi:create", "nvi:read"],
             scopes_added=["nvi:create"],
             scopes_removed=[],
@@ -136,7 +136,7 @@ class TestOrganizationEvents:
             records,
             Log.ORGANIZATION_DELETED,
             organization_id=str(organization.id),
-            ura_number=str(TEST_EXTERNAL_ID),
+            organization_identifier=str(TEST_EXTERNAL_ID),
         )
 
     def test_a_refused_delete_is_not_logged_as_deleted(
@@ -394,7 +394,7 @@ class TestResolveEvents:
             records,
             Log.CLIENT_RESOLVED,
             client_id=str(request_for.client_id),
-            ura_number=str(TEST_EXTERNAL_ID),
+            organization_identifier=str(TEST_EXTERNAL_ID),
             certificate_organization_identifier=str(TEST_OIN),
             matched_domain=TEST_DOMAIN,
             source_id=TEST_SOURCE_ID,
@@ -426,7 +426,7 @@ class TestResolveEvents:
             records,
             Log.CLIENT_RESOLVE_DENIED,
             client_id=str(denied.client_id),
-            ura_number=str(TEST_EXTERNAL_ID),
+            organization_identifier=str(TEST_EXTERNAL_ID),
             certificate_organization_identifier=str(TEST_OIN),
             certificate_domains=denied.certificate_domains,
             source_id=denied.source_id,
