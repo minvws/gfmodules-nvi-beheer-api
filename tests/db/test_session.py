@@ -143,7 +143,7 @@ def test_a_retried_connection_failure_is_logged_per_attempt(retrying_database: D
 
     attempts = [
         (entry.message["error_type"], entry.message["retry_attempt"], entry.message["backoff_seconds"])
-        for entry in records.for_event(Log.DB_CONNECTION_FAILED)
+        for entry in records.for_event(Log.SYS_DB_CONNECTION_FAILED)
     ]
     assert attempts == [("OperationalError", 1, 0.01), ("OperationalError", 2, 0.01)]
     assert len(records) == len(attempts)
@@ -156,7 +156,7 @@ def test_the_last_connection_failure_is_logged_without_a_backoff(retrying_databa
         with patch.object(session.session, "execute", side_effect=_failing(*failures)), pytest.raises(DatabaseError):
             session.execute(stmt)
 
-    backoffs = [entry.message["backoff_seconds"] for entry in records.for_event(Log.DB_CONNECTION_FAILED)]
+    backoffs = [entry.message["backoff_seconds"] for entry in records.for_event(Log.SYS_DB_CONNECTION_FAILED)]
     assert backoffs == [0.01, 0.01, 0]
 
 
@@ -166,7 +166,7 @@ def test_a_connection_failure_during_commit_is_logged(retrying_database: Databas
         with patch.object(session.session, "commit", side_effect=flaky), pytest.raises(DatabaseError):
             session.commit()
 
-    assert_event_emitted(records, Log.DB_CONNECTION_FAILED, error_type="OperationalError")
+    assert_event_emitted(records, Log.SYS_DB_CONNECTION_FAILED, error_type="OperationalError")
 
 
 @run_once_and_retried
@@ -183,7 +183,7 @@ def test_a_schema_error_is_logged_with_where_it_failed_but_not_the_value(
 
     entry = assert_event_emitted(
         records,
-        Log.DB_SCHEMA_ERROR,
+        Log.SYS_DB_SCHEMA_ERROR,
         exception_type="StringDataRightTruncation",
         table="organizations",
         column="name",
@@ -207,7 +207,7 @@ def test_a_rejected_operation_is_logged_with_its_constraint_but_not_the_value(
 
     entry = assert_event_emitted(
         records,
-        Log.DB_OPERATION_FAILED,
+        Log.SYS_DB_OPERATION_FAILED,
         exception_type="UniqueViolation",
         table="sources",
         constraint="uq_sources_source_id_active",
