@@ -49,7 +49,7 @@ def source_fields(source: Source) -> dict[str, Any]:
 def resolve_request_fields(request: ClientResolveRequest) -> dict[str, Any]:
     return {
         "client_id": str(request.client_id),
-        "organization_identifier": str(request.organization_external_id),
+        "represented_organization_identifier": str(request.organization_external_id),
         "certificate_organization_identifier": str(request.certificate_organization_identifier),
         "source_id": request.source_id,
     }

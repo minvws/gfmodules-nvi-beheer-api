@@ -112,7 +112,7 @@ class TestClientResolved:
             Log.CLIENT_RESOLVED,
             "resolved",
             client_id="client-1",
-            organization_identifier=_URA,
+            represented_organization_identifier=_URA,
             certificate_organization_identifier=_OIN,
             matched_domain="example.com",
             source_id="src-1",
@@ -130,7 +130,7 @@ class TestClientResolveDenied:
             Log.CLIENT_RESOLVE_DENIED,
             "denied",
             client_id="client-1",
-            organization_identifier=_URA,
+            represented_organization_identifier=_URA,
             certificate_organization_identifier=_OIN,
             certificate_domains=["example.com"],
             source_id="src-1",
@@ -139,7 +139,7 @@ class TestClientResolveDenied:
 
         assert routed[LoggingStreams.APP][0]["certificate_domains"] == ["example.com"]
         siem = routed[LoggingStreams.SIEM][0]
-        assert (siem["client_id"], siem["organization_identifier"], siem["error_reason"]) == (
+        assert (siem["client_id"], siem["represented_organization_identifier"], siem["error_reason"]) == (
             "client-1",
             _URA,
             "certificate_mismatch",
