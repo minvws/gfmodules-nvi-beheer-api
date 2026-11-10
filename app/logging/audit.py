@@ -22,7 +22,7 @@ def with_changes(before: Mapping[str, Any], after: Mapping[str, Any], *names: st
 
 
 def organization_fields(ura_number: UraNumber, scopes: list[AuthorizationScope] | None) -> dict[str, Any]:
-    return {"ura_number": str(ura_number), "scopes": scope_names(scopes)}
+    return {"organization_identifier": str(ura_number), "scopes": scope_names(scopes)}
 
 
 def client_fields(client: Client) -> dict[str, Any]:
@@ -49,7 +49,7 @@ def source_fields(source: Source) -> dict[str, Any]:
 def resolve_request_fields(request: ClientResolveRequest) -> dict[str, Any]:
     return {
         "client_id": str(request.client_id),
-        "ura_number": str(request.organization_external_id),
+        "organization_identifier": str(request.organization_external_id),
         "certificate_organization_identifier": str(request.certificate_organization_identifier),
         "source_id": request.source_id,
     }

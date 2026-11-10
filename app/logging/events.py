@@ -27,13 +27,13 @@ def _app_only(event_id: str, fields: tuple[str, ...], level: int = logging.INFO)
     return LogEvent(event_id, level, (_APP,), {_APP: (ACTOR.name, *fields)})
 
 
-_ORGANIZATION = ("organization_id", "ura_number", "scopes")
+_ORGANIZATION = ("organization_id", "organization_identifier", "scopes")
 _CLIENT = ("organization_id", "client_id", "scopes", "certificate_ids", "source_ids")
 _CERTIFICATE = ("organization_id", "certificate_id", "certificate_organization_identifier")
 _CLIENT_CERTIFICATE = (*_CERTIFICATE, "client_id")
 _SOURCE = ("organization_id", "source_id")
 _CLIENT_SOURCE = (*_SOURCE, "client_id")
-_RESOLVE = ("client_id", "ura_number", "certificate_organization_identifier")
+_RESOLVE = ("client_id", "organization_identifier", "certificate_organization_identifier")
 _REFUSAL = ("error_reason", "status_code")
 
 
