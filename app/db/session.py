@@ -220,7 +220,7 @@ class DbSession:
         except OperationalError as e:
             gflog.emit(
                 logger,
-                Log.DB_CONNECTION_FAILED,
+                Log.SYS_DB_CONNECTION_FAILED,
                 "Database connection failed, discarding the pending work",
                 fields={"error_type": type(e).__name__},
             )
@@ -246,14 +246,14 @@ class DbSession:
         if isinstance(exc, DataError):
             gflog.emit(
                 logger,
-                Log.DB_SCHEMA_ERROR,
+                Log.SYS_DB_SCHEMA_ERROR,
                 "Database rejected the data for its schema",
                 fields=_schema_error_fields(exc),
             )
         else:
             gflog.emit(
                 logger,
-                Log.DB_OPERATION_FAILED,
+                Log.SYS_DB_OPERATION_FAILED,
                 "Database rejected the operation",
                 fields=_operation_error_fields(exc),
             )
@@ -279,7 +279,7 @@ class DbSession:
                 attempt += 1
                 gflog.emit(
                     logger,
-                    Log.DB_CONNECTION_FAILED,
+                    Log.SYS_DB_CONNECTION_FAILED,
                     "Database connection failed",
                     fields={
                         "error_type": type(e).__name__,

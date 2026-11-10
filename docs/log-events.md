@@ -38,9 +38,9 @@ The request context also holds these, but an event carries them only on the stre
 | `SYS_MISSING_CORRELATION_ID` | 100628 | ERROR | `endpoint`, `method` |
 | `ACCESS_REQUEST` | 100 | INFO | `endpoint`, `method`, `status_code`, `status_code_missing`, `duration_ms`, `body`, `body_truncated`, `actor_cn`, `organization_id` |
 | `HEALTH_UNHEALTHY` | 100600 | ERROR | `component`, `status`, `error_detail` |
-| `DB_CONNECTION_FAILED` | 100603 | ERROR | `error_type`, `retry_attempt`, `backoff_seconds` |
-| `DB_SCHEMA_ERROR` | 100605 | ERROR | `exception_type`, `table`, `column`, `value_length`, `column_limit` |
-| `DB_OPERATION_FAILED` | 100626 | WARNING | `exception_type`, `table`, `constraint` |
+| `SYS_DB_CONNECTION_FAILED` | 100603 | ERROR | `error_type`, `retry_attempt`, `backoff_seconds` |
+| `SYS_DB_SCHEMA_ERROR` | 100605 | ERROR | `exception_type`, `table`, `column`, `value_length`, `column_limit` |
+| `SYS_DB_OPERATION_FAILED` | 100626 | WARNING | `exception_type`, `table`, `constraint` |
 | `ORGANIZATION_CREATED` | 100607 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes` |
 | `ORGANIZATION_UPDATED` | 100608 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes`, `scopes_added`, `scopes_removed` |
 | `ORGANIZATION_DELETED` | 100609 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes` |
@@ -70,7 +70,7 @@ The request context also holds these, but an event carries them only on the stre
 | `SYS_APP_CRASHED` | 100602 | CRITICAL | `shutdown_reason` |
 | `SYS_UNHANDLED_EXCEPTION` | 100604 | ERROR | `exception_type`, `endpoint`, `method`, `actor_cn`, `organization_id` |
 | `HEALTH_UNHEALTHY` | 100600 | ERROR | `component`, `status` |
-| `DB_CONNECTION_FAILED` | 100603 | ERROR | `error_type` |
+| `SYS_DB_CONNECTION_FAILED` | 100603 | ERROR | `error_type` |
 | `ORGANIZATION_CREATED` | 100607 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes` |
 | `ORGANIZATION_UPDATED` | 100608 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes`, `scopes_added`, `scopes_removed` |
 | `ORGANIZATION_DELETED` | 100609 | INFO | `actor_cn`, `organization_id`, `organization_identifier`, `scopes` |

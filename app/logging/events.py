@@ -55,13 +55,13 @@ class Log(_Base):
         (_APP, _SIEM),
         {_APP: ("component", "status", "error_detail"), _SIEM: ("component", "status")},
     )
-    DB_CONNECTION_FAILED = LogEvent(
+    SYS_DB_CONNECTION_FAILED = LogEvent(
         "100603",
         logging.ERROR,
         (_APP, _SIEM),
         {_APP: ("error_type", "retry_attempt", "backoff_seconds"), _SIEM: ("error_type",)},
     )
-    DB_SCHEMA_ERROR = LogEvent(
+    SYS_DB_SCHEMA_ERROR = LogEvent(
         "100605",
         logging.ERROR,
         (_APP,),
@@ -69,7 +69,7 @@ class Log(_Base):
             _APP: ("exception_type", "table", "column", "value_length", "column_limit"),
         },
     )
-    DB_OPERATION_FAILED = LogEvent(
+    SYS_DB_OPERATION_FAILED = LogEvent(
         "100626",
         logging.WARNING,
         (_APP,),
