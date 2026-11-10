@@ -184,5 +184,5 @@ def setup_fastapi() -> FastAPI:
     if config.stats.enabled:
         fastapi.add_middleware(StatsdMiddleware, module_name=config.stats.module_name or "default")
 
-    fastapi.add_middleware(RequestContextMiddleware, capture_body_methods=("POST", "PUT", "DELETE"))
+    fastapi.add_middleware(RequestContextMiddleware)
     return fastapi
