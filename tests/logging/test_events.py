@@ -34,7 +34,7 @@ def test_the_event_overview_is_current() -> None:
         ("DB_CONNECTION_FAILED", "100603"),
         ("SYS_UNHANDLED_EXCEPTION", "100604"),
         ("DB_SCHEMA_ERROR", "100605"),
-        ("SYS_MISSING_CORRELATION_ID", "100606"),
+        ("SYS_MISSING_CORRELATION_ID", "100628"),
         ("ORGANIZATION_CREATED", "100607"),
         ("ORGANIZATION_UPDATED", "100608"),
         ("ORGANIZATION_DELETED", "100609"),
