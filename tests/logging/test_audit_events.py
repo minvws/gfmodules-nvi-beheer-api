@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from gfmodules.logging import LoggingStreams
+from gfmodules.logging import LoggingStreams, bind_context
 from gfmodules.logging.middleware import RequestContextMiddleware
 from gfmodules.logging.testing import CapturedRecords, assert_event_emitted, capture_records, capture_stream
 
@@ -33,6 +33,12 @@ from tests.conftest import (
     TEST_SOURCE_ID,
     TEST_SOURCE_NAME,
 )
+
+
+@pytest.fixture(autouse=True)
+def request_context() -> Iterator[None]:
+    with bind_context({}):
+        yield
 
 
 @pytest.fixture

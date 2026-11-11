@@ -7,7 +7,7 @@ from pytest_mock import MockerFixture
 
 from app import application
 from app.config import set_config
-from app.logging.events import ACTOR, Log
+from app.logging.events import ACTOR, ORGANIZATION, Log
 from tests.test_config import get_test_config
 
 _APP = LoggingStreams.APP
@@ -104,11 +104,13 @@ class TestTheOverriddenSlots:
         assert rerouted == set(_GIVEN_THE_ACTOR)
 
     @pytest.mark.parametrize("name", _GIVEN_THE_ACTOR)
-    def test_a_rerouted_slot_only_adds_who_made_the_request(self, name: str) -> None:
+    def test_a_rerouted_slot_only_adds_who_made_the_request_and_for_which_organization(self, name: str) -> None:
         shared = getattr(DefaultEventCatalogue, name)
         event = getattr(Log, name)
         assert event.streams == shared.streams
-        assert event.fields == {stream: (*shared.fields[stream], ACTOR.name) for stream in shared.streams}
+        assert event.fields == {
+            stream: (*shared.fields[stream], ACTOR.name, ORGANIZATION.name) for stream in shared.streams
+        }
 
 
 class TestStreamRoutingIsDeclared:
