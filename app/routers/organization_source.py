@@ -6,10 +6,15 @@ from fastapi import APIRouter, Depends, Query
 
 from app.container import get_organization_source_service
 from app.models.source import Source, SourceCreate, SourceQueryParams, SourceUpdate
+from app.routers.context import organization_in_context
 from app.services.source.organization_source import OrganizationSourceService
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/organizations/{organization_id}/source", tags=["Organization Sources"])
+router = APIRouter(
+    prefix="/organizations/{organization_id}/source",
+    dependencies=[Depends(organization_in_context)],
+    tags=["Organization Sources"],
+)
 
 
 @router.post("", response_model=Source)
