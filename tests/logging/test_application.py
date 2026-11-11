@@ -83,18 +83,14 @@ class TestLifespan:
 
 
 class TestApplicationInit:
-    def test_installs_the_logging_excepthook_and_signal_handlers(
-        self, use_config: Config, mocker: MockerFixture
-    ) -> None:
+    def test_installs_the_logging_excepthook(self, use_config: Config, mocker: MockerFixture) -> None:
         install_excepthook = mocker.patch("app.application.gflog.install_excepthook")
-        install_signal_handlers = mocker.patch("app.application.gflog.install_signal_handlers")
         configure = mocker.patch("app.application.gflog.configure")
 
         application.application_init()
 
         configure.assert_called_once()
         install_excepthook.assert_called_once_with(application.logger)
-        install_signal_handlers.assert_called_once_with()
 
     def test_configures_logging_with_the_catalogue(self, use_config: Config, mocker: MockerFixture) -> None:
         configure = mocker.patch("app.application.gflog.configure")
@@ -105,7 +101,6 @@ class TestApplicationInit:
             config=use_config.logging,
             loglevel=use_config.app.loglevel,
             catalogue=Log,
-            extra_context_fields=(ACTOR,),
         )
 
 

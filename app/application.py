@@ -22,7 +22,7 @@ from app.config import (
     _PATH,
     get_config,
 )
-from app.logging.events import ACTOR, Log
+from app.logging.events import Log
 from app.middleware.stats import StatsdMiddleware
 from app.routers.client import router as client_router
 from app.routers.client_certificate import router as client_certificate_router
@@ -92,7 +92,6 @@ def run() -> None:
 def application_init() -> None:
     setup_logging()
     gflog.install_excepthook(logger)
-    gflog.install_signal_handlers()
 
 
 def create_fastapi_app() -> FastAPI:
@@ -118,7 +117,6 @@ def setup_logging() -> None:
         config=config.logging,
         loglevel=config.app.loglevel,
         catalogue=Log,
-        extra_context_fields=(ACTOR,),
     )
 
 
@@ -186,10 +184,5 @@ def setup_fastapi() -> FastAPI:
     if config.stats.enabled:
         fastapi.add_middleware(StatsdMiddleware, module_name=config.stats.module_name or "default")
 
-    fastapi.add_middleware(
-        RequestContextMiddleware,
-        correlation_id_expected=config.logging.correlation_id_expected,
-        capture_body_methods=("POST", "PUT", "DELETE"),
-        trust_forwarded_for=config.logging.trust_forwarded_for,
-    )
+    fastapi.add_middleware(RequestContextMiddleware, capture_body_methods=("POST", "PUT", "DELETE"))
     return fastapi

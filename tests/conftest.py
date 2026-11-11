@@ -31,7 +31,7 @@ from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.scope import ScopeRepository
 from app.db.repository.source import SourceRepository
-from app.logging.events import ACTOR, Log
+from app.logging.events import Log
 from app.models.certificates import CertificateCreate
 from app.models.client import ClientCreate
 from app.models.oin import Oin
@@ -86,7 +86,6 @@ def logging_catalogue() -> Generator[None, Any, None]:
         config=ConfigLogging(console_streams=["debug"], access_logs=True),
         loglevel="DEBUG",
         catalogue=Log,
-        extra_context_fields=(ACTOR,),
         strict_fields=True,
     )
     try:
