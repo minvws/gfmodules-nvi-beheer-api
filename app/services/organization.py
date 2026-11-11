@@ -74,6 +74,7 @@ class OrganizationService:
 
             organization = Organization.from_entity(new_org)
 
+        gflog.set_context({"organization_id": str(organization.id)})
         self._log_created(organization)
         return organization
 
@@ -164,8 +165,8 @@ class OrganizationService:
             Log.ORGANIZATION_UPDATED,
             "Organization updated",
             fields=with_changes(
-                organization_fields(id, current.external_id, current.scopes),
-                organization_fields(id, updated.external_id, updated.scopes),
+                organization_fields(current.external_id, current.scopes),
+                organization_fields(updated.external_id, updated.scopes),
                 "scopes",
             ),
         )
@@ -188,7 +189,7 @@ class OrganizationService:
             logger,
             Log.ORGANIZATION_DELETED,
             "Organization deleted",
-            fields=organization_fields(org.id, org.external_id, [s.name for s in org.scopes]),
+            fields=organization_fields(org.external_id, [s.name for s in org.scopes]),
         )
 
     @staticmethod
@@ -197,14 +198,14 @@ class OrganizationService:
             logger,
             Log.ORGANIZATION_CREATED,
             "Organization created",
-            fields=organization_fields(organization.id, organization.external_id, organization.scopes),
+            fields=organization_fields(organization.external_id, organization.scopes),
         )
         for certificate in organization.certificates or []:
             gflog.emit(
                 logger,
                 Log.CERTIFICATE_CREATED,
                 "Certificate created",
-                fields=certificate_fields(organization.id, certificate),
+                fields=certificate_fields(certificate),
             )
         for source in organization.sources or []:
             gflog.emit(logger, Log.SOURCE_CREATED, "Source created", fields=source_fields(source))

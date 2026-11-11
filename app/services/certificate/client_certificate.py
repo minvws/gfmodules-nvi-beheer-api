@@ -108,7 +108,7 @@ class ClientCertificateService:
             logger,
             Log.CLIENT_CERTIFICATE_ASSIGNED,
             "Certificate assigned to client",
-            fields={**certificate_fields(organization_id, assigned), "client_id": str(client_id)},
+            fields={**certificate_fields(assigned), "client_id": str(client_id)},
         )
         return assigned
 
@@ -144,7 +144,7 @@ class ClientCertificateService:
             logger,
             Log.CLIENT_CERTIFICATE_UNASSIGNED,
             "Certificate unassigned from client",
-            fields={**certificate_fields(organization_id, unassigned), "client_id": str(client_id)},
+            fields={**certificate_fields(unassigned), "client_id": str(client_id)},
         )
         return unassigned
 

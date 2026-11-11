@@ -12,6 +12,7 @@ from app.models.organization import (
     OrganizationQueryParams,
     OrganizationUpdate,
 )
+from app.routers.context import organization_id_in_context
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,12 @@ def register(
     return result
 
 
-@router.get("/{id}", response_model=Organization, response_model_exclude_none=True)
+@router.get(
+    "/{id}",
+    dependencies=[Depends(organization_id_in_context)],
+    response_model=Organization,
+    response_model_exclude_none=True,
+)
 def get_by_id(
     id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
@@ -50,7 +56,12 @@ def get_many(
     return orgs
 
 
-@router.put("/{id}", response_model=OrganizationUpdate, response_model_exclude_none=True)
+@router.put(
+    "/{id}",
+    dependencies=[Depends(organization_id_in_context)],
+    response_model=OrganizationUpdate,
+    response_model_exclude_none=True,
+)
 def update(
     id: UUID,
     body: OrganizationUpdate,
@@ -60,7 +71,7 @@ def update(
     return result
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", dependencies=[Depends(organization_id_in_context)])
 def delete(
     id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],

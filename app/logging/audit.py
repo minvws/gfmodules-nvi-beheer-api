@@ -1,6 +1,5 @@
 from collections.abc import Mapping
 from typing import Any
-from uuid import UUID
 
 from app.models.certificates import Certificate
 from app.models.client import Client, ClientResolveRequest
@@ -22,13 +21,12 @@ def with_changes(before: Mapping[str, Any], after: Mapping[str, Any], *names: st
     return changes
 
 
-def organization_fields(id: UUID, ura_number: UraNumber, scopes: list[AuthorizationScope] | None) -> dict[str, Any]:
-    return {"organization_id": str(id), "ura_number": str(ura_number), "scopes": scope_names(scopes)}
+def organization_fields(ura_number: UraNumber, scopes: list[AuthorizationScope] | None) -> dict[str, Any]:
+    return {"ura_number": str(ura_number), "scopes": scope_names(scopes)}
 
 
 def client_fields(client: Client) -> dict[str, Any]:
     return {
-        "organization_id": str(client.organization_id),
         "client_id": str(client.id),
         "scopes": scope_names(client.scopes),
         "certificate_ids": [str(c.id) for c in client.certificates or []],
@@ -36,9 +34,8 @@ def client_fields(client: Client) -> dict[str, Any]:
     }
 
 
-def certificate_fields(organization_id: UUID, certificate: Certificate) -> dict[str, Any]:
+def certificate_fields(certificate: Certificate) -> dict[str, Any]:
     return {
-        "organization_id": str(organization_id),
         "certificate_id": str(certificate.id),
         "certificate_organization_identifier": str(certificate.organization_identifier),
         "domain": certificate.domain,
@@ -46,7 +43,7 @@ def certificate_fields(organization_id: UUID, certificate: Certificate) -> dict[
 
 
 def source_fields(source: Source) -> dict[str, Any]:
-    return {"organization_id": str(source.organization_id), "source_id": source.source_id}
+    return {"source_id": source.source_id}
 
 
 def resolve_request_fields(request: ClientResolveRequest) -> dict[str, Any]:

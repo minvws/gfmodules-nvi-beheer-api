@@ -10,6 +10,7 @@ _SIEM = LoggingStreams.SIEM
 _Base = DefaultEventCatalogue
 
 ACTOR = ContextField(name="actor_cn", header="x-gf-act-cn", sanitizer=sanitize_free_text)
+ORGANIZATION = ContextField(name="organization_id", header=None)
 
 
 def _app_and_siem(
@@ -37,16 +38,16 @@ _REFUSAL = ("error_reason", "status_code")
 
 
 class Log(_Base):
-    context_fields = (ACTOR,)
+    context_fields = (ACTOR, ORGANIZATION)
 
     SYS_APP_STARTED = _Base.SYS_APP_STARTED.with_id("100601")
     SYS_APP_STOPPED = _Base.SYS_APP_STOPPED.with_id("100602")
     SYS_APP_CRASHED = _Base.SYS_APP_CRASHED.with_id("100602")
     SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("100604").add_fields(
-        {_APP: (ACTOR.name,), _SIEM: (ACTOR.name,)}
+        {_APP: (ACTOR.name, ORGANIZATION.name), _SIEM: (ACTOR.name, ORGANIZATION.name)}
     )
     SYS_MISSING_CORRELATION_ID = _Base.SYS_MISSING_CORRELATION_ID.with_id("100606")
-    ACCESS_REQUEST = _Base.ACCESS_REQUEST.add_fields({_APP: (ACTOR.name,)})
+    ACCESS_REQUEST = _Base.ACCESS_REQUEST.add_fields({_APP: (ACTOR.name, ORGANIZATION.name)})
 
     HEALTH_UNHEALTHY = LogEvent(
         "100600",
