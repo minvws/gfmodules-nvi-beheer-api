@@ -111,3 +111,10 @@ def test_invalid_config_error_lists_every_failing_field(tmp_path: Path) -> None:
 
     for field in ("app", "database.dsn", "telemetry", "stats", "uvicorn"):
         assert f"{field}: Field required" in str(error)
+
+
+def test_the_example_config_reads_the_logging_streams() -> None:
+    logging = ConfigLogging.model_validate(read_ini_file("app.conf.example")["logging"])
+
+    assert logging.syslog_streams == ["app", "siem", "public_inspect"]
+    assert logging.console_streams == ["debug"]

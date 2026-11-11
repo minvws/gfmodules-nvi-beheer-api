@@ -27,13 +27,13 @@ def _app_only(event_id: str, fields: tuple[str, ...], level: int = logging.INFO)
     return LogEvent(event_id, level, (_APP,), {_APP: (ACTOR.name, *fields)})
 
 
-_ORGANIZATION = ("organization_id", "ura_number", "scopes")
+_ORGANIZATION = ("organization_id", "organization_identifier", "scopes")
 _CLIENT = ("organization_id", "client_id", "scopes", "certificate_ids", "source_ids")
 _CERTIFICATE = ("organization_id", "certificate_id", "certificate_organization_identifier")
 _CLIENT_CERTIFICATE = (*_CERTIFICATE, "client_id")
 _SOURCE = ("organization_id", "source_id")
 _CLIENT_SOURCE = (*_SOURCE, "client_id")
-_RESOLVE = ("client_id", "ura_number", "certificate_organization_identifier")
+_RESOLVE = ("client_id", "represented_organization_identifier", "certificate_organization_identifier")
 _REFUSAL = ("error_reason", "status_code")
 
 
@@ -46,7 +46,7 @@ class Log(_Base):
     SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("100604").add_fields(
         {_APP: (ACTOR.name, ORGANIZATION.name), _SIEM: (ACTOR.name, ORGANIZATION.name)}
     )
-    SYS_MISSING_CORRELATION_ID = _Base.SYS_MISSING_CORRELATION_ID.with_id("100606")
+    SYS_MISSING_CORRELATION_ID = _Base.SYS_MISSING_CORRELATION_ID.with_id("100628")
     ACCESS_REQUEST = _Base.ACCESS_REQUEST.add_fields({_APP: (ACTOR.name, ORGANIZATION.name)})
 
     HEALTH_UNHEALTHY = LogEvent(
@@ -55,13 +55,13 @@ class Log(_Base):
         (_APP, _SIEM),
         {_APP: ("component", "status", "error_detail"), _SIEM: ("component", "status")},
     )
-    DB_CONNECTION_FAILED = LogEvent(
+    SYS_DB_CONNECTION_FAILED = LogEvent(
         "100603",
         logging.ERROR,
         (_APP, _SIEM),
         {_APP: ("error_type", "retry_attempt", "backoff_seconds"), _SIEM: ("error_type",)},
     )
-    DB_SCHEMA_ERROR = LogEvent(
+    SYS_DB_SCHEMA_ERROR = LogEvent(
         "100605",
         logging.ERROR,
         (_APP,),
@@ -69,7 +69,7 @@ class Log(_Base):
             _APP: ("exception_type", "table", "column", "value_length", "column_limit"),
         },
     )
-    DB_OPERATION_FAILED = LogEvent(
+    SYS_DB_OPERATION_FAILED = LogEvent(
         "100626",
         logging.WARNING,
         (_APP,),
