@@ -45,7 +45,7 @@ def get_one_for_client(
 
 
 @router.delete("/{id}")
-def unassigne_one_for_clients(
+def unassign_one_for_clients(
     organization_id: UUID,
     client_id: UUID,
     id: UUID,

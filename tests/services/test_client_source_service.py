@@ -123,7 +123,7 @@ def test_get_many_should_raise_on_id_missmatch(
         client_source_service.get_many(unknown_id, client.id, params)
 
 
-def test_assigne_one_should_succeed(
+def test_assign_one_should_succeed(
     client_source_service: ClientSourceService,
     organization_service: OrganizationService,
     org_create_dto_1: OrganizationCreate,
@@ -141,7 +141,7 @@ def test_assigne_one_should_succeed(
     assert actual == target
 
 
-def test_assigne_one_should_raise_on_conflict(
+def test_assign_one_should_raise_on_conflict(
     client_source_service: ClientSourceService,
     organization_service: OrganizationService,
     org_create_dto_1: OrganizationCreate,
@@ -158,7 +158,7 @@ def test_assigne_one_should_raise_on_conflict(
         _ = client_source_service.assign_one(org.id, client.id, target.id)
 
 
-def test_assigne_one_should_raise_on_missmatch(
+def test_assign_one_should_raise_on_missmatch(
     client_source_service: ClientSourceService,
     organization_service: OrganizationService,
     org_create_dto_1: OrganizationCreate,
@@ -179,7 +179,7 @@ def test_assigne_one_should_raise_on_missmatch(
         _ = client_source_service.assign_one(uuid4(), client.id, target.id)
 
 
-def test_unassigne_one_should_succeed(
+def test_unassign_one_should_succeed(
     client_source_service: ClientSourceService,
     organization_service: OrganizationService,
     org_create_dto_1: OrganizationCreate,
@@ -198,7 +198,7 @@ def test_unassigne_one_should_succeed(
         _ = client_source_service.get_one(org.id, client.id, target.id)
 
 
-def test_unassigne_one_should_raise_on_id_missmatch(
+def test_unassign_one_should_raise_on_id_missmatch(
     client_source_service: ClientSourceService,
     organization_service: OrganizationService,
     org_create_dto_1: OrganizationCreate,

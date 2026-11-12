@@ -19,7 +19,7 @@ def assign_one(
     data: ScopeAssign,
     service: Annotated[OrganizationScopesService, Depends(get_org_scopes_service)],
 ) -> Any:
-    return service.assigne_one(organization_id, data.scope)
+    return service.assign_one(organization_id, data.scope)
 
 
 @router.delete("")
@@ -28,5 +28,5 @@ def unassing_one(
     data: Annotated[ScopeUnassign, Query()],
     service: Annotated[OrganizationScopesService, Depends(get_org_scopes_service)],
 ) -> Any:
-    service.unassigne_one(organization_id, data.scope)
+    service.unassign_one(organization_id, data.scope)
     return Response(status_code=204)

@@ -33,7 +33,7 @@ def get_one(
 
 
 @router.post("/{id}", response_model=Source)
-def assigne_one(
+def assign_one(
     organization_id: UUID,
     client_id: UUID,
     id: UUID,

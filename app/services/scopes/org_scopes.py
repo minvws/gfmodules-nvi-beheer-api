@@ -13,7 +13,7 @@ class OrganizationScopesService:
     def __init__(self, db: Database) -> None:
         self.db = db
 
-    def assigne_one(self, id: UUID, scope: AuthorizationScope) -> OrganizationUpdate:
+    def assign_one(self, id: UUID, scope: AuthorizationScope) -> OrganizationUpdate:
         with self.db.get_db_session(commit=True) as session:
             repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(id=id)
@@ -31,7 +31,7 @@ class OrganizationScopesService:
 
             return OrganizationUpdate.from_entity(org)
 
-    def unassigne_one(self, id: UUID, scope: AuthorizationScope) -> None:
+    def unassign_one(self, id: UUID, scope: AuthorizationScope) -> None:
         with self.db.get_db_session(commit=True) as session:
             repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(id=id, client_ctx=OrganizationClientQueryContext(scopes=[scope]))
