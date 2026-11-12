@@ -9,7 +9,7 @@ from app.services.organization import OrganizationService
 from app.services.scopes.org_scopes import OrganizationScopesService
 
 
-def test_assigne_one_should_succeed(
+def test_assign_one_should_succeed(
     org_create_dto_1: OrganizationCreate,
     organization_service: OrganizationService,
     org_scopes_service: OrganizationScopesService,
@@ -18,21 +18,21 @@ def test_assigne_one_should_succeed(
     org_create_dto_1.clients = None
 
     org = organization_service.create_one(org_create_dto_1)
-    updated_org = org_scopes_service.assigne_one(org.id, AuthorizationScope.CREATE)
+    updated_org = org_scopes_service.assign_one(org.id, AuthorizationScope.CREATE)
 
     assert updated_org.scopes is not None
     assert len(updated_org.scopes) == 1
     assert updated_org.scopes[0].name == AuthorizationScope.CREATE.name
 
 
-def test_assigne_one_should_raise_when_org_not_found(
+def test_assign_one_should_raise_when_org_not_found(
     org_scopes_service: OrganizationScopesService,
 ) -> None:
     with pytest.raises(RecordNotFoundError):
-        _ = org_scopes_service.assigne_one(uuid4(), AuthorizationScope.CREATE)
+        _ = org_scopes_service.assign_one(uuid4(), AuthorizationScope.CREATE)
 
 
-def test_assigne_one_should_raise_when_org_does_not_have_scope(
+def test_assign_one_should_raise_when_org_does_not_have_scope(
     org_create_dto_1: OrganizationCreate,
     organization_service: OrganizationService,
     org_scopes_service: OrganizationScopesService,
@@ -41,10 +41,10 @@ def test_assigne_one_should_raise_when_org_does_not_have_scope(
     org_create_dto_1.clients = None
 
     org = organization_service.create_one(org_create_dto_1)
-    _ = org_scopes_service.assigne_one(org.id, AuthorizationScope.CREATE)
+    _ = org_scopes_service.assign_one(org.id, AuthorizationScope.CREATE)
 
     with pytest.raises(ConflictError):
-        _ = org_scopes_service.assigne_one(org.id, AuthorizationScope.CREATE)
+        _ = org_scopes_service.assign_one(org.id, AuthorizationScope.CREATE)
 
 
 def test_unassinge_one_should_succeed(
@@ -56,7 +56,7 @@ def test_unassinge_one_should_succeed(
     org_create_dto_1.clients = None
 
     org = organization_service.create_one(org_create_dto_1)
-    org_scopes_service.unassigne_one(org.id, AuthorizationScope.CREATE)
+    org_scopes_service.unassign_one(org.id, AuthorizationScope.CREATE)
     updated_org = organization_service.get_one(org.id)
 
     assert org.scopes is not None
@@ -68,7 +68,7 @@ def test_unassinge_one_should_raise_when_org_not_found(
     org_scopes_service: OrganizationScopesService,
 ) -> None:
     with pytest.raises(RecordNotFoundError):
-        org_scopes_service.unassigne_one(uuid4(), AuthorizationScope.LOCALIZE)
+        org_scopes_service.unassign_one(uuid4(), AuthorizationScope.LOCALIZE)
 
 
 def test_unassinge_one_should_raise_when_scope_not_in_org(
@@ -83,10 +83,10 @@ def test_unassinge_one_should_raise_when_scope_not_in_org(
 
     assert org.scopes is None
     with pytest.raises(RecordNotFoundError):
-        org_scopes_service.unassigne_one(org.id, AuthorizationScope.CREATE)
+        org_scopes_service.unassign_one(org.id, AuthorizationScope.CREATE)
 
 
-def test_unassigne_one_should_raise_when_client_uses_scope(
+def test_unassign_one_should_raise_when_client_uses_scope(
     org_create_dto_1: OrganizationCreate,
     organization_service: OrganizationService,
     org_scopes_service: OrganizationScopesService,
@@ -101,4 +101,4 @@ def test_unassigne_one_should_raise_when_client_uses_scope(
     assert AuthorizationScope.CREATE in client.scopes
 
     with pytest.raises(ConflictError):
-        org_scopes_service.unassigne_one(org.id, AuthorizationScope.CREATE)
+        org_scopes_service.unassign_one(org.id, AuthorizationScope.CREATE)

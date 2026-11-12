@@ -17,7 +17,7 @@ class ClientScopesService:
     def __init__(self, db: Database) -> None:
         self.db = db
 
-    def assigne_one(self, organization_id: UUID, id: UUID, scope: AuthorizationScope) -> ClientPlein:
+    def assign_one(self, organization_id: UUID, id: UUID, scope: AuthorizationScope) -> ClientPlein:
         with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(

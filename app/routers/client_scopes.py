@@ -20,7 +20,7 @@ def assign_one(
     data: ScopeAssign,
     service: Annotated[ClientScopesService, Depends(get_client_scopes_service)],
 ) -> Any:
-    return service.assigne_one(organization_id, client_id, data.scope)
+    return service.assign_one(organization_id, client_id, data.scope)
 
 
 @router.delete("")
