@@ -1,32 +1,30 @@
-import logging
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Response
 
 from app.container import get_org_scopes_service
 from app.models.organization import OrganizationUpdate
-from app.models.scopes import ScopeAssign, ScopeUnassign
+from app.models.scopes import AuthorizationScope
 from app.services.scopes.org_scopes import OrganizationScopesService
 
-logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/organizations/{organization_id}/scopes", tags=["Organization Scopes"])
+router = APIRouter(prefix="/organizations/{organization_id}/scope", tags=["Organization Scopes"])
 
 
-@router.post("", response_model=OrganizationUpdate)
+@router.post("/{scope}", response_model=OrganizationUpdate)
 def assign_one(
     organization_id: UUID,
-    data: ScopeAssign,
+    scope: AuthorizationScope,
     service: Annotated[OrganizationScopesService, Depends(get_org_scopes_service)],
 ) -> Any:
-    return service.assign_one(organization_id, data.scope)
+    return service.assign_one(organization_id, scope)
 
 
-@router.delete("")
+@router.delete("/{scope}")
 def unassing_one(
     organization_id: UUID,
-    data: Annotated[ScopeUnassign, Query()],
+    scope: AuthorizationScope,
     service: Annotated[OrganizationScopesService, Depends(get_org_scopes_service)],
 ) -> Any:
-    service.unassign_one(organization_id, data.scope)
+    service.unassign_one(organization_id, scope)
     return Response(status_code=204)

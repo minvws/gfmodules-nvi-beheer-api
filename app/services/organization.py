@@ -17,7 +17,6 @@ from app.db.repository.scope import ScopeRepository
 from app.exceptions import (
     ConflictError,
     EntityHasActiveMembersError,
-    ForbiddenOperationError,
     RecordNotFoundError,
 )
 from app.logging.audit import certificate_fields, client_fields, organization_fields, source_fields, with_changes
@@ -154,7 +153,7 @@ class OrganizationService:
                 session.flush()
             except IntegrityError:
                 session.rollback()
-                raise ForbiddenOperationError(f"Organization {id} has Clients using scopes marked for change")
+                raise ConflictError(f"Organization {id} has Clients using scopes marked for change")
             except DatabaseError:
                 session.rollback()
                 raise

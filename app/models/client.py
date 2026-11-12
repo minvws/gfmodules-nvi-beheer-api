@@ -49,22 +49,6 @@ class ClientFields(BaseModel):
     scopes: list[AuthorizationScope] | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
 
-class ClientPlein(CommonModel, ClientFields):
-    organization_id: UUID
-
-    @classmethod
-    def from_entity(cls, model: ClientEntity) -> Self:
-        return cls(
-            id=model.id,
-            name=model.name,
-            organization_id=model.organization_id,
-            description=model.description,
-            scopes=[s.name for s in model.scopes],
-            created_at=model.created_at,
-            modified_at=model.modified_at,
-        )
-
-
 class ClientCreate(ClientFields):
     certificates: list[CertificateCreate] | None = None
     sources: list[SourceCreate] | None = None

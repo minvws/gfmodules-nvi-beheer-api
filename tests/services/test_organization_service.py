@@ -10,6 +10,7 @@ from app.db.models.source import SourceEntity
 from app.db.repository.contexts.organization_context import OrganizationQueryContext
 from app.db.repository.organization import OrganizationRepository
 from app.exceptions import (
+    ConflictError,
     EntityHasActiveMembersError,
     ForbiddenOperationError,
     RecordNotFoundError,
@@ -556,5 +557,5 @@ def test_update_should_raise_when_org_has_clients_with_scopes(
     assert client.scopes is not None
     update_dto = OrganizationUpdate(external_id=SECOND_EXTERNAL_ID, name=org.name)
 
-    with pytest.raises(ForbiddenOperationError):
+    with pytest.raises(ConflictError):
         _ = organization_service.update_one(org.id, update_dto)

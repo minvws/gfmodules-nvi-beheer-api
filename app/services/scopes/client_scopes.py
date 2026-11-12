@@ -8,7 +8,7 @@ from app.db.repository.contexts.organization_context import (
 )
 from app.db.repository.organization import OrganizationRepository
 from app.exceptions import ConflictError, RecordNotFoundError
-from app.models.client import ClientPlein
+from app.models.client import Client
 from app.models.scopes import AuthorizationScope
 from app.services.scopes.utils import ScopeUtils
 
@@ -17,7 +17,7 @@ class ClientScopesService:
     def __init__(self, db: Database) -> None:
         self.db = db
 
-    def assign_one(self, organization_id: UUID, id: UUID, scope: AuthorizationScope) -> ClientPlein:
+    def assign_one(self, organization_id: UUID, id: UUID, scope: AuthorizationScope) -> Client:
         with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             ctx = OrganizationQueryContext(
@@ -31,18 +31,26 @@ class ClientScopesService:
             if org is None:
                 raise RecordNotFoundError(organization_id)
 
-            ScopeUtils.assert_scopes_granted(org, [scope])
-
             if not org.clients:
                 raise RecordNotFoundError(id)
 
+            ScopeUtils.assert_scopes_granted(org, [scope])
+
             client = org.clients[0]
             if scope in [s.name for s in client.scopes]:
-                raise ConflictError(f"Client {client.id} already as scope {scope.value} assigned")
+                raise ConflictError(f"Client {client.id} already has scope {scope.value} assigned")
 
             target = next(s for s in org.scopes if s.name == scope)
             client.scopes.append(target)
-            return ClientPlein.from_entity(client)
+            return Client(
+                id=client.id,
+                name=client.name,
+                scopes=[s.name for s in client.scopes] if client.scopes else None,
+                organization_id=client.organization_id,
+                description=client.description,
+                created_at=client.created_at,
+                modified_at=client.modified_at,
+            )
 
     def unassing_one(self, organization_id: UUID, id: UUID, scope: AuthorizationScope) -> None:
         with self.db.get_db_session(commit=True) as session:
@@ -57,7 +65,7 @@ class ClientScopesService:
                 raise RecordNotFoundError(id)
 
             if scope not in [s.name for s in client.scopes]:
-                raise RecordNotFoundError(f"Client {client.id} does not have scope {scope.value}")
+                raise RecordNotFoundError(f"scope {scope.value} of client {client.id}")
 
             target = next(s for s in client.scopes if s.name == scope)
             client.scopes.remove(target)

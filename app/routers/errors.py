@@ -18,6 +18,7 @@ from app.exceptions import (
     DomainError,
     EntityHasActiveMembersError,
     ForbiddenOperationError,
+    InvariantViolationError,
     RecordNotFoundError,
     ResolveError,
     ScopesNotGrantedError,
@@ -33,6 +34,7 @@ STATUS_CODES: dict[type[DomainError], int] = {
     ConflictError: 409,
     ForbiddenOperationError: 403,
     ResolveError: 404,
+    InvariantViolationError: 500,
 }
 
 

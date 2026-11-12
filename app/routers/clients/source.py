@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -9,7 +8,6 @@ from app.logging.context import organization_in_context
 from app.models.source import Source, SourceQueryParams
 from app.services.source.client_source import ClientSourceService
 
-logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/organizations/{organization_id}/clients/{client_id}/sources",
     dependencies=[Depends(organization_in_context)],
