@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.exceptions import ConflictError, RecordNotFoundError
+from app.exceptions import ConflictError, ForbiddenOperationError, RecordNotFoundError
 from app.models.organization import OrganizationCreate
 from app.models.scopes import AuthorizationScope
 from app.services.organization import OrganizationService
@@ -43,7 +43,7 @@ def test_assign_one_should_raise_when_org_does_not_have_scope(
     org = organization_service.create_one(org_create_dto_1)
     _ = org_scopes_service.assign_one(org.id, AuthorizationScope.CREATE)
 
-    with pytest.raises(ConflictError):
+    with pytest.raises(ForbiddenOperationError):
         _ = org_scopes_service.assign_one(org.id, AuthorizationScope.CREATE)
 
 

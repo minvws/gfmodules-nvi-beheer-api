@@ -192,6 +192,7 @@ class ClientService:
             if active_member:
                 raise EntityHasActiveMembersError("Client", active_member, id)
 
+            client.scopes = []
             client.deleted_at = datetime.now(UTC)
             deleted = Client.from_entity(client)
 

@@ -1,19 +1,17 @@
-import logging
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response
 
 from app.container import get_client_scopes_service
-from app.models.client import ClientPlein
+from app.models.client import Client
 from app.models.scopes import ScopeAssign, ScopeUnassign
 from app.services.scopes.client_scopes import ClientScopesService
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations/{organization_id}/clients/{client_id}/scopes", tags=["Client Scopes"])
 
 
-@router.post("", response_model=ClientPlein)
+@router.post("", response_model=Client)
 def assign_one(
     organization_id: UUID,
     client_id: UUID,

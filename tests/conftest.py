@@ -5,13 +5,13 @@ from unittest.mock import MagicMock
 
 import gfmodules.logging as gflog
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gfmodules.logging import ConfigLogging
 from gfmodules.logging.testing import reset_for_tests
 from pydantic import SecretStr
 from sqlalchemy import text
 
+from app.application import setup_fastapi
 from app.config import ConfigDatabase
 from app.container import (
     get_client_certificate_service,
@@ -39,14 +39,6 @@ from app.models.organization import OrganizationCreate
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate
 from app.models.ura import UraNumber
-from app.routers.client import router as client_router
-from app.routers.client_certificate import router as client_certificate_router
-from app.routers.client_source import router as client_source_router
-from app.routers.errors import install_domain_error_handler
-from app.routers.organization import router as organization_router
-from app.routers.organization_certificate import router as organization_certificate_router
-from app.routers.organization_source import router as organization_source_router
-from app.routers.resolve import router as resolve_router
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
@@ -275,15 +267,7 @@ def mock_client_service() -> MagicMock:
 
 
 @pytest.fixture
-def mock_organization_service() -> MagicMock:
-    service = MagicMock(spec=OrganizationService)
-    service.exists.return_value = True
-    return service
-
-
-@pytest.fixture
 def api(
-    mock_client_service: MagicMock,
     organization_service: OrganizationService,
     client_service: ClientService,
     organization_certificate_service: OrganizationCertificateService,
@@ -291,18 +275,7 @@ def api(
     client_certificate_service: ClientCertificateService,
     client_source_service: ClientSourceService,
 ) -> TestClient:
-    app = FastAPI()
-    install_domain_error_handler(app)
-    for router in (
-        organization_router,
-        client_router,
-        organization_certificate_router,
-        organization_source_router,
-        client_certificate_router,
-        client_source_router,
-        resolve_router,
-    ):
-        app.include_router(router)
+    app = setup_fastapi()
     app.dependency_overrides[get_client_service] = lambda: client_service
     app.dependency_overrides[get_organization_service] = lambda: organization_service
     app.dependency_overrides[get_org_certificate_service] = lambda: organization_certificate_service

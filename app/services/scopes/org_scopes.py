@@ -4,7 +4,7 @@ from app.db.db import Database
 from app.db.repository.contexts.organization_context import OrganizationClientQueryContext, OrganizationQueryContext
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.scope import ScopeRepository
-from app.exceptions import ConflictError, RecordNotFoundError
+from app.exceptions import ConflictError, ForbiddenOperationError, InvariantViolationError, RecordNotFoundError
 from app.models.organization import OrganizationUpdate
 from app.models.scopes import AuthorizationScope
 
@@ -22,12 +22,14 @@ class OrganizationScopesService:
                 raise RecordNotFoundError(id)
 
             if scope in [s.name for s in org.scopes]:
-                raise ConflictError(f"Organization `{org.id}` already has scope `{scope.value}`")
+                raise ForbiddenOperationError(f"Organization `{org.id}` already has scope `{scope.value}`")
 
             scope_repo = session.get_repository(ScopeRepository)
-            app_scopes = scope_repo.find_many()
-            org_scope = next(s for s in app_scopes if s.name == scope)
-            org.scopes.append(org_scope)
+            app_scopes = scope_repo.find_many([scope])
+            if len(app_scopes) != 1:
+                raise InvariantViolationError()
+
+            org.scopes.append(app_scopes[0])
 
             return OrganizationUpdate.from_entity(org)
 
@@ -41,7 +43,7 @@ class OrganizationScopesService:
                 raise RecordNotFoundError(id)
 
             if scope not in [s.name for s in org.scopes]:
-                raise RecordNotFoundError(f"Organization `{org.id}` does not have `{scope.value}`")
+                raise RecordNotFoundError(f"Scope `{scope.value}` of {org.id}")
 
             if org.clients:
                 clients_ids = ", ".join([str(c.id) for c in org.clients])

@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -9,7 +8,6 @@ from app.models.organization import OrganizationUpdate
 from app.models.scopes import ScopeAssign, ScopeUnassign
 from app.services.scopes.org_scopes import OrganizationScopesService
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations/{organization_id}/scopes", tags=["Organization Scopes"])
 
 
