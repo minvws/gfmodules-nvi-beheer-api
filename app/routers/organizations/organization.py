@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -14,7 +13,6 @@ from app.models.organization import (
 )
 from app.services.organization import OrganizationService
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
 

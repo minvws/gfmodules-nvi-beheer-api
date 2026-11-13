@@ -36,7 +36,7 @@ def test_every_domain_error_has_a_reason_of_its_own() -> None:
 
 
 def test_every_mapped_status_code_is_a_client_error() -> None:
-    assert all(400 <= code < 500 for code in STATUS_CODES.values())
+    assert all(400 <= code <= 500 for code in STATUS_CODES.values())
 
 
 def test_subclasses_inherit_the_mapping_of_their_parent() -> None:

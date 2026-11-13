@@ -7,6 +7,7 @@ from app import utils
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.source import SourceEntity
+from app.db.repository.client import ClientRepository
 from app.exceptions import (
     EntityHasActiveMembersError,
     ForbiddenOperationError,
@@ -540,6 +541,30 @@ def test_delete_one_should_succeed(
 
     with pytest.raises(RecordNotFoundError):
         _ = client_service.get_one(new_client.id, org.id)
+
+
+def test_delete_one_should_clear_client_scopes(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    client_repository: ClientRepository,
+    org_create_dto_1: OrganizationCreate,
+) -> None:
+
+    org = organization_service.create_one(org_create_dto_1)
+    dto = ClientCreate(name="some name", scopes=org.scopes)
+    new_client = client_service.create_one(org.id, dto)
+
+    client_service.delete_one(new_client.id, org.id)
+
+    with client_repository.db_session:
+        deleted_client = client_repository.find_one(new_client.id, org.id, include_deleted=True)
+
+        assert new_client.scopes is not None
+        assert len(new_client.scopes) > 0
+        assert deleted_client is not None
+        assert deleted_client.scopes == []
+        assert deleted_client.deleted_at is not None
+        assert deleted_client.id == new_client.id
 
 
 def test_delete_one_should_raise_with_unkown_org(

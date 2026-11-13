@@ -129,5 +129,9 @@ class Log(_Base):
         ("DELETE", "/organizations/{organization_id}/source/{id}"): "100713",
         ("POST", "/organizations/{organization_id}/clients/{client_id}/sources/{id}"): "100714",
         ("DELETE", "/organizations/{organization_id}/clients/{client_id}/sources/{id}"): "100715",
-        ("POST", "/clients/resolve"): "100716",
+        ("POST", "/organizations/{organization_id}/clients/{client_id}/scopes"): "100716",
+        ("DELETE", "/organizations/{organization_id}/clients/{client_id}/scopes"): "100717",
+        ("POST", "/organizations/{organization_id}/scopes"): "100718",
+        ("DELETE", "/organizations/{organization_id}/scopes"): "100719",
+        ("POST", "/clients/resolve"): "100720",
     }

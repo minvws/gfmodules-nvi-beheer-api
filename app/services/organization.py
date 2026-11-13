@@ -25,7 +25,7 @@ from app.logging.events import Log
 from app.models.client import ClientCreate
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
 from app.services.certificate.client_certificate import ClientCertificateService
-from app.services.scopes import ScopeService
+from app.services.scopes.utils import ScopeUtils
 from app.services.source.client_source import ClientSourceService
 
 logger = logging.getLogger(__name__)
@@ -91,8 +91,8 @@ class OrganizationService:
         """Build a client of a new organization; its scopes, certificates and sources must come from the org."""
         client_entity = ClientEntity(name=client.name, description=client.description)
         if client.scopes:
-            ScopeService.assert_scopes_granted(org_entity, client.scopes)
-            client_entity.scopes = ScopeService.make_client_scope_from_org(org_entity, client_entity, client.scopes)
+            ScopeUtils.assert_scopes_granted(org_entity, client.scopes)
+            client_entity.scopes = ScopeUtils.make_client_scope_from_org(org_entity, client_entity, client.scopes)
 
         if client.certificates:
             client_entity.certificates = ClientCertificateService.get_client_certs_from_org(

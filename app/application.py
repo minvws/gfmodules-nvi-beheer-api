@@ -24,16 +24,18 @@ from app.config import (
 )
 from app.logging.events import Log
 from app.middleware.stats import StatsdMiddleware
-from app.routers.client import router as client_router
-from app.routers.client_certificate import router as client_certificate_router
-from app.routers.client_source import router as client_source_router
+from app.routers.clients.certificate import router as client_certificate_router
+from app.routers.clients.client import router as client_router
+from app.routers.clients.resolve import router as resolve_router
+from app.routers.clients.scopes import router as client_scopes_router
+from app.routers.clients.source import router as client_source_router
 from app.routers.default import router as default_router
 from app.routers.errors import install_domain_error_handler
 from app.routers.health import router as health_router
-from app.routers.organization import router as organization_router
-from app.routers.organization_certificate import router as organization_certificate_router
-from app.routers.organization_source import router as organization_source_router
-from app.routers.resolve import router as resolve_router
+from app.routers.organizations.certificate import router as organization_certificate_router
+from app.routers.organizations.organization import router as organization_router
+from app.routers.organizations.scopes import router as organization_scopes_router
+from app.routers.organizations.source import router as organization_source_router
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +173,8 @@ def setup_fastapi() -> FastAPI:
         client_certificate_router,
         organization_source_router,
         client_source_router,
+        organization_scopes_router,
+        client_scopes_router,
         resolve_router,
     ]
 

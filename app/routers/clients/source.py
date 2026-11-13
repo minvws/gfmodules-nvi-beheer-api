@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -8,7 +7,6 @@ from app.container import get_client_source_service
 from app.models.source import Source, SourceQueryParams
 from app.services.source.client_source import ClientSourceService
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations/{organization_id}/clients/{client_id}/sources", tags=["Client Sources"])
 
 
@@ -33,7 +31,7 @@ def get_one(
 
 
 @router.post("/{id}", response_model=Source)
-def assigne_one(
+def assign_one(
     organization_id: UUID,
     client_id: UUID,
     id: UUID,
