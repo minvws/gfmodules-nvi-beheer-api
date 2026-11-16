@@ -1,5 +1,4 @@
 import logging
-from typing import ClassVar
 
 from gfmodules.logging import ContextField, DefaultEventCatalogue, LogEvent, LoggingStreams
 from gfmodules.logging.context import sanitize_free_text
@@ -112,23 +111,3 @@ class Log(_Base):
     )
     REQUEST_REFUSED = _app_only("100624", (*_REFUSAL, "validation_errors"), level=logging.WARNING)
     REQUEST_FORBIDDEN = _app_and_siem("100627", _REFUSAL, level=logging.WARNING)
-
-    access_event_id: ClassVar = {
-        ("POST", "/organizations"): "100700",
-        ("PUT", "/organizations/{organization_id}"): "100701",
-        ("DELETE", "/organizations/{organization_id}"): "100702",
-        ("POST", "/organizations/{organization_id}/clients"): "100703",
-        ("PUT", "/organizations/{organization_id}/clients/{id}"): "100704",
-        ("DELETE", "/organizations/{organization_id}/clients/{id}"): "100705",
-        ("POST", "/organizations/{organization_id}/certificate"): "100706",
-        ("PUT", "/organizations/{organization_id}/certificate/{id}"): "100707",
-        ("DELETE", "/organizations/{organization_id}/certificate/{id}"): "100708",
-        ("POST", "/organizations/{organization_id}/clients/{client_id}/certificate/{id}"): "100709",
-        ("DELETE", "/organizations/{organization_id}/clients/{client_id}/certificate/{id}"): "100710",
-        ("POST", "/organizations/{organization_id}/source"): "100711",
-        ("PUT", "/organizations/{organization_id}/source/{id}"): "100712",
-        ("DELETE", "/organizations/{organization_id}/source/{id}"): "100713",
-        ("POST", "/organizations/{organization_id}/clients/{client_id}/sources/{id}"): "100714",
-        ("DELETE", "/organizations/{organization_id}/clients/{client_id}/sources/{id}"): "100715",
-        ("POST", "/clients/resolve"): "100716",
-    }

@@ -89,27 +89,3 @@ The request context also holds these, but an event carries them only on the stre
 | `CLIENT_SOURCE_UNASSIGNED` | 100622 | INFO | `actor_cn`, `organization_id`, `source_id`, `client_id` |
 | `CLIENT_RESOLVE_DENIED` | 100625 | WARNING | `actor_cn`, `client_id`, `represented_organization_identifier`, `certificate_organization_identifier`, `error_reason` |
 | `REQUEST_FORBIDDEN` | 100627 | WARNING | `actor_cn`, `error_reason`, `status_code` |
-
-## Access event ids per route
-
-`ACCESS_REQUEST` carries these ids instead of its own on these routes.
-
-| Method | Route | Id |
-| --- | --- | --- |
-| POST | `/organizations` | 100700 |
-| PUT | `/organizations/{organization_id}` | 100701 |
-| DELETE | `/organizations/{organization_id}` | 100702 |
-| POST | `/organizations/{organization_id}/clients` | 100703 |
-| PUT | `/organizations/{organization_id}/clients/{id}` | 100704 |
-| DELETE | `/organizations/{organization_id}/clients/{id}` | 100705 |
-| POST | `/organizations/{organization_id}/certificate` | 100706 |
-| PUT | `/organizations/{organization_id}/certificate/{id}` | 100707 |
-| DELETE | `/organizations/{organization_id}/certificate/{id}` | 100708 |
-| POST | `/organizations/{organization_id}/clients/{client_id}/certificate/{id}` | 100709 |
-| DELETE | `/organizations/{organization_id}/clients/{client_id}/certificate/{id}` | 100710 |
-| POST | `/organizations/{organization_id}/source` | 100711 |
-| PUT | `/organizations/{organization_id}/source/{id}` | 100712 |
-| DELETE | `/organizations/{organization_id}/source/{id}` | 100713 |
-| POST | `/organizations/{organization_id}/clients/{client_id}/sources/{id}` | 100714 |
-| DELETE | `/organizations/{organization_id}/clients/{client_id}/sources/{id}` | 100715 |
-| POST | `/clients/resolve` | 100716 |
