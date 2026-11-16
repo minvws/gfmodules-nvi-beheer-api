@@ -6,8 +6,8 @@ from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import Response
 
 from app.container import get_client_service
+from app.logging.context import organization_in_context
 from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
-from app.routers.context import organization_in_context
 from app.services.client import ClientService
 
 logger = logging.getLogger(__name__)

@@ -21,6 +21,7 @@ from app.exceptions import (
     RecordNotFoundError,
 )
 from app.logging.audit import certificate_fields, client_fields, organization_fields, source_fields, with_changes
+from app.logging.context import organization_in_context
 from app.logging.events import Log
 from app.models.client import ClientCreate
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
@@ -74,7 +75,7 @@ class OrganizationService:
 
             organization = Organization.from_entity(new_org)
 
-        gflog.set_context({"organization_id": str(organization.id)})
+        organization_in_context(organization.id)
         self._log_created(organization)
         return organization
 
