@@ -97,7 +97,7 @@ class OrganizationCertificateService:
             logger,
             Log.CERTIFICATE_CREATED,
             "Certificate created",
-            fields=certificate_fields(organization_id, certificate),
+            fields=certificate_fields(certificate),
         )
         return certificate
 
@@ -147,7 +147,7 @@ class OrganizationCertificateService:
             logger,
             Log.CERTIFICATE_UPDATED,
             "Certificate updated",
-            fields=certificate_fields(organization_id, updated),
+            fields=certificate_fields(updated),
         )
         return updated
 
@@ -177,7 +177,7 @@ class OrganizationCertificateService:
             logger,
             Log.CERTIFICATE_DELETED,
             "Certificate deleted",
-            fields=certificate_fields(organization_id, deleted),
+            fields=certificate_fields(deleted),
         )
         return deleted
 

@@ -38,6 +38,7 @@ def route() -> Iterator[Any]:
             "method": "POST",
             "correlation_id": "corr-1",
             "actor_cn": _ACTOR,
+            "organization_id": "org-1",
         }
     ):
         yield _route
@@ -50,7 +51,6 @@ class TestClientCreated:
             route(
                 Log.CLIENT_CREATED,
                 "created",
-                organization_id="org-1",
                 client_id="client-1",
                 scopes=["nvi:localize", "nvi:read"],
                 certificate_ids=["cert-1"],
@@ -94,7 +94,6 @@ class TestCertificateAssigned:
         routed: Routed = route(
             Log.CLIENT_CERTIFICATE_ASSIGNED,
             "assigned",
-            organization_id="org-1",
             client_id="client-1",
             certificate_id="cert-1",
             certificate_organization_identifier=_OIN,
