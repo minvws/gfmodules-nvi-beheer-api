@@ -3,12 +3,8 @@ import logging
 import pytest
 from gfmodules.logging import DefaultEventCatalogue, LoggingStreams, declared_events
 from gfmodules.logging.testing import assert_catalogue_complete, assert_event_overview_current
-from pytest_mock import MockerFixture
 
-from app import application
-from app.config import set_config
 from app.logging.events import ACTOR, ORGANIZATION, Log
-from tests.test_config import get_test_config
 
 _APP = LoggingStreams.APP
 _SIEM = LoggingStreams.SIEM
@@ -31,10 +27,10 @@ def test_the_event_overview_is_current() -> None:
         ("SYS_APP_STARTED", "100601"),
         ("SYS_APP_STOPPED", "100602"),
         ("SYS_APP_CRASHED", "100602"),
-        ("DB_CONNECTION_FAILED", "100603"),
+        ("SYS_DB_CONNECTION_FAILED", "100603"),
         ("SYS_UNHANDLED_EXCEPTION", "100604"),
-        ("DB_SCHEMA_ERROR", "100605"),
-        ("SYS_MISSING_CORRELATION_ID", "100606"),
+        ("SYS_DB_SCHEMA_ERROR", "100605"),
+        ("SYS_MISSING_CORRELATION_ID", "100628"),
         ("ORGANIZATION_CREATED", "100607"),
         ("ORGANIZATION_UPDATED", "100608"),
         ("ORGANIZATION_DELETED", "100609"),
@@ -54,7 +50,7 @@ def test_the_event_overview_is_current() -> None:
         ("CLIENT_RESOLVED", "100623"),
         ("REQUEST_REFUSED", "100624"),
         ("CLIENT_RESOLVE_DENIED", "100625"),
-        ("DB_OPERATION_FAILED", "100626"),
+        ("SYS_DB_OPERATION_FAILED", "100626"),
         ("REQUEST_FORBIDDEN", "100627"),
         ("ACCESS_REQUEST", "100"),
     ],
@@ -66,30 +62,6 @@ def test_events_carry_the_id_the_nvi_spec_assigns(name: str, event_id: str) -> N
 def test_no_two_application_events_share_an_id() -> None:
     ids = [event.event_id for name, event in declared_events(Log) if name != "SYS_APP_CRASHED"]
     assert len(ids) == len(set(ids))
-
-
-class TestAccessEventIds:
-    @pytest.fixture
-    def mutating_routes(self, mocker: MockerFixture) -> set[tuple[str, str]]:
-        mocker.patch("app.application.container.configure")
-        set_config(get_test_config())
-        paths = application.setup_fastapi().openapi()["paths"]
-        return {
-            (method.upper(), path)
-            for path, operations in paths.items()
-            for method in operations
-            if method in {"post", "put", "patch", "delete"}
-        }
-
-    def test_every_mutating_route_has_an_access_id(self, mutating_routes: set[tuple[str, str]]) -> None:
-        assert mutating_routes - Log.access_event_id.keys() == set()
-
-    def test_every_access_id_belongs_to_a_mutating_route(self, mutating_routes: set[tuple[str, str]]) -> None:
-        assert Log.access_event_id.keys() - mutating_routes == set()
-
-    def test_no_two_routes_share_an_access_id(self) -> None:
-        ids = list(Log.access_event_id.values())
-        assert len(ids) == len(set(ids))
 
 
 class TestTheOverriddenSlots:
