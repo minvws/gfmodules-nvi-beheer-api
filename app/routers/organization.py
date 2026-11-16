@@ -12,7 +12,7 @@ from app.models.organization import (
     OrganizationQueryParams,
     OrganizationUpdate,
 )
-from app.routers.context import organization_id_in_context
+from app.routers.context import organization_in_context
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -34,16 +34,16 @@ def register(
 
 
 @router.get(
-    "/{id}",
-    dependencies=[Depends(organization_id_in_context)],
+    "/{organization_id}",
+    dependencies=[Depends(organization_in_context)],
     response_model=Organization,
     response_model_exclude_none=True,
 )
 def get_by_id(
-    id: UUID,
+    organization_id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    result = service.get_one(id)
+    result = service.get_one(organization_id)
     return result
 
 
@@ -57,24 +57,24 @@ def get_many(
 
 
 @router.put(
-    "/{id}",
-    dependencies=[Depends(organization_id_in_context)],
+    "/{organization_id}",
+    dependencies=[Depends(organization_in_context)],
     response_model=OrganizationUpdate,
     response_model_exclude_none=True,
 )
 def update(
-    id: UUID,
+    organization_id: UUID,
     body: OrganizationUpdate,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    result = service.update_one(id, dto=body)
+    result = service.update_one(organization_id, dto=body)
     return result
 
 
-@router.delete("/{id}", dependencies=[Depends(organization_id_in_context)])
+@router.delete("/{organization_id}", dependencies=[Depends(organization_in_context)])
 def delete(
-    id: UUID,
+    organization_id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    service.delete_one(id)
+    service.delete_one(organization_id)
     return Response(status_code=204)

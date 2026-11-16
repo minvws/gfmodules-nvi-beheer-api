@@ -115,8 +115,8 @@ class Log(_Base):
 
     access_event_id: ClassVar = {
         ("POST", "/organizations"): "100700",
-        ("PUT", "/organizations/{id}"): "100701",
-        ("DELETE", "/organizations/{id}"): "100702",
+        ("PUT", "/organizations/{organization_id}"): "100701",
+        ("DELETE", "/organizations/{organization_id}"): "100702",
         ("POST", "/organizations/{organization_id}/clients"): "100703",
         ("PUT", "/organizations/{organization_id}/clients/{id}"): "100704",
         ("DELETE", "/organizations/{organization_id}/clients/{id}"): "100705",
