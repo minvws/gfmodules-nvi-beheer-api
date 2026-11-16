@@ -5,8 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 
 from app.container import get_organization_source_service
+from app.logging.context import organization_in_context
 from app.models.source import Source, SourceCreate, SourceQueryParams, SourceUpdate
-from app.routers.context import organization_in_context
 from app.services.source.organization_source import OrganizationSourceService
 
 logger = logging.getLogger(__name__)

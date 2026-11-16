@@ -5,8 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 
 from app.container import get_client_certificate_service
+from app.logging.context import organization_in_context
 from app.models.certificates import Certificate, ClientCertificateQueryParams
-from app.routers.context import organization_in_context
 from app.services.certificate.client_certificate import ClientCertificateService
 
 logger = logging.getLogger(__name__)

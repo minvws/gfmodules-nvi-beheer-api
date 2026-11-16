@@ -6,13 +6,13 @@ from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import Response
 
 from app.container import get_organization_service
+from app.logging.context import organization_in_context
 from app.models.organization import (
     Organization,
     OrganizationCreate,
     OrganizationQueryParams,
     OrganizationUpdate,
 )
-from app.routers.context import organization_in_context
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
