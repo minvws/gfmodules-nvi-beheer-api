@@ -8,7 +8,7 @@ from gfmodules.logging import LoggingStreams, bind_context
 from gfmodules.logging.middleware import RequestContextMiddleware
 from gfmodules.logging.testing import CapturedRecords, assert_event_emitted, capture_records, capture_stream
 
-from app.container import get_organization_service
+from app.container import get_client_service, get_org_certificate_service, get_organization_service
 from app.exceptions import EntityHasActiveMembersError, ResolveError
 from app.logging.events import ACTOR, Log
 from app.models.certificates import CertificateCreate, CertificateUpdate
@@ -16,7 +16,9 @@ from app.models.client import ClientCreate, ClientResolveRequest, ClientUpdate
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate, SourceUpdate
+from app.routers.client import router as client_router
 from app.routers.organization import router as organization_router
+from app.routers.organization_certificate import router as organization_certificate_router
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService
@@ -448,3 +450,39 @@ class TestActor:
 
         assert response.status_code == 201
         assert [message[ACTOR.name] for message in messages if "organization_id" in message] == ["beheer.example.nl"]
+
+
+class TestOrganizationContext:
+    def test_every_log_of_a_request_about_an_organization_names_it(
+        self,
+        organization_service: OrganizationService,
+        organization_certificate_service: OrganizationCertificateService,
+        client_service: ClientService,
+    ) -> None:
+        app = FastAPI()
+        for router in (organization_router, organization_certificate_router, client_router):
+            app.include_router(router)
+        app.dependency_overrides[get_organization_service] = lambda: organization_service
+        app.dependency_overrides[get_org_certificate_service] = lambda: organization_certificate_service
+        app.dependency_overrides[get_client_service] = lambda: client_service
+        app.add_middleware(RequestContextMiddleware)
+        api = TestClient(app)
+        created = OrganizationCreate(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME)
+        updated = OrganizationUpdate(external_id=TEST_EXTERNAL_ID, name="Renamed", scopes=[AuthorizationScope.READ])
+        certificate = CertificateCreate(organization_identifier=TEST_OIN, domain=TEST_DOMAIN)
+        client = ClientCreate(name=TEST_CLIENT_NAME, scopes=[AuthorizationScope.READ])
+
+        with (
+            capture_stream(LoggingStreams.APP, "app") as app_messages,
+            capture_stream(LoggingStreams.SIEM, "app") as siem_messages,
+        ):
+            organization_id = api.post("/organizations", json=created.model_dump(mode="json")).json()["id"]
+            responses = [
+                api.put(f"/organizations/{organization_id}", json=updated.model_dump(mode="json")),
+                api.post(f"/organizations/{organization_id}/certificate", json=certificate.model_dump(mode="json")),
+                api.post(f"/organizations/{organization_id}/clients", json=client.model_dump(mode="json")),
+            ]
+
+        assert [response.status_code for response in responses] == [200, 200, 201]
+        assert [message.get("organization_id") for message in siem_messages] == [organization_id] * 4
+        assert [message.get("organization_id") for message in app_messages] == [organization_id] * 8
