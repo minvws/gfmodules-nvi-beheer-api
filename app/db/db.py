@@ -1,7 +1,6 @@
 import logging
 
 from sqlalchemy import StaticPool, create_engine, text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import ConfigDatabase
@@ -47,19 +46,14 @@ class Database:
         logger.info("Generating tables...")
         Base.metadata.create_all(self.engine)
 
-    def is_healthy(self) -> bool:
-        """
-        Check if the database is healthy
-
-        :return: True if the database is healthy, False otherwise
-        """
+    def health_error(self) -> str | None:
         try:
             with Session(self.engine) as session:
                 session.execute(text("SELECT 1"))
-            return True
-        except SQLAlchemyError as e:
-            logger.info("Database is not healthy: %s", e)
-            return False
+        except Exception as e:
+            logger.exception("Database health check failed")
+            return f"Database check failed: {type(e).__name__}"
+        return None
 
     def get_db_session(self, commit: bool = False) -> DbSession:
         return DbSession(self.engine, self._config_database.retry_backoff, commit)
