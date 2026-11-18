@@ -1,6 +1,7 @@
 import logging
 
 from sqlalchemy import StaticPool, create_engine, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.config import ConfigDatabase
@@ -8,6 +9,11 @@ from app.db.models.base import Base
 from app.db.session import DbSession
 
 logger = logging.getLogger(__name__)
+
+
+def failure_reason(error: Exception) -> str:
+    cause = error.orig if isinstance(error, DBAPIError) and error.orig else error
+    return str(cause).partition("\n")[0] or type(cause).__name__
 
 
 class Database:
@@ -52,7 +58,7 @@ class Database:
                 session.execute(text("SELECT 1"))
         except Exception as e:
             logger.exception("Database health check failed")
-            return f"Database check failed: {type(e).__name__}"
+            return f"Database check failed: {failure_reason(e)}"
         return None
 
     def get_db_session(self, commit: bool = False) -> DbSession:

@@ -9,7 +9,7 @@ from app.db.db import Database
 from app.logging.events import Log
 from app.routers.health import router
 
-DATABASE_DOWN = "Database check failed: OperationalError"
+DATABASE_DOWN = "Database check failed: connection refused"
 
 
 def test_health_reports_the_database() -> None:
