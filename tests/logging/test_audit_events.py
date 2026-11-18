@@ -5,6 +5,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gfmodules.logging import LoggingStreams, bind_context
+from gfmodules.logging.formatter import PlainTextFormatter
 from gfmodules.logging.middleware import RequestContextMiddleware
 from gfmodules.logging.testing import CapturedRecords, assert_event_emitted, capture_records, capture_stream
 
@@ -400,6 +401,8 @@ class TestResolveEvents:
             source_id=TEST_SOURCE_ID,
             scopes=response.scopes.split(),
         )
+        resolved = records.for_event(Log.CLIENT_RESOLVED)[0].record
+        assert f"scopes={response.scopes.split()}" in PlainTextFormatter().format(resolved)
 
     @pytest.mark.parametrize(
         "change,reason",

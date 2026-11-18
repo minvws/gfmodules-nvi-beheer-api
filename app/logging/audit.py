@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from app.models.certificates import Certificate
@@ -8,7 +8,7 @@ from app.models.source import Source
 from app.models.ura import UraNumber
 
 
-def scope_names(scopes: list[AuthorizationScope] | None) -> list[str]:
+def scope_names(scopes: Iterable[AuthorizationScope] | None) -> list[str]:
     return sorted(str(scope) for scope in scopes or [])
 
 
