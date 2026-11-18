@@ -21,7 +21,7 @@ from app.db.repository.contexts.organization_context import (
 )
 from app.db.repository.organization import OrganizationRepository
 from app.exceptions import EntityHasActiveMembersError, RecordNotFoundError, ResolveError
-from app.logging.audit import client_fields, resolve_request_fields, with_changes
+from app.logging.audit import client_fields, resolve_request_fields, scope_names, with_changes
 from app.logging.events import Log
 from app.models.client import (
     Client,
@@ -214,12 +214,13 @@ class ClientService:
             if request.source_id is not None and not client.sources:
                 self._deny(request, "source_not_linked")
 
-            scope_names = {s.name for s in client.scopes}
+            granted = {s.name for s in client.scopes}
             if request.source_id is None:
-                scope_names &= SOURCE_INDEPENDENT_SCOPES  # keeps only the elements present in both sets
+                granted &= SOURCE_INDEPENDENT_SCOPES
+            granted_names = scope_names(granted)
 
             response = ClientResolveResponse(
-                scopes=" ".join(sorted(scope_names)),
+                scopes=" ".join(granted_names),
                 organization_name=client.organization.name,
                 matched_domain=client.certificates[0].domain,
             )
@@ -231,7 +232,7 @@ class ClientService:
             fields={
                 **resolve_request_fields(request),
                 "matched_domain": response.matched_domain,
-                "scopes": sorted(scope_names),
+                "scopes": granted_names,
             },
         )
         return response
