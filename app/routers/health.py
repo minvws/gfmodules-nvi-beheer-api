@@ -59,28 +59,26 @@ def ok_or_error(value: bool) -> str:
     },
     tags=["Health"],
 )
-def health(
-    db: Annotated[Database, Depends(get_database)],
-) -> JSONResponse:
+def health(db: Annotated[Database, Depends(get_database)]) -> JSONResponse:
+    logger.debug("Checking application health")
 
-    logger.info("Checking application health")
+    errors = {"database": db.health_error()}
+    components = {name: ok_or_error(error is None) for name, error in errors.items()}
+    healthy = all(error is None for error in errors.values())
 
-    components = {
-        "database": ok_or_error(db.is_healthy()),
-    }
-    healthy = ok_or_error(all(value == "ok" for value in components.values()))
-    content = {"status": healthy, "components": components}
-    if healthy == "ok":
-        return JSONResponse(content=content)
-    unhealthy = [name for name, status in components.items() if status != "ok"]
-    gflog.emit(
-        logger,
-        Log.HEALTH_UNHEALTHY,
-        "Health check unhealthy",
-        fields={
-            "component": ",".join(unhealthy),
-            "status": "error",
-            "error_detail": f"unhealthy components: {', '.join(unhealthy)}",
+    for name, error in errors.items():
+        if error is not None:
+            gflog.emit(
+                logger,
+                Log.HEALTH_UNHEALTHY,
+                "Health check unhealthy",
+                fields={"component": name, "status": "error", "error_detail": error},
+            )
+
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content={
+            "status": ok_or_error(healthy),
+            "components": components,
         },
     )
-    return JSONResponse(status_code=503, content=content)
