@@ -17,9 +17,9 @@ from app.models.client import ClientCreate, ClientResolveRequest, ClientUpdate
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from app.models.scopes import AuthorizationScope
 from app.models.source import SourceCreate, SourceUpdate
-from app.routers.client import router as client_router
-from app.routers.organization import router as organization_router
-from app.routers.organization_certificate import router as organization_certificate_router
+from app.routers.clients.client import router as client_router
+from app.routers.organizations.certificate import router as organization_certificate_router
+from app.routers.organizations.organization import router as organization_router
 from app.services.certificate.client_certificate import ClientCertificateService
 from app.services.certificate.organization_certificate import OrganizationCertificateService
 from app.services.client import ClientService

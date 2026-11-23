@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends
@@ -7,7 +6,6 @@ from app.container import get_client_service
 from app.models.client import ClientResolveRequest, ClientResolveResponse
 from app.services.client import ClientService
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/clients", tags=["Clients"])
 
 

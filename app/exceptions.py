@@ -59,3 +59,10 @@ class ResolveError(DomainError):
 
     reason = "resolve_denied"
     message = "Client authorization does not exist for given parameters"
+
+
+class InvariantViolationError(DomainError):
+    """A general purpose intended to as a guard against certain operations that might break the core domain rules."""
+
+    reason = "core_domain_violation"
+    message = "An unexpected internal state violation occurred while processing the request. No changes were saved to prevent data inconsistency."
